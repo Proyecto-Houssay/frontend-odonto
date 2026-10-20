@@ -29,6 +29,7 @@ const navItems: NavItem[] = [
   { label: 'Odontólogos', to: '/odontologos', icon: Stethoscope },
   { label: 'Turnos', to: '/turnos', icon: Calendar },
   { label: 'Historias Clínicas', to: '/historias-clinicas', icon: ClipboardList },
+  { label: 'Odontograma', to: '/odontograma', icon: ClipboardList },
   { label: 'Gestión de Usuarios', to: '/usuarios', icon: UserCheck },
   { label: 'Informes y Caja', to: '/informes', icon: BarChart3 },
 ]

@@ -30,6 +30,17 @@ El servidor de desarrollo queda disponible en la URL que muestre Vite, normalmen
 | `npm run lint` | Ejecuta Oxlint |
 | `npm run build` | Ejecuta TypeScript y genera el build de producción |
 | `npm run preview` | Sirve localmente el build generado |
+| `npm test` | Ejecuta pruebas del odontograma y generación real de PDF |
+
+## Odontograma académico
+
+Abrir `/odontograma` e ingresar el ID de un paciente existente, o `/pacientes/ID/odontograma`. El enlace **Odontograma** está en el menú. La pantalla en `src/pages/Odontograma.jsx` conserva JavaScript y no reemplaza el módulo de historias clínicas.
+
+Se requiere un JWT real de `ODONTOLOGO` o `ADMINISTRADOR`, obtenido con `POST /api/auth/login` en Swagger. Pegarlo en el campo enmascarado **Token Bearer (solo en memoria)**; el login visual del dashboard no inicia una sesión de API. Seleccionar piezas, consultar la ficha debajo del odontograma, asignar condiciones, revisar el presupuesto, aceptar el consentimiento, dibujar y capturar la firma, guardar y ejecutar **Descargar PDF con Firma**. Solo **Guardado #ID** confirma persistencia; un PDF local se identifica como borrador. Tratamientos y precios son ilustrativos y requieren validación profesional. No hay cobros.
+
+Vite proxifica `/api` a `http://localhost:8080`. Para otro backend de desarrollo: `$env:ODONTO_API_TARGET='http://localhost:18080'; npm run dev -- --port 15173`. En producción, configurar un reverse proxy equivalente. La página también se importa sin router y acepta props opcionales `pacienteId`, `token` y `apiUrl` (por defecto `/api`), sin guardar el token en `localStorage`.
+
+El catálogo y consentimiento `academic-v1` se verifican con la API antes de firmar. Cambiar paciente, piezas o consentimiento invalida la firma. Redimensionar el canvas revoca captura y aceptación para evitar una firma desalineada. Consultar la guía `docs/odontograma-academico.md` del backend para el flujo Swagger → interfaz → GET → Workbench y los límites de la simulación.
 
 ## Estructura principal
 

@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
+import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom'
 import { DashboardLayout } from './components/layout/DashboardLayout'
 import { DashboardHome } from './pages/DashboardHome'
 import { PacientesPage } from './pages/PacientesPage'
@@ -9,6 +10,12 @@ import { UsuariosPage } from './pages/UsuariosPage'
 import { InformesPage } from './pages/InformesPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 
+const Odontograma = lazy(() => import('./pages/Odontograma.jsx'))
+function OdontogramaRoute() {
+  const { pacienteId } = useParams()
+  return <Suspense fallback={<p>Cargando odontograma…</p>}><Odontograma pacienteId={pacienteId} /></Suspense>
+}
+
 export function App() {
   return (
     <BrowserRouter>
@@ -17,6 +24,8 @@ export function App() {
         <Route path="/" element={<DashboardLayout />}>
           <Route index element={<DashboardHome />} />
           <Route path="pacientes" element={<PacientesPage />} />
+          <Route path="odontograma" element={<OdontogramaRoute />} />
+          <Route path="pacientes/:pacienteId/odontograma" element={<OdontogramaRoute />} />
           <Route path="odontologos" element={<OdontologosPage />} />
           <Route path="turnos" element={<TurnosPage />} />
           <Route path="historias-clinicas" element={<HistoriasClinicasPage />} />
