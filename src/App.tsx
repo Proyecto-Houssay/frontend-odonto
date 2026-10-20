@@ -11,9 +11,9 @@ import { InformesPage } from './pages/InformesPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 
 const Odontograma = lazy(() => import('./pages/Odontograma.jsx'))
-function OdontogramaRoute() {
+function OdontogramaRoute({ demoMode, backendMode = false }: { demoMode: boolean; backendMode?: boolean }) {
   const { pacienteId } = useParams()
-  return <Suspense fallback={<p>Cargando odontograma…</p>}><Odontograma pacienteId={pacienteId} /></Suspense>
+  return <Suspense fallback={<p>Cargando odontograma…</p>}><Odontograma pacienteId={pacienteId} demoMode={demoMode} backendMode={backendMode} /></Suspense>
 }
 
 export function App() {
@@ -24,8 +24,9 @@ export function App() {
         <Route path="/" element={<DashboardLayout />}>
           <Route index element={<DashboardHome />} />
           <Route path="pacientes" element={<PacientesPage />} />
-          <Route path="odontograma" element={<OdontogramaRoute />} />
-          <Route path="pacientes/:pacienteId/odontograma" element={<OdontogramaRoute />} />
+          <Route path="odontograma" element={<OdontogramaRoute demoMode />} />
+          <Route path="odontograma/backend" element={<OdontogramaRoute demoMode={false} backendMode />} />
+          <Route path="pacientes/:pacienteId/odontograma" element={<OdontogramaRoute demoMode={false} />} />
           <Route path="odontologos" element={<OdontologosPage />} />
           <Route path="turnos" element={<TurnosPage />} />
           <Route path="historias-clinicas" element={<HistoriasClinicasPage />} />

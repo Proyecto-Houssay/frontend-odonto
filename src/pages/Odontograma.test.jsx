@@ -62,6 +62,37 @@ describe('Odontograma académico', () => {
     expect(screen.getByRole('button', { name: 'Diente 11: Sano' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByTestId('estimate-total')).toHaveTextContent('$0')
   })
+  it('supports a session-only demo flow without contacting the backend', async () => {
+    render(<Odontograma demoMode />)
+    expect(await screen.findByText(/Modo demostración/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Abrir modo de guardado en backend local' })).toHaveAttribute('href', '/odontograma/backend')
+    expect(fetch).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Guardar requiere backend' })).toBeDisabled()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Diente 16: Caries' })).toBeInTheDocument())
+    fireEvent.change(screen.getByRole('combobox', { name: 'Paciente de prueba' }), { target: { value: '9002' } })
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Diente 21: Ausente' })).toBeInTheDocument())
+    expect(screen.getByTestId('estimate-total')).toHaveTextContent('$335.000')
+    fireEvent.change(screen.getByRole('combobox', { name: 'Paciente de prueba' }), { target: { value: '9001' } })
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Diente 16: Caries' })).toBeInTheDocument())
+
+    fireEvent.change(screen.getByLabelText('Agregar paciente temporal'), { target: { value: 'Paciente temporal' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar' }))
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Paciente de prueba' })).toHaveValue('9003'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Diente 11: Sin evaluar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Asignar Caries' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /Acepto el consentimiento/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Dibujar firma de prueba' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Capturar firma' }))
+    expect(screen.getByAltText('Vista previa de la firma capturada')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Descargar PDF con Firma' })).toBeEnabled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Descargar PDF con Firma' }))
+    expect(mocks.pdfSave).toHaveBeenCalledWith('presupuesto_paciente_9003.pdf')
+    expect(mocks.pdfText.mock.calls.flat(2).join(' ')).toContain('DEMO EN NAVEGADOR - BORRADOR NO GUARDADO')
+    expect(mocks.pdfText.mock.calls.flat(2).join(' ')).toContain('Paciente: Paciente temporal')
+    expect(fetch).not.toHaveBeenCalled()
+  })
   it('replaces conditions without duplicates, shows full treatment and total', async () => {
     await mount(); mark()
     expect(screen.getByText('Destrucción del esmalte por bacterias')).toBeInTheDocument()
@@ -117,6 +148,40 @@ describe('Odontograma académico', () => {
     expect(token).toHaveAttribute('type', 'password')
     fireEvent.change(token, { target: { value: 'manual-token' } })
     await screen.findByText(/Catálogo verificado/)
+    expect(localStorage.length).toBe(0)
+  })
+  it('verifies the catalog, then posts the exact DTO with the in-memory JWT only after consent and signature', async () => {
+    fetch.mockImplementation(async (url, options = {}) => {
+      if (String(url).endsWith('/odontograma/catalogo')) return { ok: true, status: 200, json: async () => catalog }
+      return { ok: true, status: 201, json: async () => savedResponse(JSON.parse(options.body)) }
+    })
+    render(<Odontograma backendMode />)
+    fireEvent.change(screen.getByLabelText('ID de paciente'), { target: { value: '7' } })
+    fireEvent.change(screen.getByLabelText('Token Bearer (solo en memoria)'), { target: { value: 'manual-token' } })
+    expect(await screen.findByText('Catálogo verificado')).toBeInTheDocument()
+    expect(screen.getByRole('note')).toHaveTextContent('Una página abierta desde Vercel no puede acceder al backend ni a la base local')
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(fetch.mock.calls[0][0]).toBe('/api/odontograma/catalogo')
+    expect(fetch.mock.calls[0][1].headers.Authorization).toBe('Bearer manual-token')
+
+    mark()
+    const save = screen.getByRole('button', { name: 'Guardar odontograma' })
+    expect(save).toBeDisabled()
+    fireEvent.click(screen.getByRole('checkbox', { name: /Acepto el consentimiento/ }))
+    expect(save).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Dibujar firma de prueba' }))
+    expect(save).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Capturar firma' }))
+    expect(save).toBeEnabled()
+    fireEvent.click(save)
+
+    await screen.findByText(/Guardado #15/)
+    expect(fetch).toHaveBeenCalledTimes(2)
+    const [url, options] = fetch.mock.calls[1]
+    expect(url).toBe('/api/odontograma')
+    expect(options.method).toBe('POST')
+    expect(options.headers).toEqual({ 'Content-Type': 'application/json', Authorization: 'Bearer manual-token' })
+    expect(JSON.parse(options.body)).toEqual({ pacienteId: 7, dientes: [{ numero: 11, afeccion: 'caries' }], consentimientoAceptado: true, versionConsentimiento: VERSION, firmaBase64: mocks.png })
     expect(localStorage.length).toBe(0)
   })
   it('saves once with canonical input and downloads server snapshot', async () => {
