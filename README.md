@@ -4,13 +4,20 @@ Interfaz web del sistema de gestión odontológica Novadent. Incluye el dashboar
 
 ## Tecnologías
 
-- React 19 y TypeScript
-- Vite
-- Tailwind CSS v4
-- React Router DOM v7
-- Lucide React
-- Vitest y Testing Library
+Versiones declaradas en `package.json` de la rama documentada:
 
+| Tecnología | Versión | Uso |
+|---|---|---|
+| React / React DOM | `^19.2.8` | Interfaz |
+| TypeScript | `~6.0.2` | Tipado estático |
+| Vite | `^8.3.0` | Servidor y build |
+| Tailwind CSS | `^4.3.3` | Estilos |
+| React Router DOM | `^7.18.3` | Navegación |
+| Lucide React | `^1.46.0` | Iconografía |
+| Vitest | `^5.0.5` | Pruebas |
+| Testing Library | `^16.3.3` / `^14.6.8` | Pruebas de interfaz |
+| jsPDF | `^4.2.1` | PDF académico |
+| React Signature Canvas | `^1.1.0-alpha.2` | Firma demostrativa |
 ## Requisitos
 
 - Node.js y npm
@@ -101,6 +108,10 @@ No incluir contraseñas, tokens, archivos `.env` ni datos personales reales en c
 
 - [Alcance del dashboard de Braian](docs/braian-dashboard.md)
 - [Wiki del frontend Novadent](https://github.com/Proyecto-Houssay/frontend-odonto/wiki)
+- [Arquitectura](https://github.com/Proyecto-Houssay/frontend-odonto/wiki/Arquitectura-Frontend)
+- [Tecnologías y ejecución](https://github.com/Proyecto-Houssay/frontend-odonto/wiki/Tecnologias-y-Ejecucion)
+- [Product Backlog](https://github.com/Proyecto-Houssay/frontend-odonto/wiki/Product-Backlog)
+- [Flujo de trabajo](https://github.com/Proyecto-Houssay/frontend-odonto/wiki/Flujo-de-Trabajo)
 - [Repositorio del backend](https://github.com/Proyecto-Houssay/backend-odonto)
 
-La Wiki del frontend requiere que se cree su primera página desde GitHub; los borradores de Inicio, Arquitectura y Flujo de trabajo están preparados en el PR de documentación.
+La Wiki está publicada y organiza la arquitectura, el stack, el backlog y los sprints del frontend.
