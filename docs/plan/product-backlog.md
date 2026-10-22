@@ -7,7 +7,7 @@
 ## Resumen del estado
 
 - Sprint 0: 2 issues abiertos, 0 cerrados.
-- Sprint 1: 6 issues abiertos, 1 cerrado. Falta completar el Dashboard navegable antes de entrar al trabajo de módulos.
+- Sprint 1: 7 issues abiertos, 1 cerrado; se agregó TR-28 para quitar metadatos de planificación y cifras mock de la interfaz. Falta completar el Dashboard navegable antes de entrar al trabajo de módulos.
 - Sprints 2–6: organizados como milestones nuevos; issues de trabajo listados debajo.
 - Ningún milestone tiene fechas comprometidas.
 
