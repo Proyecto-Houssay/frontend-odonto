@@ -1,7 +1,7 @@
 # Sprint 1 — Funcionalidades iniciales
 
 **Milestone:** Sprint 1 - Funcionalidades iniciales  
-**Estado actual:** incompleto — 6 issues abiertos, 1 cerrado  
+**Estado actual:** incompleto — 7 issues abiertos, 1 cerrado  
 **Objetivo:** completar el armazón de la aplicación: layout, rutas y módulos navegables.
 
 ## Historias y tareas
@@ -13,6 +13,7 @@
 - [#5](https://github.com/Proyecto-Houssay/frontend-odonto/issues/5) — TR-04: Sidebar y navegación activa.
 - [#6](https://github.com/Proyecto-Houssay/frontend-odonto/issues/6) — TR-05: DashboardLayout con Outlet.
 - [#7](https://github.com/Proyecto-Houssay/frontend-odonto/issues/7) — TR-06: vistas placeholder para módulos.
+- [#44](https://github.com/Proyecto-Houssay/frontend-odonto/issues/44) — TR-28: retirar metadatos de sprint/equipo y cifras mock del Dashboard.
 
 ## Qué falta para darlo por terminado
 
