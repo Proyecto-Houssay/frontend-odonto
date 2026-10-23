@@ -234,7 +234,7 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
     try {
       const response = await fetch(`${baseUrl}/odontograma`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` }, body: JSON.stringify(body) })
       if (response.status !== 201) {
-        const messages = { 400: 'Revise los datos, el consentimiento y la firma.', 401: 'El token falta o venció; inicie sesión en Swagger.',
+        const messages = { 400: 'Revise los datos, el consentimiento y la firma.', 401: 'La sesión venció; vuelva a iniciar sesión en el frontend.',
           403: 'Se requiere el rol ODONTOLOGO o ADMINISTRADOR.', 404: 'El paciente no existe.' }
         throw new Error(messages[response.status] || 'El servidor no confirmó el guardado. No se reintentó automáticamente.')
       }
