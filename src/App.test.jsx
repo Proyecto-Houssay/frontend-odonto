@@ -13,16 +13,20 @@ vi.mock('react-signature-canvas', async () => {
 
 afterEach(() => {
   cleanup()
+  sessionStorage.clear()
   window.history.replaceState({}, '', '/')
 })
 
 describe('odontogram routes', () => {
-  it('exposes the explicit API-backed route with manual credentials and local-only guidance', async () => {
+  it('exposes the explicit API-backed route using the app session and local-only guidance', async () => {
+    sessionStorage.setItem('novadent.auth.session', JSON.stringify({
+      token: 'test-token', tokenType: 'Bearer', username: 'admin', expiresAt: Date.now() + 60000,
+    }))
     window.history.replaceState({}, '', '/odontograma/backend')
     render(<App />)
 
     expect(await screen.findByLabelText('ID de paciente')).toBeInTheDocument()
-    expect(screen.getByLabelText('Token Bearer (solo en memoria)')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Token Bearer (solo en memoria)')).not.toBeInTheDocument()
     expect(screen.getByRole('note')).toHaveTextContent('Una página abierta desde Vercel no puede acceder al backend ni a la base local')
     expect(screen.queryByText(/Modo demostración/)).not.toBeInTheDocument()
   })

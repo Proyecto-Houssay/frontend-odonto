@@ -69,6 +69,16 @@ En producción se necesita un backend accesible por HTTPS y un reverse proxy o c
 
 Las vistas de módulos se completan junto con sus historias de usuario y tareas técnicas. La estructura de rutas y el layout son compartidos.
 
+
+## Inicio de sesión y pacientes
+
+Al abrir el frontend, iniciá sesión con una cuenta existente o usá **Crear una cuenta**. El alta pública llama `POST /api/auth/register`; si SMTP no está configurado, la cuenta igualmente se crea y la pantalla indica claramente que el correo no se envió. La aplicación llama `POST /api/auth/login` y conserva el JWT en `sessionStorage` de esta pestaña hasta cerrar sesión o vencer (15 minutos). El botón **Cerrar sesión** elimina esa sesión.
+
+**Recuperar contraseña:** elegí **¿Olvidaste tu contraseña?**, ingresá el correo y seguí el enlace recibido para establecer una clave nueva. El mensaje no confirma si el correo pertenece a una cuenta. Para que los correos lleguen, configurá SMTP en el `.env` privado del backend y reinicialo; la guía está en el README del backend. Sin SMTP, la pantalla avisa que el envío no está configurado y no simula que se mandó un correo. El enlace por defecto apunta a `http://localhost:5174`; si Vite usa otro puerto, definí `APP_FRONTEND_BASE_URL` en el entorno del backend.
+
+La pantalla **Pacientes** usa `GET`, `POST`, `PUT` y `DELETE /api/pacientes`, con los campos y validaciones que exige el backend. Crear y editar vuelven a cargar la lista para mostrar los datos confirmados por la API. Un DNI repetido o un paciente con registros vinculados se informa con el mensaje devuelto por el backend.
+
+
 ## Odontograma académico
 
 La vista en `src/pages/Odontograma.jsx` es una demostración y no reemplaza la historia clínica. Para probarla, usar un paciente existente y un JWT vigente de rol `ODONTOLOGO` o `ADMINISTRADOR`, obtenido mediante `POST /api/auth/login` en Swagger. El login visual del dashboard no crea una sesión de API.

@@ -1,14 +1,14 @@
 import React from 'react'
 import { Menu, LogOut, Bell } from 'lucide-react'
+import { useAuth } from '../../auth/useAuth'
 
 interface NavbarProps {
   onToggleSidebar: () => void
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
-  const handleLogout = () => {
-    alert('Simulación: Sesión cerrada.')
-  }
+  const { session, logout } = useAuth()
+  const initials = (session?.username || 'U').slice(0, 2).toUpperCase()
 
   return (
     <header className="h-16 bg-white border-b border-slate-200 sticky top-0 z-30 flex items-center justify-between px-4 lg:px-8">
@@ -50,14 +50,14 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
         {/* Datos de usuario */}
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 font-semibold flex items-center justify-center text-sm">
-            BA
+            {initials}
           </div>
           <div className="hidden md:block text-left">
             <span className="block text-sm font-medium text-slate-700 leading-tight">
-              Braian Aguilera
+              {session?.username}
             </span>
             <span className="block text-xs text-slate-500">
-              Administrador
+              Sesión activa
             </span>
           </div>
         </div>
@@ -65,7 +65,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
         {/* Botón Salir */}
         <button
           type="button"
-          onClick={handleLogout}
+          onClick={logout}
           className="p-2 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors ml-1"
           title="Cerrar sesión"
           aria-label="Cerrar sesión"

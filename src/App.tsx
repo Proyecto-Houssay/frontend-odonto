@@ -1,7 +1,10 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom'
+import { AuthProvider } from './auth/AuthProvider'
+import { useAuth } from './auth/useAuth'
 import { DashboardLayout } from './components/layout/DashboardLayout'
 import { DashboardHome } from './pages/DashboardHome'
+import { LoginPage } from './pages/LoginPage'
 import { PacientesPage } from './pages/PacientesPage'
 import { TurnosPage } from './pages/TurnosPage'
 import { OdontologosPage } from './pages/OdontologosPage'
@@ -13,30 +16,46 @@ import { NotFoundPage } from './pages/NotFoundPage'
 const Odontograma = lazy(() => import('./pages/Odontograma.jsx'))
 function OdontogramaRoute({ demoMode, backendMode = false }: { demoMode: boolean; backendMode?: boolean }) {
   const { pacienteId } = useParams()
-  return <Suspense fallback={<p>Cargando odontograma…</p>}><Odontograma pacienteId={pacienteId} demoMode={demoMode} backendMode={backendMode} /></Suspense>
+  const { session } = useAuth()
+  return <Suspense fallback={<p>Cargando odontograma…</p>}><Odontograma pacienteId={pacienteId} token={session?.token || ''} demoMode={demoMode} backendMode={backendMode} /></Suspense>
+}
+
+function AppRoutes() {
+  const { session, logout } = useAuth()
+  const hasPasswordResetToken = new URLSearchParams(window.location.search).has('token')
+
+  useEffect(() => {
+    if (hasPasswordResetToken && session) logout()
+  }, [hasPasswordResetToken, session, logout])
+
+  if (!session || hasPasswordResetToken) return <LoginPage />
+
+  return (
+    <Routes>
+      <Route path="/" element={<DashboardLayout />}>
+        <Route index element={<DashboardHome />} />
+        <Route path="pacientes" element={<PacientesPage />} />
+        <Route path="odontograma" element={<OdontogramaRoute demoMode={false} backendMode />} />
+        <Route path="odontograma/backend" element={<OdontogramaRoute demoMode={false} backendMode />} />
+        <Route path="odontograma/demo" element={<OdontogramaRoute demoMode />} />
+        <Route path="pacientes/:pacienteId/odontograma" element={<OdontogramaRoute demoMode={false} />} />
+        <Route path="odontologos" element={<OdontologosPage />} />
+        <Route path="turnos" element={<TurnosPage />} />
+        <Route path="historias-clinicas" element={<HistoriasClinicasPage />} />
+        <Route path="usuarios" element={<UsuariosPage />} />
+        <Route path="informes" element={<InformesPage />} />
+        <Route path="*" element={<NotFoundPage />} />
+      </Route>
+    </Routes>
+  )
 }
 
 export function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        {/* Ruta raíz con Layout contenedor y Outlet */}
-        <Route path="/" element={<DashboardLayout />}>
-          <Route index element={<DashboardHome />} />
-          <Route path="pacientes" element={<PacientesPage />} />
-          <Route path="odontograma" element={<OdontogramaRoute demoMode />} />
-          <Route path="odontograma/backend" element={<OdontogramaRoute demoMode={false} backendMode />} />
-          <Route path="pacientes/:pacienteId/odontograma" element={<OdontogramaRoute demoMode={false} />} />
-          <Route path="odontologos" element={<OdontologosPage />} />
-          <Route path="turnos" element={<TurnosPage />} />
-          <Route path="historias-clinicas" element={<HistoriasClinicasPage />} />
-          <Route path="usuarios" element={<UsuariosPage />} />
-          <Route path="informes" element={<InformesPage />} />
-        </Route>
-
-        {/* Ruta para capturar cualquier enlace no encontrado (404) */}
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
     </BrowserRouter>
   )
 }
