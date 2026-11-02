@@ -8,6 +8,7 @@ import { OdontologosPage } from './pages/OdontologosPage'
 import { HistoriasClinicasPage } from './pages/HistoriasClinicasPage'
 import { UsuariosPage } from './pages/UsuariosPage'
 import { InformesPage } from './pages/InformesPage'
+import { TeletriajePage } from './pages/TeletriajePage'
 import { NotFoundPage } from './pages/NotFoundPage'
 
 const Odontograma = lazy(() => import('./pages/Odontograma.jsx'))
@@ -29,6 +30,7 @@ export function App() {
           <Route path="pacientes/:pacienteId/odontograma" element={<OdontogramaRoute demoMode={false} />} />
           <Route path="odontologos" element={<OdontologosPage />} />
           <Route path="turnos" element={<TurnosPage />} />
+          <Route path="teletriaje" element={<TeletriajePage />} />
           <Route path="historias-clinicas" element={<HistoriasClinicasPage />} />
           <Route path="usuarios" element={<UsuariosPage />} />
           <Route path="informes" element={<InformesPage />} />

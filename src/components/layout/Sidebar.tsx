@@ -9,7 +9,8 @@ import {
   UserCheck,
   BarChart3,
   X,
-  HeartPulse
+  HeartPulse,
+  Video
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -28,6 +29,7 @@ const navItems: NavItem[] = [
   { label: 'Pacientes', to: '/pacientes', icon: Users },
   { label: 'Odontólogos', to: '/odontologos', icon: Stethoscope },
   { label: 'Turnos', to: '/turnos', icon: Calendar },
+  { label: 'Teletriaje', to: '/teletriaje', icon: Video },
   { label: 'Historias Clínicas', to: '/historias-clinicas', icon: ClipboardList },
   { label: 'Odontograma', to: '/odontograma', icon: ClipboardList },
   { label: 'Gestión de Usuarios', to: '/usuarios', icon: UserCheck },

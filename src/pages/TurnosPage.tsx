@@ -14,13 +14,21 @@ export const TurnosPage: React.FC = () => {
             Agenda médica, asignación de citas y disponibilidad de consultorios.
           </p>
         </div>
-        <button
-          type="button"
-          className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2.5 rounded-xl shadow-xs transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          Nuevo Turno
-        </button>
+        <div className="flex items-center gap-2">
+          <a
+            href="/teletriaje"
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2.5 rounded-xl shadow-xs transition-colors text-sm"
+          >
+            Ir a Teletriaje Prioritario
+          </a>
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2.5 rounded-xl shadow-xs transition-colors text-sm"
+          >
+            <Plus className="w-5 h-5" />
+            Nuevo Turno
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center">
