@@ -9,8 +9,11 @@ import {
   UserCheck,
   BarChart3,
   X,
-  HeartPulse
+  HeartPulse,
+  MessageCircle
 } from 'lucide-react'
+import { useAuth } from '../../auth/useAuth'
+import type { AppRole } from '../../auth/context'
 
 interface SidebarProps {
   isOpen: boolean
@@ -21,20 +24,28 @@ interface NavItem {
   label: string
   to: string
   icon: React.ElementType
+  roles: AppRole[]
 }
 
+const staffRoles: AppRole[] = ['ADMINISTRADOR', 'ODONTOLOGO', 'RECEPCIONISTA']
+const clinicalRoles: AppRole[] = ['ADMINISTRADOR', 'ODONTOLOGO']
+
 const navItems: NavItem[] = [
-  { label: 'Inicio', to: '/', icon: LayoutDashboard },
-  { label: 'Pacientes', to: '/pacientes', icon: Users },
-  { label: 'Odontólogos', to: '/odontologos', icon: Stethoscope },
-  { label: 'Turnos', to: '/turnos', icon: Calendar },
-  { label: 'Historias Clínicas', to: '/historias-clinicas', icon: ClipboardList },
-  { label: 'Odontograma', to: '/odontograma', icon: ClipboardList },
-  { label: 'Gestión de Usuarios', to: '/usuarios', icon: UserCheck },
-  { label: 'Informes y Caja', to: '/informes', icon: BarChart3 },
+  { label: 'Inicio', to: '/', icon: LayoutDashboard, roles: staffRoles },
+  { label: 'Pacientes', to: '/pacientes', icon: Users, roles: staffRoles },
+  { label: 'Odontólogos', to: '/odontologos', icon: Stethoscope, roles: staffRoles },
+  { label: 'Turnos', to: '/turnos', icon: Calendar, roles: staffRoles },
+  { label: 'Historias Clínicas', to: '/historias-clinicas', icon: ClipboardList, roles: clinicalRoles },
+  { label: 'Odontograma', to: '/odontograma', icon: ClipboardList, roles: clinicalRoles },
+  { label: 'Gestión de Usuarios', to: '/usuarios', icon: UserCheck, roles: ['ADMINISTRADOR'] },
+  { label: 'Informes (demo)', to: '/informes', icon: BarChart3, roles: ['ADMINISTRADOR'] },
+  { label: 'Asistente IA', to: '/chatbot', icon: MessageCircle, roles: ['ADMINISTRADOR', 'PACIENTE'] },
 ]
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
+  const { session } = useAuth()
+  const visibleNavItems = navItems.filter((item) => session && item.roles.includes(session.role))
+
   return (
     <>
       {/* Backdrop para móviles */}
@@ -78,7 +89,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           <p className="px-3 text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
             Módulos del Sistema
           </p>
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon
             return (
               <NavLink

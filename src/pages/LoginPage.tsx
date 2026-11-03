@@ -82,7 +82,7 @@ export function LoginPage() {
     }
   }
 
-  const heading = mode === 'register' ? 'Crear cuenta de acceso'
+  const heading = mode === 'register' ? 'Crear cuenta de paciente'
     : mode === 'forgot' ? 'Recuperar contraseña'
       : mode === 'reset' ? 'Restablecer contraseña'
         : mode === 'reset-success' ? 'Contraseña actualizada'
@@ -112,7 +112,7 @@ export function LoginPage() {
           <>
             <p className="mb-6 text-sm text-slate-600">
               {mode === 'login' && 'Usá la cuenta registrada en el backend para continuar.'}
-              {mode === 'register' && 'Creá una cuenta para acceder al sistema académico Novadent.'}
+              {mode === 'register' && 'Creá una cuenta de paciente para consultar el asistente de Novadent.'}
               {mode === 'forgot' && 'Ingresá el correo asociado a tu cuenta. Si corresponde, te enviaremos un enlace.'}
               {mode === 'reset' && 'Elegí una contraseña nueva para recuperar el acceso a tu cuenta.'}
             </p>

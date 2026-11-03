@@ -1,19 +1,23 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { apiRequest } from '../lib/api'
-import { AUTH_SESSION_KEY, AuthContext, type AuthSession } from './context'
+import { AUTH_SESSION_KEY, AuthContext, type AppRole, type AuthSession } from './context'
 
 type LoginResponse = {
   token: string
   tokenType: string
   expiresIn: number
+  role: AppRole
 }
+
+const appRoles: AppRole[] = ['ADMINISTRADOR', 'ODONTOLOGO', 'RECEPCIONISTA', 'PACIENTE']
 
 function readStoredSession(): AuthSession | null {
   try {
     const raw = sessionStorage.getItem(AUTH_SESSION_KEY)
     if (!raw) return null
     const stored = JSON.parse(raw) as AuthSession
-    if (!stored.token || !stored.username || !Number.isFinite(stored.expiresAt) || stored.expiresAt <= Date.now()) {
+    if (!stored.token || !stored.username || !appRoles.includes(stored.role)
+      || !Number.isFinite(stored.expiresAt) || stored.expiresAt <= Date.now()) {
       sessionStorage.removeItem(AUTH_SESSION_KEY)
       return null
     }
@@ -37,13 +41,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       method: 'POST',
       body: { usernameOrEmail, password },
     })
-    if (!response.token || !Number.isFinite(response.expiresIn) || response.expiresIn <= 0) {
+    if (!response.token || !appRoles.includes(response.role)
+      || !Number.isFinite(response.expiresIn) || response.expiresIn <= 0) {
       throw new Error('El backend respondió sin un token de sesión válido.')
     }
     setSession({
       token: response.token,
       tokenType: response.tokenType || 'Bearer',
       username: usernameOrEmail,
+      role: response.role,
       expiresAt: Date.now() + response.expiresIn * 1000,
     })
   }, [])

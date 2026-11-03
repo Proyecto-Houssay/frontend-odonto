@@ -68,7 +68,7 @@ describe('account access', () => {
   it('submits a new password with the one-time token from the reset link', async () => {
     window.history.replaceState({}, '', '/?token=one-time-token')
     sessionStorage.setItem('novadent.auth.session', JSON.stringify({
-      token: 'old-session-token', tokenType: 'Bearer', username: 'ana', expiresAt: Date.now() + 60_000,
+      token: 'old-session-token', tokenType: 'Bearer', username: 'ana', role: 'PACIENTE', expiresAt: Date.now() + 60_000,
     }))
     fetchMock.mockResolvedValueOnce(response(null, 204))
     vi.stubGlobal('fetch', fetchMock)

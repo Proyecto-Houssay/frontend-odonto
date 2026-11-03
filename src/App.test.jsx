@@ -20,7 +20,7 @@ afterEach(() => {
 describe('odontogram routes', () => {
   it('exposes the explicit API-backed route using the app session and local-only guidance', async () => {
     sessionStorage.setItem('novadent.auth.session', JSON.stringify({
-      token: 'test-token', tokenType: 'Bearer', username: 'admin', expiresAt: Date.now() + 60000,
+      token: 'test-token', tokenType: 'Bearer', username: 'admin', role: 'ADMINISTRADOR', expiresAt: Date.now() + 60000,
     }))
     window.history.replaceState({}, '', '/odontograma/backend')
     render(<App />)
