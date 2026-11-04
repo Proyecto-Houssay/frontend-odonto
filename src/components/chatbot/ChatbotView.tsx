@@ -28,13 +28,13 @@ export const ChatbotView: React.FC<{ compact?: boolean }> = ({ compact = false }
     {
       id: 'welcome',
       role: 'assistant',
-      text: '¡Hola! Soy el asistente inteligente de Clínica Novadent con tecnología RAG (Retrieval-Augmented Generation).\n\nEstoy conectado al nomenclador arancelario, convenios de obras sociales (OSDE, Swiss Medical, Galeno, IOMA, PAMI) y a nuestros protocolos clínicos de urgencia 24/7.\n\n¿En qué te puedo asesorar hoy?',
+      text: '¡Hola! Te doy la bienvenida al Asistente Virtual de Clínica Novadent 🦷✨\n\nEstoy disponible las 24 horas para ayudarte y orientarte con:\n• 🚨 **Dolor o urgencias dentales** (muelas de juicio, traumatismos, inflamación aguda).\n• 💲 **Precios y coberturas** de obras sociales (OSDE, Swiss Medical, Galeno, IOMA, PAMI) o aranceles particulares.\n• 📅 **Turnos disponibles** y cómo anotarte en nuestra lista de espera inteligente si la agenda está completa.\n\n¿En qué te puedo asesorar hoy?',
       timestamp: new Date(),
       intencion: 'consulta_general',
       accionesSugeridas: [
         'Me duele la muela de juicio hace 3 días',
         '¿Cuánto sale una limpieza con OSDE?',
-        '¿Cómo funcionan los turnos de urgencia?'
+        '¿Qué hago si se me cayó un diente por un golpe?'
       ]
     }
   ])
@@ -155,13 +155,13 @@ export const ChatbotView: React.FC<{ compact?: boolean }> = ({ compact = false }
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="font-bold text-base tracking-tight text-white">Novadent AI Assistant</h2>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-400/30">
-                RAG Engine
+              <h2 className="font-bold text-base tracking-tight text-white">Asistente Virtual Novadent</h2>
+              <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                En Línea 24/7
               </span>
             </div>
             <p className="text-xs text-slate-300 flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-amber-400" /> Spring AI + Nomenclador Clínico Oficial
+              <Sparkles className="w-3 h-3 text-amber-400" /> Triage de Urgencias y Precios de Obra Social
             </p>
           </div>
         </div>
