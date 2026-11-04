@@ -63,7 +63,8 @@ En producción se necesita un backend accesible por HTTPS y un reverse proxy o c
 | `/turnos` | Turnos | Vista del módulo |
 | `/historias-clinicas` | Historias clínicas | Vista del módulo |
 | `/usuarios` | Usuarios | Vista del módulo |
-| `/informes` | Informes y caja | Placeholder |
+| `/informes` | Informes operativos | Datos de demostración (solo administración) |
+| `/chatbot` | Asistente IA | Chat RAG con citas (paciente y administración) |
 | `/odontograma` | Odontograma académico | Integración demostrativa |
 | `/pacientes/:pacienteId/odontograma` | Odontograma de paciente | Integración demostrativa |
 
@@ -104,6 +105,10 @@ docs/
 ## Trabajo con el backend
 
 La API debe estar levantada localmente para usar las funciones conectadas. Confirmar las rutas y roles vigentes en Swagger antes de integrar un módulo. Manejar los estados de carga, vacío, error, validación, falta de autorización y éxito; no reemplazar silenciosamente errores de API con mocks.
+
+Los informes operativos del prototipo muestran cifras estáticas de demostración, claramente marcadas. No se consultan ni se guardan en el backend. Finanzas, cobros y caja quedaron fuera del alcance.
+
+Las cuentas creadas desde el registro público reciben el rol `PACIENTE` y solo pueden usar el asistente. Los informes y la gestión de usuarios se muestran únicamente a `ADMINISTRADOR`; el backend también valida esos permisos.
 
 No incluir contraseñas, tokens, archivos `.env` ni datos personales reales en commits.
 

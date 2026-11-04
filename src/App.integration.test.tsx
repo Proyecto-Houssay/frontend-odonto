@@ -54,7 +54,7 @@ afterEach(() => {
 
 describe('frontend backed by the local API', () => {
   it('logs in against Spring Boot, keeps the session for this tab, and logs out', async () => {
-    fetchMock.mockResolvedValueOnce(response({ token: 'jwt-from-backend', tokenType: 'Bearer', expiresIn: 900 }))
+    fetchMock.mockResolvedValueOnce(response({ token: 'jwt-from-backend', tokenType: 'Bearer', expiresIn: 900, role: 'ADMINISTRADOR' }))
     vi.stubGlobal('fetch', fetchMock)
 
     await login()
@@ -73,7 +73,7 @@ describe('frontend backed by the local API', () => {
 
   it('lists patients and creates one through the API contract', async () => {
     fetchMock
-      .mockResolvedValueOnce(response({ token: 'jwt-from-backend', tokenType: 'Bearer', expiresIn: 900 }))
+      .mockResolvedValueOnce(response({ token: 'jwt-from-backend', tokenType: 'Bearer', expiresIn: 900, role: 'ADMINISTRADOR' }))
       .mockResolvedValueOnce(response([patient]))
       .mockResolvedValueOnce(response('Paciente registrado correctamente'))
       .mockResolvedValueOnce(response([{ ...patient, id: 2, nombre: 'Martino', apellido: 'Costigliolo' }]))
@@ -103,7 +103,7 @@ describe('frontend backed by the local API', () => {
 
   it('updates and deletes patients through PUT and DELETE', async () => {
     fetchMock
-      .mockResolvedValueOnce(response({ token: 'jwt-from-backend', tokenType: 'Bearer', expiresIn: 900 }))
+      .mockResolvedValueOnce(response({ token: 'jwt-from-backend', tokenType: 'Bearer', expiresIn: 900, role: 'ADMINISTRADOR' }))
       .mockResolvedValueOnce(response([patient]))
       .mockResolvedValueOnce(response({ ...patient, nombre: 'Ana María' }))
       .mockResolvedValueOnce(response([ { ...patient, nombre: 'Ana María' } ]))
@@ -130,7 +130,7 @@ describe('frontend backed by the local API', () => {
   it('passes the authenticated token to the backend odontogram without asking for it again', async () => {
     const catalog = { versionCatalogo: VERSION, versionConsentimiento: VERSION, textoConsentimiento: CONSENT_TEXT, afecciones: CATALOG }
     fetchMock
-      .mockResolvedValueOnce(response({ token: 'jwt-from-backend', tokenType: 'Bearer', expiresIn: 900 }))
+      .mockResolvedValueOnce(response({ token: 'jwt-from-backend', tokenType: 'Bearer', expiresIn: 900, role: 'ADMINISTRADOR' }))
       .mockResolvedValueOnce(response(catalog))
     vi.stubGlobal('fetch', fetchMock)
 
@@ -143,5 +143,52 @@ describe('frontend backed by the local API', () => {
     expect(fetchMock.mock.calls[1][0]).toBe('/api/odontograma/catalogo')
     expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe('Bearer jwt-from-backend')
     expect(screen.queryByLabelText('Token Bearer (solo en memoria)')).not.toBeInTheDocument()
+  })
+
+  it('limits a patient to the chatbot and sends the authenticated request to RAG', async () => {
+    fetchMock
+      .mockResolvedValueOnce(response({ token: 'patient-jwt', tokenType: 'Bearer', expiresIn: 900, role: 'PACIENTE' }))
+      .mockResolvedValueOnce(response({
+        respuesta: 'La clínica atiende de lunes a viernes.',
+        intencion: 'consulta_general',
+        timestamp: '2026-11-02T12:00:00',
+        citas: [{ id: 'faq-1', documento: 'faq.md — Horarios', version: '1', fragmento: 'Lunes a viernes de 9 a 17.' }],
+      }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    window.history.replaceState({}, '', '/informes')
+    render(<App />)
+    fireEvent.change(screen.getByLabelText('Usuario o correo electrónico'), { target: { value: 'ana' } })
+    fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'demo-password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Ingresar' }))
+
+    expect(await screen.findByRole('heading', { name: 'Consultas con fuentes' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Asistente IA' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Informes (demo)' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Gestión de Usuarios' })).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Tu pregunta'), { target: { value: '¿Qué horarios tienen?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar' }))
+
+    expect(await screen.findByText('La clínica atiende de lunes a viernes.')).toBeInTheDocument()
+    expect(screen.getByText('faq.md — Horarios · versión 1')).toBeInTheDocument()
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/chatbot/ask')
+    expect(fetchMock.mock.calls[1][1].method).toBe('POST')
+    expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe('Bearer patient-jwt')
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ mensaje: '¿Qué horarios tienen?' })
+  })
+
+  it('shows only clearly labeled operational demo values in reports', async () => {
+    fetchMock.mockResolvedValueOnce(response({ token: 'admin-jwt', tokenType: 'Bearer', expiresIn: 900, role: 'ADMINISTRADOR' }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await login()
+    fireEvent.click(screen.getByRole('link', { name: 'Informes (demo)' }))
+
+    expect(await screen.findByRole('heading', { name: 'Informes operativos' })).toBeInTheDocument()
+    expect(screen.getByText('Datos de ejemplo')).toBeInTheDocument()
+    expect(screen.getByRole('note')).toHaveTextContent('no se consultan ni se guardan en el backend')
+    expect(screen.getByText(/Finanzas, cobros y caja quedaron fuera del alcance actual/)).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })

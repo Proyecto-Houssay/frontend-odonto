@@ -2,10 +2,13 @@ import { createContext } from 'react'
 
 export const AUTH_SESSION_KEY = 'novadent.auth.session'
 
+export type AppRole = 'ADMINISTRADOR' | 'ODONTOLOGO' | 'RECEPCIONISTA' | 'PACIENTE'
+
 export type AuthSession = {
   token: string
   tokenType: string
   username: string
+  role: AppRole
   expiresAt: number
 }
 
