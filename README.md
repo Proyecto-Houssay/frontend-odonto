@@ -20,14 +20,15 @@ El archivo `.env.local` usa `VITE_API_BASE_URL` con la URL raíz del backend, po
 
 ## Rutas
 
-- `/chatbot` — consulta el endpoint real `POST /api/chatbot/ask`, muestra documentos, versiones y fragmentos citados, y representa carga, error y falta de evidencia. No crea respuestas de respaldo si el backend falla.
-- `/informes` — consulta inventario persistido, turnos por período y resumen anual mediante `/api/reports/*`.
+- `/ingresar` — obtiene una sesión del backend y la conserva durante una hora o hasta cerrar sesión.
+- `/chatbot` — solo PATIENT y ADMIN pueden consultar `POST /api/chatbot/ask`; muestra documentos, versiones y fragmentos citados.
+- `/informes` — ADMIN, RECEPCIONISTA y ODONTOLOGO consultan datos; ADMIN puede registrar/editar insumos y registrar ingresos/egresos. Las vistas y acciones siguen los permisos que valida el backend.
 
-El backend de esta rama aún no ofrece autenticación real con roles; estas vistas no constituyen un portal autenticado ni informes protegidos. No deben exponerse como tales hasta integrar el control de acceso del backend.
+El backend debe tener configurados `AUTH_JWT_SECRET` (32 bytes como mínimo) y las credenciales del rol que ingresa. No hay usuarios o contraseñas por defecto; consultá el README del backend para las variables requeridas. La interfaz conserva el token solo en `sessionStorage` y lo envía como bearer en las llamadas protegidas.
 
 ## Alcance de informes
 
-Ganancias y cobros no se muestran porque el backend no registra pagos ni ofrece esos endpoints. El informe por período cuenta turnos registrados; no los afirma como atenciones completadas. La pantalla de inventario es de solo consulta, porque no existe una operación de eliminación ni un rol de usuario verificable en esta rama.
+Los cobros y el resultado financiero se calculan solo con movimientos persistidos en el backend. Un cobro debe vincularse a un turno existente; la pantalla no muestra valores demostrativos. El informe distingue turnos registrados de atenciones marcadas como `COMPLETADO`. La aplicación no ofrece eliminación de insumos porque la API no define esa operación.
 
 ## Comandos
 
@@ -41,4 +42,4 @@ Ganancias y cobros no se muestran porque el backend no registra pagos ni ofrece 
 
 ## Seguridad de datos
 
-El asistente acepta preguntas generales y muestra el material devuelto por el backend. No brinda diagnósticos, no recomienda medicamentos y advierte cuando no hay evidencia suficiente. El token administrativo de gestión de documentos se configura solo en el backend; nunca debe incluirse en el frontend.
+El asistente acepta preguntas generales y muestra el material devuelto por el backend. No brinda diagnósticos, no recomienda medicamentos y advierte cuando no hay evidencia suficiente. La clave JWT y las credenciales se configuran solo en el backend; nunca deben incluirse en el frontend.
