@@ -1,70 +1,44 @@
 # Novadent — Frontend
 
-Frontend del sistema de gestión odontológica. Esta aplicación presenta el dashboard compartido y las vistas base que cada integrante ampliará en su módulo.
+Prototipo frontend del sistema odontológico Novadent. En esta rama incluye un asistente conectado al backend con citas y vistas de consulta para inventario e informes.
 
 ## Stack
 
-- React 19
-- TypeScript
-- Vite
-- Tailwind CSS v4
-- React Router DOM v7
-- Lucide React
+- React 19, TypeScript y Vite 8.
+- Tailwind CSS v4 y React Router DOM.
+- Vitest, Testing Library y jsdom para pruebas de interfaz.
 
 ## Inicio rápido
 
 ```bash
-git clone https://github.com/Proyecto-Houssay/frontend-odonto.git
-cd frontend-odonto
-npm install
+npm ci
+Copy-Item .env.example .env.local
 npm run dev
 ```
 
-El servidor de desarrollo queda disponible en la URL que muestre Vite, normalmente `http://localhost:5173`.
+El archivo `.env.local` usa `VITE_API_BASE_URL` con la URL raíz del backend, por ejemplo `http://localhost:8080` (sin `/api`). El servidor de desarrollo suele quedar en `http://localhost:5173`.
+
+## Rutas
+
+- `/chatbot` — consulta el endpoint real `POST /api/chatbot/ask`, muestra documentos, versiones y fragmentos citados, y representa carga, error y falta de evidencia. No crea respuestas de respaldo si el backend falla.
+- `/informes` — consulta inventario persistido, turnos por período y resumen anual mediante `/api/reports/*`.
+
+El backend de esta rama aún no ofrece autenticación real con roles; estas vistas no constituyen un portal autenticado ni informes protegidos. No deben exponerse como tales hasta integrar el control de acceso del backend.
+
+## Alcance de informes
+
+Ganancias y cobros no se muestran porque el backend no registra pagos ni ofrece esos endpoints. El informe por período cuenta turnos registrados; no los afirma como atenciones completadas. La pantalla de inventario es de solo consulta, porque no existe una operación de eliminación ni un rol de usuario verificable en esta rama.
 
 ## Comandos
 
 | Comando | Uso |
 |---|---|
-| `npm run dev` | Inicia el servidor de desarrollo |
+| `npm run dev` | Inicia el servidor local |
 | `npm run lint` | Ejecuta Oxlint |
-| `npm run build` | Ejecuta TypeScript y genera el build de producción |
-| `npm run preview` | Sirve localmente el build generado |
+| `npm test` | Ejecuta las pruebas de interfaz |
+| `npm run build` | Valida TypeScript y genera el build de producción |
+| `npm run preview` | Sirve el build generado |
 
-## Estructura principal
+## Seguridad de datos
 
-```text
-src/
-├── components/layout/   # DashboardLayout, Navbar y Sidebar
-├── pages/               # Dashboard y vistas de módulos
-├── App.tsx              # Router principal
-├── main.tsx             # Punto de entrada
-└── index.css            # Tailwind y estilos globales
-docs/
-└── braian-dashboard.md  # Alcance e integración del dashboard
-```
-
-## Rutas del dashboard
-
-- `/` — Dashboard principal
-- `/pacientes` — Pacientes
-- `/odontologos` — Odontólogos
-- `/turnos` — Turnos
-- `/historias-clinicas` — Historias clínicas
-- `/usuarios` — Gestión de usuarios
-- `/informes` — Informes y caja (placeholder)
-
-Las rutas y el layout son infraestructura compartida. Cada integrante debe reemplazar solamente el contenido de su módulo y conservar el contrato de navegación.
-
-## Flujo de trabajo
-
-- `develop` es la base de integración.
-- Las ramas de trabajo son `Mateo`, `Kevin`, `Braian`, `Josue` e `Iris`.
-- Los Pull Requests deben apuntar a `develop` y vincular su HU/TR correspondiente.
-- No se deben publicar secretos ni archivos `.env`.
-
-## Alcance actual
-
-El dashboard contiene estructura, navegación y placeholders. Autenticación, permisos, CRUDs, informes reales y consumo de API quedan pendientes de sus respectivas HU/TR.
-
-Para conocer el límite de integración con el backend, consultar [`docs/braian-dashboard.md`](docs/braian-dashboard.md) y la [wiki del proyecto](https://github.com/Proyecto-Houssay/backend-odonto/wiki).
+El asistente acepta preguntas generales y muestra el material devuelto por el backend. No brinda diagnósticos, no recomienda medicamentos y advierte cuando no hay evidencia suficiente. El token administrativo de gestión de documentos se configura solo en el backend; nunca debe incluirse en el frontend.

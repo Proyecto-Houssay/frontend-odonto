@@ -1,18 +1,28 @@
-import { Activity } from 'lucide-react'
+import { BrowserRouter, Link, Navigate, Route, Routes } from 'react-router-dom'
+import { ChatbotPage } from './pages/ChatbotPage'
+import { ReportsPage } from './pages/ReportsPage'
 
 function App() {
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 max-w-md w-full text-center space-y-4">
-        <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center mx-auto">
-          <Activity className="w-6 h-6" />
-        </div>
-        <h1 className="text-2xl font-bold text-slate-800">Novadent - Sistema Odontológico</h1>
-        <p className="text-slate-600 text-sm">
-          Proyecto inicializado con éxito con React, Vite, TypeScript y Tailwind CSS.
-        </p>
+    <BrowserRouter>
+      <div className="min-h-screen bg-slate-50">
+        <nav className="border-b border-slate-200 bg-white">
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
+            <Link to="/chatbot" className="font-bold text-slate-950">Novadent</Link>
+            <div className="flex gap-4 text-sm font-semibold">
+              <Link className="text-slate-700 hover:text-blue-700" to="/chatbot">Asistente</Link>
+              <Link className="text-slate-700 hover:text-blue-700" to="/informes">Informes</Link>
+            </div>
+          </div>
+        </nav>
+        <Routes>
+          <Route path="/" element={<Navigate to="/chatbot" replace />} />
+          <Route path="/chatbot" element={<ChatbotPage />} />
+          <Route path="/informes" element={<ReportsPage />} />
+          <Route path="*" element={<Navigate to="/chatbot" replace />} />
+        </Routes>
       </div>
-    </div>
+    </BrowserRouter>
   )
 }
 
