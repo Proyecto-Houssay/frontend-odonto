@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { HeartPulse, LoaderCircle } from 'lucide-react'
+import { HeartPulse, LoaderCircle, MessageSquare, Shield } from 'lucide-react'
 import { ApiError, apiRequest } from '../lib/api'
 import { useAuth } from '../auth/useAuth'
 
@@ -77,6 +77,20 @@ export function LoginPage() {
       } else {
         setError(failure instanceof Error ? failure.message : 'No se pudo completar la solicitud.')
       }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleQuickDemoLogin = async (user: string, pass: string) => {
+    setUsernameOrEmail(user)
+    setPassword(pass)
+    setSubmitting(true)
+    setError('')
+    try {
+      await login(user, pass)
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'No se pudo iniciar sesión de demo.')
     } finally {
       setSubmitting(false)
     }
@@ -184,6 +198,33 @@ export function LoginPage() {
               {mode === 'register' ? <button className="font-medium text-blue-700 hover:text-blue-800 hover:underline" onClick={() => switchMode('login')} type="button">Ya tengo cuenta · Iniciar sesión</button> : null}
               {mode === 'forgot' || mode === 'reset' ? <button className="font-medium text-blue-700 hover:text-blue-800 hover:underline" onClick={() => switchMode('login')} type="button">Volver a iniciar sesión</button> : null}
             </div>
+
+            {/* Accesos rápidos de demostración para Vercel Preview y pruebas locales */}
+            {mode === 'login' && (
+              <div className="mt-6 pt-5 border-t border-slate-200">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2.5">
+                  Acceso Rápido Demo (Preview Vercel)
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleQuickDemoLogin('ana', 'demo-password')}
+                    disabled={submitting}
+                    className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors shadow-2xs"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5 text-blue-600" /> Paciente (ChatBot)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickDemoLogin('admin', 'demo-password')}
+                    disabled={submitting}
+                    className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-slate-100 text-slate-800 hover:bg-slate-200 border border-slate-300 rounded-lg transition-colors shadow-2xs"
+                  >
+                    <Shield className="w-3.5 h-3.5 text-slate-700" /> Administrador
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
         <p className="mt-6 text-xs text-slate-500">Sistema académico local · conexión al backend Novadent</p>
