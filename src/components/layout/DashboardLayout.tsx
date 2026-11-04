@@ -1,13 +1,16 @@
 import React, { useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Navbar } from './Navbar'
+import { ChatbotFloatingWidget } from '../chatbot/ChatbotFloatingWidget'
 
 export const DashboardLayout: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const location = useLocation()
+  const isChatbotRoute = location.pathname.startsWith('/chatbot')
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-slate-50 flex relative">
       {/* Barra lateral de navegación */}
       <Sidebar
         isOpen={isSidebarOpen}
@@ -26,6 +29,9 @@ export const DashboardLayout: React.FC = () => {
           </div>
         </main>
       </div>
+
+      {/* Widget flotante del Chatbot IA accesible en todo el sistema excepto en la vista completa */}
+      {!isChatbotRoute && <ChatbotFloatingWidget />}
     </div>
   )
 }
