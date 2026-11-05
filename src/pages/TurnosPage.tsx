@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
-  Activity, ArrowLeft, ArrowRight, CalendarDays, Check, Clock3, MessageCircle,
-  Search, Send, Sparkles, Stethoscope, Video, X,
+  Activity, ArrowLeft, ArrowRight, BellPlus, CalendarDays, Check, Clock3,
+  ExternalLink, MessageCircle, Search, Send, Sparkles, Stethoscope, Video, X,
 } from 'lucide-react'
 
 type Appointment = {
@@ -10,10 +10,20 @@ type Appointment = {
   hora: string
   motivo?: string
   estado?: string
+  telemedicina?: boolean
+  estadoSala?: string
+  enlaceVideo?: string | null
+  enlaceFuncional?: boolean
   paciente?: { id: number; nombre: string; apellido: string }
   odontologo?: { id: number; nombre: string; apellido: string; especialidad?: { nombre: string } }
 }
 type Dentist = { id: number; nombre: string; apellido: string; activo?: boolean; especialidad?: { nombre: string } }
+type TeleAppointment = {
+  id: number; turnoId: number; fecha: string; hora: string; estadoTurno?: string
+  pacienteId?: number; pacienteNombre?: string; odontologoId?: number; odontologoNombre?: string
+  estadoSala?: string; enlaceVideo?: string | null; enlaceFuncional?: boolean
+}
+type AvailabilityResponse = { odontologoId: number; fecha: string; horariosDisponibles: string[] }
 type ChatAnswer = { accionesSugeridas?: string[] }
 type ChatTurn = { role: 'user' | 'assistant'; text: string; answer?: ChatAnswer }
 
@@ -47,6 +57,25 @@ async function askJosue(message: string) {
     return { respuesta: 'No pude conectar con el asistente ahora. Podés abrir Teletriaje para iniciar una solicitud y el equipo te ayudará a coordinarla.', accionesSugeridas: ['Ir a Teletriaje'] }
   }
 }
+function addReminder(appointment: Appointment) {
+  const escapeIcs = (value: string) => value.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;')
+  const dateTime = `${appointment.fecha.replaceAll('-', '')}T${appointment.hora.replaceAll(':', '').slice(0, 4)}00`
+  const title = appointment.telemedicina ? 'Teleconsulta odontológica' : 'Turno odontológico'
+  const description = `${appointment.motivo || 'Consulta odontológica'}${appointment.odontologo ? ` · Dr./Dra. ${appointment.odontologo.nombre} ${appointment.odontologo.apellido}` : ''}${appointment.enlaceFuncional && appointment.enlaceVideo ? ` · Videollamada: ${appointment.enlaceVideo}` : ''}`
+  const content = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Novadent//Agenda//ES', 'CALSCALE:GREGORIAN',
+    'BEGIN:VEVENT', `UID:novadent-turno-${appointment.id}@agenda`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}`,
+    `DTSTART;TZID=America/Argentina/Buenos_Aires:${dateTime}`, `SUMMARY:${escapeIcs(title)}`, `DESCRIPTION:${escapeIcs(description)}`,
+    'BEGIN:VALARM', 'TRIGGER:-PT30M', 'ACTION:DISPLAY', `DESCRIPTION:${escapeIcs(`En 30 minutos: ${title}`)}`, 'END:VALARM',
+    'END:VEVENT', 'END:VCALENDAR', '',
+  ].join('\r\n')
+  const url = URL.createObjectURL(new Blob([content], { type: 'text/calendar;charset=utf-8' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `novadent-turno-${appointment.id}-${appointment.fecha}.ics`
+  link.click()
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
 function dateKey(date: Date) {
   const y = date.getFullYear(), m = String(date.getMonth() + 1).padStart(2, '0'), d = String(date.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
@@ -70,6 +99,9 @@ function stateColor(state?: string) {
 export function TurnosPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [dentists, setDentists] = useState<Dentist[]>([])
+  const [availableSlots, setAvailableSlots] = useState<string[]>([])
+  const [availabilityLoading, setAvailabilityLoading] = useState(false)
+  const [availabilityError, setAvailabilityError] = useState('')
   const [week, setWeek] = useState(() => startOfWeek(new Date()))
   const [selectedDay, setSelectedDay] = useState(dateKey(new Date()))
   const [dentistFilter, setDentistFilter] = useState('all')
@@ -84,16 +116,39 @@ export function TurnosPage() {
     setLoading(true)
     setLoadError('')
     try {
-      const [turnos, profesionales] = await Promise.all([
+      const weekEnd = new Date(week)
+      weekEnd.setDate(week.getDate() + 6)
+      const from = dateKey(week), through = dateKey(weekEnd)
+      const filter = dentistFilter === 'all' ? '' : `&odontologoId=${encodeURIComponent(dentistFilter)}`
+      const [turnos, profesionales, virtuales] = await Promise.all([
         getJson<Appointment[]>('/turnos'),
         getJson<Dentist[]>('/odontologos'),
+        getJson<TeleAppointment[]>(`/teletriaje/citas/agenda?desde=${from}&hasta=${through}${filter}`),
       ])
-      setAppointments(Array.isArray(turnos) ? turnos : [])
+      const citasVirtuales = Array.isArray(virtuales) ? virtuales : []
+      const turnosVirtuales = new Set(citasVirtuales.map((cita) => cita.turnoId))
+      const turnosComunes = (Array.isArray(turnos) ? turnos : [])
+        .filter((turno) => turno.fecha >= from && turno.fecha <= through && !turnosVirtuales.has(turno.id))
+        .filter((turno) => dentistFilter === 'all' || String(turno.odontologo?.id) === dentistFilter)
+      const citasMapeadas: Appointment[] = citasVirtuales.map((cita) => ({
+        id: cita.turnoId,
+        fecha: cita.fecha,
+        hora: cita.hora,
+        motivo: 'Teleconsulta odontológica',
+        estado: cita.estadoTurno || 'CONFIRMADO',
+        telemedicina: true,
+        estadoSala: cita.estadoSala,
+        enlaceVideo: cita.enlaceVideo,
+        enlaceFuncional: cita.enlaceFuncional,
+        paciente: cita.pacienteNombre ? { id: cita.pacienteId || 0, nombre: cita.pacienteNombre, apellido: '' } : undefined,
+        odontologo: cita.odontologoNombre ? { id: cita.odontologoId || 0, nombre: cita.odontologoNombre, apellido: '' } : undefined,
+      }))
+      setAppointments([...turnosComunes, ...citasMapeadas].sort((a, b) => `${a.fecha}${a.hora}`.localeCompare(`${b.fecha}${b.hora}`)))
       setDentists(Array.isArray(profesionales) ? profesionales : [])
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'No se pudo cargar la agenda.')
     } finally { setLoading(false) }
-  }, [])
+  }, [week, dentistFilter])
 
   useEffect(() => { void loadAgenda() }, [loadAgenda])
 
@@ -103,10 +158,10 @@ export function TurnosPage() {
     return day
   }), [week])
   const visibleAppointments = useMemo(() => appointments.filter((appointment) =>
-    appointment.fecha === selectedDay && (dentistFilter === 'all' || String(appointment.odontologo?.id) === dentistFilter),
+    appointment.fecha === selectedDay,
   ).sort((a, b) => a.hora.localeCompare(b.hora)), [appointments, selectedDay, dentistFilter])
   const upcomingCount = appointments.filter((appointment) => appointment.fecha >= dateKey(new Date()) && !(appointment.estado || '').toLowerCase().includes('cancel')).length
-  const telemedicineCount = appointments.filter((appointment) => /tele|video|virtual/i.test(`${appointment.motivo || ''} ${appointment.estado || ''}`)).length
+  const telemedicineCount = appointments.filter((appointment) => appointment.telemedicina).length
   const dayLabel = formatDate(new Date(`${selectedDay}T12:00:00`), { weekday: 'long', day: 'numeric', month: 'long' })
 
   const submitQuestion = async (text = question) => {
@@ -127,6 +182,22 @@ export function TurnosPage() {
     const nextSelected = new Date(selectedDay + 'T12:00:00')
     nextSelected.setDate(nextSelected.getDate() + offset * 7)
     setSelectedDay(dateKey(nextSelected))
+  }
+
+  const findAvailableSlots = async () => {
+    if (dentistFilter === 'all') {
+      setAvailabilityError('Elegí un profesional para calcular sus horarios disponibles.')
+      return
+    }
+    setAvailabilityLoading(true)
+    setAvailabilityError('')
+    setAvailableSlots([])
+    try {
+      const result = await getJson<AvailabilityResponse>(`/turnos/disponibilidad/fecha/${selectedDay}?odontologoId=${encodeURIComponent(dentistFilter)}`)
+      setAvailableSlots(result.horariosDisponibles || [])
+    } catch (error) {
+      setAvailabilityError(error instanceof Error ? error.message : 'No se pudieron consultar los horarios.')
+    } finally { setAvailabilityLoading(false) }
   }
 
   return (
@@ -160,15 +231,17 @@ export function TurnosPage() {
           <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50/70">
             {weekDays.map((day, index) => {
               const key = dateKey(day), isSelected = key === selectedDay, isToday = key === dateKey(new Date())
-              const count = appointments.filter((appointment) => appointment.fecha === key && (dentistFilter === 'all' || String(appointment.odontologo?.id) === dentistFilter)).length
+              const count = appointments.filter((appointment) => appointment.fecha === key).length
               return <button key={key} onClick={() => setSelectedDay(key)} className={`relative flex min-h-[78px] flex-col items-center justify-center gap-1 border-r border-slate-100 px-1 transition last:border-r-0 ${isSelected ? 'bg-teal-50' : 'hover:bg-white'}`}><span className={`text-[11px] font-semibold uppercase ${isSelected ? 'text-teal-700' : 'text-slate-400'}`}>{weekdays[index]}</span><span className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${isSelected ? 'bg-teal-700 text-white' : isToday ? 'border border-teal-200 text-teal-700' : 'text-slate-700'}`}>{day.getDate()}</span><span className="text-[10px] text-slate-400">{count ? `${count} ${count === 1 ? 'turno' : 'turnos'}` : '—'}</span></button>
             })}
           </div>
 
           <div className="px-4 pb-5 pt-4 sm:px-5">
-            <div className="mb-4 flex items-center justify-between"><div><h3 className="text-base font-bold capitalize text-slate-800">{dayLabel}</h3><p className="text-xs text-slate-400">Agenda del día</p></div><button onClick={() => void loadAgenda()} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-teal-700" aria-label="Actualizar agenda"><Activity size={16} /></button></div>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><div><h3 className="text-base font-bold capitalize text-slate-800">{dayLabel}</h3><p className="text-xs text-slate-400">Agenda del día · turnos presenciales y teleconsultas</p></div><div className="flex items-center gap-2"><button onClick={() => void findAvailableSlots()} disabled={availabilityLoading} className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 px-3 py-2 text-xs font-semibold text-teal-700 hover:bg-teal-50 disabled:opacity-50"><Sparkles size={14} />{availabilityLoading ? 'Calculando…' : 'Ver horarios libres'}</button><button onClick={() => void loadAgenda()} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-teal-700" aria-label="Actualizar agenda"><Activity size={16} /></button></div></div>
+            {availabilityError && <p role="status" className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{availabilityError}</p>}
+            {availableSlots.length > 0 && <div className="mb-4 rounded-xl border border-teal-100 bg-teal-50/60 p-3"><div className="flex items-center justify-between gap-2"><p className="text-xs font-semibold text-teal-900">Horarios disponibles · {dentists.find((item) => String(item.id) === dentistFilter)?.apellido}</p><button onClick={() => setAvailableSlots([])} className="text-[11px] text-teal-700 underline">Ocultar</button></div><div className="mt-2 flex flex-wrap gap-2">{availableSlots.map((slot) => <button key={slot} onClick={() => { setChatOpen(true); void submitQuestion(`Quiero reservar una teleconsulta con el odontólogo ${dentistFilter} el ${selectedDay} a las ${slot}`) }} className="rounded-lg border border-teal-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-teal-800 hover:border-teal-500">{slot.slice(0, 5)}</button>)}</div><p className="mt-2 text-[10px] text-teal-700">La disponibilidad se confirma nuevamente al solicitar el turno.</p></div>}
             {loading ? <div className="space-y-3">{[1, 2, 3].map((item) => <div key={item} className="h-[68px] animate-pulse rounded-xl bg-slate-100" />)}</div> : loadError ? <div className="rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-800"><p className="font-semibold">No pudimos sincronizar la agenda</p><p className="mt-1">{loadError}</p><button onClick={() => void loadAgenda()} className="mt-3 font-semibold underline">Reintentar</button></div> : <div className="space-y-2">
-              {visibleAppointments.length ? visibleAppointments.map((appointment) => <article key={appointment.id} className="group flex gap-3 rounded-xl border border-slate-100 p-3 transition hover:border-teal-200 hover:bg-teal-50/30 sm:gap-4"><div className="w-14 shrink-0 border-r border-slate-100 pr-3 pt-1 text-right"><span className="text-sm font-bold text-slate-700">{appointment.hora.slice(0, 5)}</span><span className="mt-1 block text-[10px] text-slate-400">30 min</span></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="truncate text-sm font-semibold text-slate-800">{appointment.paciente ? `${appointment.paciente.nombre} ${appointment.paciente.apellido}` : 'Paciente'}</p><span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${stateColor(appointment.estado)}`}>{appointment.estado || 'Confirmado'}</span>{/tele|video|virtual/i.test(`${appointment.motivo || ''} ${appointment.estado || ''}`) && <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-700"><Video size={11} /> Virtual</span>}</div><p className="mt-1 truncate text-xs text-slate-500">{appointment.motivo || 'Consulta odontológica'} · {appointment.odontologo ? `Dr. ${appointment.odontologo.nombre} ${appointment.odontologo.apellido}` : 'Profesional asignado'}</p></div><span className="hidden self-center text-xs text-slate-400 sm:block">#{appointment.id}</span></article>) : <div className="rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center"><div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-slate-50 text-slate-400"><CalendarDays size={20} /></div><h4 className="mt-3 text-sm font-semibold text-slate-700">Agenda libre para este día</h4><p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-slate-500">Pedile al asistente que busque alternativas o iniciá una solicitud de teleconsulta.</p><button onClick={() => { setChatOpen(true); setTimeout(() => void submitQuestion('Buscame horarios disponibles para una teleconsulta'), 0) }} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-teal-700 hover:text-teal-900"><Sparkles size={14} /> Buscar con el asistente</button></div>}
+              {visibleAppointments.length ? visibleAppointments.map((appointment) => <article key={appointment.id} className="group flex gap-3 rounded-xl border border-slate-100 p-3 transition hover:border-teal-200 hover:bg-teal-50/30 sm:gap-4"><div className="w-14 shrink-0 border-r border-slate-100 pr-3 pt-1 text-right"><span className="text-sm font-bold text-slate-700">{appointment.hora.slice(0, 5)}</span><span className="mt-1 block text-[10px] text-slate-400">30 min</span></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="truncate text-sm font-semibold text-slate-800">{appointment.paciente ? `${appointment.paciente.nombre} ${appointment.paciente.apellido}`.trim() : 'Paciente'}</p><span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${stateColor(appointment.estado)}`}>{appointment.estado || 'Confirmado'}</span>{appointment.telemedicina && <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-700"><Video size={11} /> Teleconsulta</span>}</div><p className="mt-1 truncate text-xs text-slate-500">{appointment.motivo || 'Consulta odontológica'} · {appointment.odontologo ? `Dr. ${appointment.odontologo.nombre} ${appointment.odontologo.apellido}`.trim() : 'Profesional asignado'}</p>{appointment.telemedicina && <p className="mt-1 text-[10px] text-slate-400">Sala: {appointment.estadoSala === 'DISPONIBLE' ? 'Enlace listo' : appointment.estadoSala === 'EXPIRADA' ? 'Enlace expirado' : appointment.estadoSala === 'REVOCADA' ? 'Enlace revocado' : 'Pendiente de proveedor de videollamada'}</p>}<div className="mt-2 flex flex-wrap gap-2"><button onClick={() => addReminder(appointment)} className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-2 py-1 text-[10px] font-medium text-slate-600 hover:bg-slate-100"><BellPlus size={12} /> Agregar recordatorio</button>{appointment.telemedicina && appointment.enlaceFuncional && appointment.enlaceVideo && <a href={appointment.enlaceVideo} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-md bg-violet-50 px-2 py-1 text-[10px] font-semibold text-violet-700 hover:bg-violet-100"><ExternalLink size={12} /> Entrar a videollamada</a>}</div></div><span className="hidden self-center text-xs text-slate-400 sm:block">#{appointment.id}</span></article>) : <div className="rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center"><div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-slate-50 text-slate-400"><CalendarDays size={20} /></div><h4 className="mt-3 text-sm font-semibold text-slate-700">Agenda libre para este día</h4><p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-slate-500">Pedile al asistente que busque alternativas o iniciá una solicitud de teleconsulta.</p><button onClick={() => { setChatOpen(true); setTimeout(() => void submitQuestion('Buscame horarios disponibles para una teleconsulta'), 0) }} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-teal-700 hover:text-teal-900"><Sparkles size={14} /> Buscar con el asistente</button></div>}
             </div>}
             <div className="mt-5 flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2.5 text-[11px] leading-5 text-slate-500"><Check size={14} className="mt-0.5 shrink-0 text-teal-600" />Los cambios de disponibilidad se validan nuevamente al confirmar la reserva.</div>
           </div>
