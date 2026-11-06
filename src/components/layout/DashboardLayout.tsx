@@ -10,7 +10,7 @@ export const DashboardLayout: React.FC = () => {
   const isChatbotRoute = location.pathname.startsWith('/chatbot')
 
   return (
-    <div className="min-h-screen bg-slate-50 flex relative">
+    <div className="clinic-backdrop flex min-h-screen relative">
       {/* Barra lateral de navegación */}
       <Sidebar
         isOpen={isSidebarOpen}
@@ -23,8 +23,8 @@ export const DashboardLayout: React.FC = () => {
         <Navbar onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)} />
 
         {/* Ventana dinámica donde se inyectan las vistas de cada módulo */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-5 lg:p-6">
+          <div className="mx-auto w-full max-w-[1800px]">
             <Outlet />
           </div>
         </main>

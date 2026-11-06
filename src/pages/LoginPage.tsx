@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { HeartPulse, LoaderCircle, MessageSquare, Shield } from 'lucide-react'
+import { HeartPulse, LoaderCircle } from 'lucide-react'
 import { ApiError, apiRequest } from '../lib/api'
 import { useAuth } from '../auth/useAuth'
 
@@ -82,20 +82,6 @@ export function LoginPage() {
     }
   }
 
-  const handleQuickDemoLogin = async (user: string, pass: string) => {
-    setUsernameOrEmail(user)
-    setPassword(pass)
-    setSubmitting(true)
-    setError('')
-    try {
-      await login(user, pass)
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : 'No se pudo iniciar sesión de demo.')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
   const heading = mode === 'register' ? 'Crear cuenta de paciente'
     : mode === 'forgot' ? 'Recuperar contraseña'
       : mode === 'reset' ? 'Restablecer contraseña'
@@ -103,8 +89,10 @@ export function LoginPage() {
           : 'Ingresar a Novadent'
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-10 flex items-center justify-center">
-      <section className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-7 shadow-sm sm:p-9">
+    <main className="relative isolate flex min-h-dvh items-center justify-center bg-slate-900 px-4 py-8 sm:px-8 lg:justify-end lg:px-16 xl:px-28">
+      <img src="/images/novadent-consultorio.png" alt="" aria-hidden="true" className="absolute inset-0 -z-20 h-full w-full object-cover object-[34%_center] lg:object-center" />
+      <div aria-hidden="true" className="absolute inset-0 -z-10 bg-slate-950/30 lg:bg-linear-to-r lg:from-transparent lg:via-slate-900/5 lg:to-slate-950/40" />
+      <section className="w-full max-w-md rounded-3xl border border-white/80 bg-white/95 p-7 shadow-2xl shadow-slate-950/25 backdrop-blur-xl sm:p-9 lg:max-w-[480px] lg:bg-white/90">
         <div className="mb-7 flex items-center gap-3">
           <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600 text-white">
             <HeartPulse aria-hidden="true" className="h-7 w-7" />
@@ -198,33 +186,6 @@ export function LoginPage() {
               {mode === 'register' ? <button className="font-medium text-blue-700 hover:text-blue-800 hover:underline" onClick={() => switchMode('login')} type="button">Ya tengo cuenta · Iniciar sesión</button> : null}
               {mode === 'forgot' || mode === 'reset' ? <button className="font-medium text-blue-700 hover:text-blue-800 hover:underline" onClick={() => switchMode('login')} type="button">Volver a iniciar sesión</button> : null}
             </div>
-
-            {/* Accesos rápidos de demostración para Vercel Preview y pruebas locales */}
-            {mode === 'login' && (
-              <div className="mt-6 pt-5 border-t border-slate-200">
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2.5">
-                  Acceso Rápido Demo (Preview Vercel)
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickDemoLogin('ana', 'demo-password')}
-                    disabled={submitting}
-                    className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors shadow-2xs"
-                  >
-                    <MessageSquare className="w-3.5 h-3.5 text-blue-600" /> Paciente (ChatBot)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickDemoLogin('admin', 'demo-password')}
-                    disabled={submitting}
-                    className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-slate-100 text-slate-800 hover:bg-slate-200 border border-slate-300 rounded-lg transition-colors shadow-2xs"
-                  >
-                    <Shield className="w-3.5 h-3.5 text-slate-700" /> Administrador
-                  </button>
-                </div>
-              </div>
-            )}
           </>
         )}
         <p className="mt-6 text-xs text-slate-500">Sistema académico local · conexión al backend Novadent</p>

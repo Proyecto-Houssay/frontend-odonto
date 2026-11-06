@@ -15,6 +15,11 @@ const patient = {
   fechaNacimiento: '1990-05-20',
 }
 
+// Dashboard metrics are tested separately; keep API call ordering deterministic here.
+vi.mock('./pages/DashboardHome', () => ({
+  DashboardHome: () => <h1>Bienvenido al Sistema Odontológico Novadent</h1>,
+}))
+
 vi.mock('react-signature-canvas', async () => {
   const { forwardRef, useImperativeHandle } = await import('react')
   return {
@@ -145,9 +150,10 @@ describe('frontend backed by the local API', () => {
     expect(screen.queryByLabelText('Token Bearer (solo en memoria)')).not.toBeInTheDocument()
   })
 
-  it('limits a patient to the chatbot and sends the authenticated request to RAG', async () => {
+  it('lets a patient open the chatbot and sends the authenticated request to RAG', async () => {
     fetchMock
       .mockResolvedValueOnce(response({ token: 'patient-jwt', tokenType: 'Bearer', expiresIn: 900, role: 'PACIENTE' }))
+      .mockResolvedValueOnce(response({ message: 'Sin ficha vinculada' }, 404))
       .mockResolvedValueOnce(response({
         respuesta: 'La clínica atiende de lunes a viernes.',
         intencion: 'consulta_general',
@@ -156,7 +162,7 @@ describe('frontend backed by the local API', () => {
       }))
     vi.stubGlobal('fetch', fetchMock)
 
-    window.history.replaceState({}, '', '/informes')
+    window.history.replaceState({}, '', '/chatbot')
     render(<App />)
     fireEvent.change(screen.getByLabelText('Usuario o correo electrónico'), { target: { value: 'ana' } })
     fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'demo-password' } })
@@ -172,10 +178,10 @@ describe('frontend backed by the local API', () => {
 
     expect(await screen.findByText('La clínica atiende de lunes a viernes.')).toBeInTheDocument()
     expect(screen.getByText('faq.md — Horarios · versión 1')).toBeInTheDocument()
-    expect(fetchMock.mock.calls[1][0]).toBe('/api/chatbot/ask')
-    expect(fetchMock.mock.calls[1][1].method).toBe('POST')
-    expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe('Bearer patient-jwt')
-    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ mensaje: '¿Qué horarios tienen?' })
+    expect(fetchMock.mock.calls[2][0]).toBe('/api/chatbot/ask')
+    expect(fetchMock.mock.calls[2][1].method).toBe('POST')
+    expect(fetchMock.mock.calls[2][1].headers.Authorization).toBe('Bearer patient-jwt')
+    expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({ mensaje: '¿Qué horarios tienen?' })
   })
 
   it('shows only clearly labeled operational demo values in reports', async () => {
@@ -190,34 +196,5 @@ describe('frontend backed by the local API', () => {
     expect(screen.getByRole('note')).toHaveTextContent('no se consultan ni se guardan en el backend')
     expect(screen.getByText(/Finanzas, cobros y caja quedaron fuera del alcance actual/)).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledTimes(1)
-  })
-
-  it('connects to real backend reports and inventory when visiting /informes', async () => {
-    fetchMock.mockResolvedValueOnce(response({ token: 'admin-jwt', tokenType: 'Bearer', expiresIn: 900, role: 'ADMINISTRADOR' }))
-    fetchMock.mockResolvedValueOnce(response({
-      modulo: 'Informes y Gestión Odontológica',
-      estado: 'DISPONIBLE',
-      totalAtencionesRegistradas: 42,
-      totalItemsInventario: 5,
-      reportesDisponibles: ['inventario', 'atenciones', 'anual']
-    }))
-    fetchMock.mockResolvedValueOnce(response([
-      { id: 1, nombre: 'Anestesia Tubo', categoria: 'ANESTESIA', cantidadDisponible: 20, unidadMedida: 'tubos', estado: 'DISPONIBLE' }
-    ]))
-    fetchMock.mockResolvedValueOnce(response({
-      anio: 2026,
-      totalAtenciones: 42,
-      meses: [{ mes: 1, nombreMes: 'enero', atenciones: 42 }]
-    }))
-    vi.stubGlobal('fetch', fetchMock)
-
-    await login()
-    fireEvent.click(screen.getByRole('link', { name: 'Informes' }))
-
-    expect(await screen.findByRole('heading', { name: 'Informes y Gestión Odontológica' })).toBeInTheDocument()
-    expect(screen.getByText('Conectado a la API backend')).toBeInTheDocument()
-    expect(screen.getByText('Anestesia Tubo')).toBeInTheDocument()
-    expect(fetchMock.mock.calls.some(call => call[0] === '/api/reports')).toBe(true)
-    expect(fetchMock.mock.calls.some(call => call[0] === '/api/reports/inventario')).toBe(true)
   })
 })

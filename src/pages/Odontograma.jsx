@@ -28,6 +28,12 @@ const INITIAL_DEMO_CHARTS = {
 }
 export const formatMoney = value => '$' + new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 }).format(value)
 const patientNumber = value => /^\d+$/.test(String(value)) && Number.isSafeInteger(Number(value)) && Number(value) > 0 ? Number(value) : null
+function tokenRole(token) {
+  try {
+    const payload = token.split('.')[1]
+    return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))).role
+  } catch { return null }
+}
 const toothName = number => {
   const names = ['Incisivo central', 'Incisivo lateral', 'Canino', 'Primer premolar', 'Segundo premolar', 'Primer molar', 'Segundo molar', 'Tercer molar']
   return `${names[number % 10 - 1]} ${number < 30 ? 'superior' : 'inferior'} ${number < 20 || number >= 40 ? 'derecho' : 'izquierdo'}`
@@ -110,6 +116,8 @@ function ToothIcon({ color, lower, molar }) {
  */
 export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', demoMode = false, backendMode = false } = {}) {
   const [manualPatient, setManualPatient] = useState('')
+  const [apiPatients, setApiPatients] = useState([])
+  const [loadingPatients, setLoadingPatients] = useState(false)
   const [manualToken, setManualToken] = useState('')
   const [demoPatients, setDemoPatients] = useState(DEMO_PATIENTS)
   const [demoCharts, setDemoCharts] = useState(INITIAL_DEMO_CHARTS)
@@ -122,17 +130,26 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
   const [saved, setSaved] = useState(null)
   const [verified, setVerified] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [recordState, setRecordState] = useState({ key: '', status: 'idle' })
+  const [loadedFor, setLoadedFor] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const signatureRef = useRef(null), signatureBox = useRef(null), savingRef = useRef(false), revision = useRef(0)
   const patientId = demoMode ? patientNumber(selectedDemoPatientId) : patientNumber(pacienteId ?? manualPatient)
   const selectedDemoPatient = demoPatients.find(patient => patient.id === patientId)
   const bearer = (token || manualToken).trim().replace(/^Bearer\s+/i, '')
+  // This is presentation only. The API still enforces the authoritative role checks.
+  const readOnly = !demoMode && tokenRole(bearer) === 'RECEPCIONISTA'
   const baseUrl = apiUrl.replace(/\/$/, '')
+  const recordKey = `${patientId}|${bearer}`
+  const recordStatus = recordState.key === recordKey ? recordState.status : 'loading'
+  const persisted = readOnly && saved?.pacienteId === patientId && loadedFor === bearer ? saved : null
   const teeth = ALL_TEETH.filter(number => chart[number]).map(numero => ({ numero, ...CONDITION[chart[numero]] }))
   const total = teeth.reduce((sum, item) => sum + item.costoEstimado, 0)
-  const diagnosis = CONDITION[chart[selected]]
-  const canSign = (demoMode || verified) && patientId && teeth.length > 0 && accepted && !saving
+  const visibleTeeth = readOnly ? persisted?.dientes || [] : teeth
+  const visibleTotal = readOnly ? persisted?.totalPresupuesto || 0 : total
+  const diagnosis = readOnly ? persisted?.dientes.find(tooth => tooth.numero === selected) : CONDITION[chart[selected]]
+  const canSign = !readOnly && (demoMode || verified) && patientId && teeth.length > 0 && accepted && !saving
   const consentText = demoMode ? DEMO_CONSENT_TEXT : CONSENT_TEXT
   const snapshot = { pacienteId: patientId, pacienteNombre: demoMode ? selectedDemoPatient?.nombre : undefined, modoDemo: demoMode,
     dientes: teeth, totalPresupuesto: total, moneda: 'ARS', versionCatalogo: demoMode ? `${VERSION}-demo` : VERSION,
@@ -174,6 +191,39 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
   }, [bearer, baseUrl, demoMode])
 
   useEffect(() => {
+    if (!readOnly || !verified || !patientId || !bearer) return
+    const controller = new AbortController()
+    async function loadLatest() {
+      try {
+        const headers = { Authorization: `Bearer ${bearer}` }
+        const listResponse = await fetch(`${baseUrl}/odontograma?pacienteId=${patientId}`, { headers, signal: controller.signal })
+        if (!listResponse.ok) throw new Error('No fue posible consultar los odontogramas de este paciente.')
+        const records = await listResponse.json()
+        if (!Array.isArray(records)) throw new Error('El listado de odontogramas no es válido.')
+        const latest = records.filter(record => record.pacienteId === patientId && Number.isSafeInteger(record.id))
+          .sort((a, b) => Date.parse(b.creadoEn) - Date.parse(a.creadoEn) || b.id - a.id)[0]
+        if (!latest) { if (!controller.signal.aborted) setRecordState({ key: recordKey, status: 'empty' }); return }
+        const detailResponse = await fetch(`${baseUrl}/odontograma/${latest.id}`, { headers, signal: controller.signal })
+        if (!detailResponse.ok) throw new Error('No fue posible abrir el último odontograma.')
+        const detail = await detailResponse.json()
+        if (detail?.id !== latest.id || detail.pacienteId !== patientId || !Array.isArray(detail.dientes)
+          || !detail.dientes.every(tooth => ALL_TEETH.includes(tooth.numero) && CONDITION[tooth.afeccion])
+          || !Number.isSafeInteger(detail.totalPresupuesto)) throw new Error('La respuesta del odontograma no es válida.')
+        if (!controller.signal.aborted) {
+          // A stale backend may still return the signature; never retain it in reception state.
+          const receptionDetail = { ...detail }
+          delete receptionDetail.firmaBase64
+          setSaved(receptionDetail); setLoadedFor(bearer); setRecordState({ key: recordKey, status: 'loaded' })
+        }
+      } catch (failure) {
+        if (!controller.signal.aborted) { setRecordState({ key: recordKey, status: 'error' }); setError(failure.message || 'No fue posible cargar el odontograma.') }
+      }
+    }
+    void loadLatest()
+    return () => controller.abort()
+  }, [readOnly, verified, patientId, bearer, baseUrl, recordKey])
+
+  useEffect(() => {
     const canvas = signatureRef.current?.getCanvas(), box = signatureBox.current
     if (!canvas || !box || typeof ResizeObserver === 'undefined') return
     let previous = ''
@@ -193,16 +243,17 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
     })
     observer.observe(box)
     return () => observer.disconnect()
-  }, [])
+  }, [readOnly])
 
   function assign(code) {
-    if (saving || chart[selected] === code) return
+    if (readOnly || saving || chart[selected] === code) return
     const nextChart = { ...chart, [selected]: code }
     setChart(nextChart)
     if (demoMode) setDemoCharts(previous => ({ ...previous, [patientId]: nextChart }))
     revoke(); setError(''); setNotice('')
   }
   function removeSelectedCondition() {
+    if (readOnly) return
     const nextChart = { ...chart }
     delete nextChart[selected]
     setChart(nextChart)
@@ -218,6 +269,23 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
     setDemoCharts(previous => ({ ...previous, [id]: {} }))
     setSelectedDemoPatientId(String(id)); setNewDemoPatientName(''); setError('')
   }
+  async function loadApiPatients() {
+    if (!bearer || loadingPatients) return
+    setLoadingPatients(true); setError('')
+    try {
+      const response = await fetch(`${baseUrl}/pacientes`, { headers: { Authorization: `Bearer ${bearer}` } })
+      if (!response.ok) throw new Error('No se pudieron cargar los pacientes registrados.')
+      const list = await response.json()
+      if (Array.isArray(list)) {
+        setApiPatients(list)
+        if (!manualPatient && list.length > 0 && list[0]?.id) setManualPatient(String(list[0].id))
+      }
+    } catch (failure) {
+      setError(failure.message || 'No se pudieron cargar los pacientes registrados.')
+    } finally {
+      setLoadingPatients(false)
+    }
+  }
   function capture() {
     if (!canSign) return
     if (!signatureRef.current || signatureRef.current.isEmpty()) { setError('Dibuje una firma antes de capturarla.'); return }
@@ -226,7 +294,7 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
     setError(''); setNotice('Firma capturada para este paciente, presupuesto y consentimiento.')
   }
   async function save() {
-    if (demoMode || savingRef.current || !canSign || !signature || !bearer) return
+    if (demoMode || readOnly || savingRef.current || !canSign || !signature || !bearer) return
     savingRef.current = true; setSaving(true); setError(''); setNotice('')
     const currentRevision = revision.current, currentSnapshot = snapshot
     const body = { pacienteId: patientId, dientes: teeth.map(({ numero, afeccion }) => ({ numero, afeccion })),
@@ -271,13 +339,18 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
         <a className="odontogram-backend-link" href="/odontograma/backend">Abrir modo de guardado en backend local</a>
       </> : <>
         <label>ID de paciente{pacienteId != null ? <input value={pacienteId} readOnly aria-label="ID de paciente" /> : <input type="text" inputMode="numeric" value={manualPatient} disabled={saving} onChange={e => setManualPatient(e.target.value)} aria-label="ID de paciente" placeholder="ID existente en la API" />}</label>
+        {pacienteId == null && apiPatients.length > 0 ? <label>Paciente registrado<select aria-label="Paciente registrado" value={manualPatient} disabled={saving} onChange={e => { setManualPatient(e.target.value); setError('') }}><option value="">Seleccionar paciente…</option>{apiPatients.map(p => <option key={p.id} value={String(p.id)}>{p.nombre} {p.apellido} · DNI {p.dni} (ID {p.id})</option>)}</select></label> : null}
+        {pacienteId == null && bearer ? <button type="button" disabled={loadingPatients || saving} onClick={loadApiPatients}>{loadingPatients ? 'Cargando pacientes…' : apiPatients.length > 0 ? 'Actualizar lista' : 'Elegir paciente de la lista'}</button> : null}
         {!token ? <label>Token Bearer (solo en memoria)<input type="password" autoComplete="off" value={manualToken} disabled={saving} onChange={e => setManualToken(e.target.value)} aria-label="Token Bearer (solo en memoria)" placeholder="Pegue el JWT de Swagger" /></label> : <p>Token proporcionado por la aplicación (no se almacena).</p>}
-        <p className="odontogram-access">{verified ? 'Catálogo verificado' : 'Se requiere JWT clínico para verificar el catálogo y firmar.'}{!patientId ? ' Ingrese un ID de paciente positivo.' : ''}</p>
+        <p className="odontogram-access">{verified ? 'Catálogo verificado' : readOnly ? 'Se requiere una sesión válida para consultar el odontograma.' : 'Se requiere JWT clínico para verificar el catálogo y firmar.'}{!patientId ? ' Ingrese un ID de paciente positivo.' : ''}</p>
         {backendMode ? <p className="odontogram-local-api-notice" role="note">Este modo usa la API en <code>/api</code>. Para conectarse a MySQL local, ejecutá el frontend con Vite y Spring Boot en tu PC. Una página abierta desde Vercel no puede acceder al backend ni a la base local de tu computadora.</p> : null}
       </>}
     </section>
     {error ? <p className="odontogram-error" role="alert">{error}</p> : null}
     {notice ? <p className="odontogram-notice" role="status">{notice}</p> : null}
+    {readOnly ? <p className="odontogram-notice" role="status">Vista de recepción · solo lectura. El diagnóstico no puede modificarse desde este rol.</p> : null}
+    {readOnly && verified && patientId && recordStatus === 'loading' ? <p role="status">Cargando último odontograma guardado…</p> : null}
+    {readOnly && recordStatus === 'empty' ? <p role="status">Este paciente todavía no tiene odontogramas guardados.</p> : null}
     <div className="odontogram-workspace">
       <section className="odontogram-card" aria-label="Odontograma FDI">
         <h2>Seleccione una pieza</h2><p>Vista del profesional: derecha del paciente a la izquierda. Seleccionar no registra una afección.</p>
@@ -285,7 +358,7 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
           <div className="odontogram-arches">{ARCHES.map((arch, index) => <div key={index}>
             <h3>{index === 0 ? 'Arcada superior' : 'Arcada inferior'}</h3>
             <div className={`odontogram-arch ${index === 1 ? 'odontogram-lower' : ''}`}>
-              {arch.map((number, position) => { const condition = CONDITION[chart[number]], color = condition?.color || '#94a3b8'
+              {arch.map((number, position) => { const condition = readOnly ? persisted?.dientes.find(tooth => tooth.numero === number) : CONDITION[chart[number]], color = condition?.color || '#94a3b8'
                 const offset = Math.round(46 * Math.sin(Math.PI * position / 15))
                 return <button key={number} type="button" className={`odontogram-tooth ${selected === number ? 'odontogram-selected' : ''}`} style={{ marginTop: index === 0 ? 46 - offset : offset, '--tooth-color': color }}
                   disabled={saving} aria-label={`Diente ${number}: ${condition?.nombre || 'Sin evaluar'}`} aria-pressed={selected === number} onClick={() => setSelected(number)}>
@@ -301,16 +374,20 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
         <p className="odontogram-eyebrow">FICHA DE LA PIEZA</p><h2>Diente {selected}</h2><p>{toothName(selected)}</p>
         <dl><dt>Afección seleccionada</dt><dd>{diagnosis?.nombre || 'Sin evaluar'}</dd><dt>Descripción</dt><dd>{diagnosis?.descripcion || 'No se ha registrado una evaluación.'}</dd>
           <dt>Tratamiento ilustrativo</dt><dd>{diagnosis?.tratamiento || 'A seleccionar por el profesional.'}</dd><dt>Costo estimado</dt><dd>{diagnosis ? `${formatMoney(diagnosis.costoEstimado)} ARS` : 'Sin estimar'}</dd></dl>
-        <h3>Asignar afección</h3><div className="odontogram-conditions">{CATALOG.map(item => <button type="button" key={item.afeccion} disabled={saving} aria-label={`Asignar ${item.nombre}`} aria-pressed={chart[selected] === item.afeccion} onClick={() => assign(item.afeccion)}><i style={{ background: item.color }} />{item.nombre}</button>)}</div>
-        <button type="button" className="odontogram-link-button" disabled={!chart[selected] || saving} onClick={removeSelectedCondition}>Quitar marca del diente {selected}</button>
+        {!readOnly ? <><h3>Asignar afección</h3><div className="odontogram-conditions">{CATALOG.map(item => <button type="button" key={item.afeccion} disabled={saving} aria-label={`Asignar ${item.nombre}`} aria-pressed={chart[selected] === item.afeccion} onClick={() => assign(item.afeccion)}><i style={{ background: item.color }} />{item.nombre}</button>)}</div>
+          <button type="button" className="odontogram-link-button" disabled={!chart[selected] || saving} onClick={removeSelectedCondition}>Quitar marca del diente {selected}</button></> : null}
       </section>
     </div>
     <section className="odontogram-card" aria-label="Resumen a firmar"><h2>Presupuesto ilustrativo</h2><p>Solo incluye piezas marcadas explícitamente. Los valores requieren validación profesional.</p>
-      {teeth.length ? <ul className="odontogram-estimate">{teeth.map(tooth => <li key={tooth.numero} data-testid="estimate-row"><strong>{tooth.numero} · {tooth.nombre}</strong><span>{tooth.tratamiento}</span><b>{formatMoney(tooth.costoEstimado)} ARS</b></li>)}</ul> : <p>No hay dientes marcados.</p>}
-      <p className="odontogram-total" data-testid="estimate-total">Total estimado <strong>{formatMoney(total)} ARS</strong></p>
-      <p className="odontogram-draft">{saved ? `Registro inmutable #${saved.id}` : 'BORRADOR NO GUARDADO · aún sin confirmación de persistencia'}</p>
+      {visibleTeeth.length ? <ul className="odontogram-estimate">{visibleTeeth.map(tooth => <li key={tooth.numero} data-testid="estimate-row"><strong>{tooth.numero} · {tooth.nombre}</strong><span>{tooth.tratamiento}</span><b>{formatMoney(tooth.costoEstimado)} ARS</b></li>)}</ul> : <p>No hay dientes marcados.</p>}
+      <p className="odontogram-total" data-testid="estimate-total">Total estimado <strong>{formatMoney(visibleTotal)} ARS</strong></p>
+      {persisted || (!readOnly && saved) ? <p className="odontogram-draft">Registro inmutable #{(persisted || saved).id}</p> : !readOnly ? <p className="odontogram-draft">BORRADOR NO GUARDADO · aún sin confirmación de persistencia</p> : null}
     </section>
-    <section className="odontogram-card" aria-label="Consentimiento y firma"><h2>Consentimiento y firma</h2><p>Versión {demoMode ? `${VERSION} · demostración` : VERSION} · firma manuscrita electrónica</p><p>{consentText}</p>
+    {readOnly ? persisted ? <section className="odontogram-card" aria-label="Consentimiento registrado"><h2>Consentimiento registrado</h2>
+      <p>{persisted.consentimientoAceptado ? 'Consentimiento aceptado' : 'Consentimiento no aceptado'} · versión {persisted.versionConsentimiento}</p>
+      <p>{persisted.textoConsentimiento}</p>
+      <p>La firma está reservada para odontología y administración.</p>
+    </section> : null : <section className="odontogram-card" aria-label="Consentimiento y firma"><h2>Consentimiento y firma</h2><p>Versión {demoMode ? `${VERSION} · demostración` : VERSION} · firma manuscrita electrónica</p><p>{consentText}</p>
       <label className="odontogram-consent"><input type="checkbox" checked={accepted} disabled={(!verified && !demoMode) || !patientId || !teeth.length || saving} onChange={e => { revoke({ consent: false }); setAccepted(e.target.checked); setError('') }} />Acepto el consentimiento para este paciente y el presupuesto mostrado.</label>
       <p id="signature-help">Revise el resumen, acepte el consentimiento y firme con mouse o con el dedo. Si cambia el área de firma, deberá volver a firmar.</p>
       <div ref={signatureBox} className={`odontogram-signature ${!canSign ? 'odontogram-signature-disabled' : ''}`} aria-disabled={!canSign}>
@@ -324,7 +401,7 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
       <div className="odontogram-actions"><button type="button" className="odontogram-primary" disabled={demoMode || !canSign || !signature || !bearer || Boolean(saved)} onClick={save}>{demoMode ? 'Guardar requiere backend' : saving ? 'Guardando…' : 'Guardar odontograma'}</button>
         <button type="button" disabled={!signature || !accepted || !patientId || !teeth.length || saving} onClick={download}>Descargar PDF con Firma</button></div>
       <p>{demoMode ? 'El PDF se descarga como borrador académico firmado y no se guarda en MySQL ni en el backend. No es un comprobante de pago.' : 'El PDF puede descargarse como borrador firmado; solo se informa guardado tras recibir HTTP 201 y verificar la respuesta. No es un comprobante de pago.'}</p>
-    </section>
+    </section>}
   </main>
 }
 

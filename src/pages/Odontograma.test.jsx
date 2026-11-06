@@ -20,6 +20,7 @@ vi.mock('jspdf', () => ({ jsPDF: class {
 } }))
 
 const catalog = { versionCatalogo: VERSION, versionConsentimiento: VERSION, textoConsentimiento: CONSENT_TEXT, afecciones: CATALOG }
+const tokenForRole = role => `header.${btoa(JSON.stringify({ role }))}.signature`
 beforeEach(() => {
   mocks.empty = true; mocks.canvas = null; mocks.pdfSave.mockClear(); mocks.pdfText.mockClear()
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => catalog })))
@@ -45,6 +46,77 @@ function savedResponse(body) {
 }
 
 describe('Odontograma académico', () => {
+  it('shows the latest persisted chart to reception without clinical editing or signing controls', async () => {
+    const receptionistToken = tokenForRole('RECEPCIONISTA')
+    const record = { ...savedResponse({ pacienteId: 7, dientes: [{ numero: 11, afeccion: 'caries' }] }), id: 22 }
+    fetch.mockImplementation(async url => {
+      if (String(url).endsWith('/catalogo')) return { ok: true, json: async () => catalog }
+      if (String(url).includes('?pacienteId=')) return { ok: true, json: async () => [
+        { id: 15, pacienteId: 7, creadoEn: '2026-10-20T12:00:00Z' },
+        { id: 22, pacienteId: 7, creadoEn: '2026-10-21T12:00:00Z' },
+      ] }
+      if (String(url).endsWith('/22')) return { ok: true, json: async () => record }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    render(<Odontograma pacienteId={7} token={receptionistToken} />)
+    expect(await screen.findByText('Registro inmutable #22')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Diente 11: Caries' })).toBeInTheDocument()
+    expect(screen.getByTestId('estimate-total')).toHaveTextContent('$45.000')
+    expect(screen.getByText(/Consentimiento aceptado · versión/)).toBeInTheDocument()
+    expect(screen.queryByAltText('Firma registrada del paciente')).not.toBeInTheDocument()
+    expect(screen.getByText('La firma está reservada para odontología y administración.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Asignar Caries' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Guardar odontograma' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Capturar firma' })).not.toBeInTheDocument()
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual(['/api/odontograma/catalogo', '/api/odontograma?pacienteId=7', '/api/odontograma/22'])
+    expect(fetch.mock.calls.every(([, options]) => options.headers.Authorization === `Bearer ${receptionistToken}`)).toBe(true)
+  })
+
+  it('does not imply the signature is absent when the API redacts it for reception', async () => {
+    const record = savedResponse({ pacienteId: 7, dientes: [{ numero: 11, afeccion: 'caries' }] })
+    delete record.firmaBase64
+    fetch.mockImplementation(async url => {
+      if (String(url).endsWith('/catalogo')) return { ok: true, json: async () => catalog }
+      if (String(url).includes('?pacienteId=')) return { ok: true, json: async () => [{ id: 15, pacienteId: 7, creadoEn: record.creadoEn }] }
+      if (String(url).endsWith('/15')) return { ok: true, json: async () => record }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    render(<Odontograma pacienteId={7} token={tokenForRole('RECEPCIONISTA')} />)
+    expect(await screen.findByText('Registro inmutable #15')).toBeInTheDocument()
+    expect(screen.queryByAltText('Firma registrada del paciente')).not.toBeInTheDocument()
+    expect(screen.getByText('La firma está reservada para odontología y administración.')).toBeInTheDocument()
+    expect(screen.queryByText('Este registro no incluye una firma visible.')).not.toBeInTheDocument()
+  })
+
+  it('shows an empty read-only state for reception without creating a draft', async () => {
+    const receptionistToken = tokenForRole('RECEPCIONISTA')
+    fetch.mockImplementation(async url => ({ ok: true, json: async () => String(url).endsWith('/catalogo') ? catalog : [] }))
+    render(<Odontograma pacienteId={7} token={receptionistToken} />)
+    expect(await screen.findByText('Este paciente todavía no tiene odontogramas guardados.')).toBeInTheDocument()
+    expect(screen.queryByText(/BORRADOR NO GUARDADO/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Asignar Caries' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Guardar odontograma' })).not.toBeInTheDocument()
+  })
+
+  it.each(['ADMINISTRADOR', 'ODONTOLOGO'])('keeps the %s editing and signing workflow', async role => {
+    render(<Odontograma pacienteId={7} token={tokenForRole(role)} />)
+    await screen.findByText('Catálogo verificado')
+    expect(screen.getByRole('button', { name: 'Asignar Caries' })).toBeEnabled()
+    expect(screen.getByRole('checkbox', { name: /Acepto el consentimiento/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Guardar odontograma' })).toBeInTheDocument()
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not reveal editing controls when reception cannot load an existing chart', async () => {
+    fetch.mockImplementation(async url => String(url).endsWith('/catalogo')
+      ? { ok: true, json: async () => catalog }
+      : { ok: false, status: 403 })
+    render(<Odontograma pacienteId={7} token={tokenForRole('RECEPCIONISTA')} />)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('No fue posible consultar'))
+    expect(screen.queryByRole('button', { name: 'Asignar Caries' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Guardar odontograma' })).not.toBeInTheDocument()
+  })
   it('has exact 32 FDI positions, catalog and integer money', () => {
     expect(ARCHES).toEqual([[18,17,16,15,14,13,12,11,21,22,23,24,25,26,27,28],[48,47,46,45,44,43,42,41,31,32,33,34,35,36,37,38]])
     expect(new Set(ARCHES.flat()).size).toBe(32)
