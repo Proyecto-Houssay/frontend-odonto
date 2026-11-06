@@ -65,8 +65,9 @@ En producción se necesita un backend accesible por HTTPS y un reverse proxy o c
 | `/centro-inteligente` | Centro de atención inteligente | Resumen, recorrido del paciente, seguimiento y lista de espera |
 | `/historias-clinicas` | Historias clínicas | Vista del módulo |
 | `/usuarios` | Usuarios | Vista del módulo |
-| `/informes` | Informes operativos | Datos de demostración (solo administración) |
-| `/chatbot` | Asistente IA | Chat RAG con citas (paciente y administración) |
+| `/informes` | Informes e inventario | Datos de API para administración, odontología y recepción; acciones financieras y de inventario limitadas por rol |
+| `/informes/demo` | Informes operativos (demo) | Datos de demostración (solo administración) |
+| `/chatbot` | Asistente IA | Chat RAG con citas; disponible en el portal del paciente y para administración |
 | `/odontograma` | Odontograma académico | Integración demostrativa |
 | `/pacientes/:pacienteId/odontograma` | Odontograma de paciente | Integración demostrativa |
 
@@ -116,7 +117,9 @@ La API debe estar levantada localmente para usar las funciones conectadas. Confi
 
 Los informes operativos del prototipo muestran cifras estáticas de demostración, claramente marcadas. No se consultan ni se guardan en el backend. Finanzas, cobros y caja quedaron fuera del alcance.
 
-Las cuentas creadas desde el registro público reciben el rol `PACIENTE` y solo pueden usar el asistente. Los informes y la gestión de usuarios se muestran únicamente a `ADMINISTRADOR`; el backend también valida esos permisos.
+Las cuentas creadas desde el registro público reciben el rol `PACIENTE` y acceden a su portal, no a las rutas internas del personal. `/informes` está disponible para usuarios autenticados del personal; la edición de inventario y el registro de movimientos se ofrecen solo a `ADMINISTRADOR`, mientras que `RECEPCIONISTA` puede consultar cobros. `/informes/demo` y la gestión de usuarios son solo para `ADMINISTRADOR`. Estas restricciones de interfaz no sustituyen la autorización obligatoria del backend.
+
+La vista conectada de informes utiliza el cliente compartido y el proxy `/api` de Vite. Espera los recursos `/api/reports/inventario`, `/api/reports/atenciones`, `/api/reports/anual`, `/api/reports/cobros`, `/api/reports/ganancias` y `/api/finanzas/movimientos`; confirmá que el backend integrado exponga y autorice cada operación antes de considerar el módulo listo. El chatbot conserva el cliente y la sesión compartidos, sin requerir una URL API independiente.
 
 No incluir contraseñas, tokens, archivos `.env` ni datos personales reales en commits.
 
