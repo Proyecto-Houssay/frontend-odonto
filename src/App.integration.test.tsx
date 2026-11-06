@@ -191,4 +191,33 @@ describe('frontend backed by the local API', () => {
     expect(screen.getByText(/Finanzas, cobros y caja quedaron fuera del alcance actual/)).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
+
+  it('connects to real backend reports and inventory when visiting /informes', async () => {
+    fetchMock.mockResolvedValueOnce(response({ token: 'admin-jwt', tokenType: 'Bearer', expiresIn: 900, role: 'ADMINISTRADOR' }))
+    fetchMock.mockResolvedValueOnce(response({
+      modulo: 'Informes y Gestión Odontológica',
+      estado: 'DISPONIBLE',
+      totalAtencionesRegistradas: 42,
+      totalItemsInventario: 5,
+      reportesDisponibles: ['inventario', 'atenciones', 'anual']
+    }))
+    fetchMock.mockResolvedValueOnce(response([
+      { id: 1, nombre: 'Anestesia Tubo', categoria: 'ANESTESIA', cantidadDisponible: 20, unidadMedida: 'tubos', estado: 'DISPONIBLE' }
+    ]))
+    fetchMock.mockResolvedValueOnce(response({
+      anio: 2026,
+      totalAtenciones: 42,
+      meses: [{ mes: 1, nombreMes: 'enero', atenciones: 42 }]
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await login()
+    fireEvent.click(screen.getByRole('link', { name: 'Informes' }))
+
+    expect(await screen.findByRole('heading', { name: 'Informes y Gestión Odontológica' })).toBeInTheDocument()
+    expect(screen.getByText('Conectado a la API backend')).toBeInTheDocument()
+    expect(screen.getByText('Anestesia Tubo')).toBeInTheDocument()
+    expect(fetchMock.mock.calls.some(call => call[0] === '/api/reports')).toBe(true)
+    expect(fetchMock.mock.calls.some(call => call[0] === '/api/reports/inventario')).toBe(true)
+  })
 })

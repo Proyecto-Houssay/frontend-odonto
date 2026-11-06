@@ -55,7 +55,8 @@ function AppRoutes() {
             <Route path="turnos" element={<TurnosPage />} />
             <Route path="historias-clinicas" element={<HistoriasClinicasPage />} />
             {isAdministrator ? <Route path="usuarios" element={<UsuariosPage />} /> : null}
-            {isAdministrator ? <Route path="informes" element={<InformesPage />} /> : null}
+            {isAdministrator ? <Route path="informes" element={<InformesPage demoMode={false} />} /> : null}
+            {isAdministrator ? <Route path="informes/demo" element={<InformesPage demoMode={true} />} /> : null}
             {isAdministrator ? <Route path="chatbot" element={<ChatbotPage />} /> : null}
             <Route path="*" element={<NotFoundPage />} />
           </>

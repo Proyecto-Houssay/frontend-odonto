@@ -38,7 +38,8 @@ const navItems: NavItem[] = [
   { label: 'Historias Clínicas', to: '/historias-clinicas', icon: ClipboardList, roles: clinicalRoles },
   { label: 'Odontograma', to: '/odontograma', icon: ClipboardList, roles: clinicalRoles },
   { label: 'Gestión de Usuarios', to: '/usuarios', icon: UserCheck, roles: ['ADMINISTRADOR'] },
-  { label: 'Informes (demo)', to: '/informes', icon: BarChart3, roles: ['ADMINISTRADOR'] },
+  { label: 'Informes', to: '/informes', icon: BarChart3, roles: ['ADMINISTRADOR'] },
+  { label: 'Informes (demo)', to: '/informes/demo', icon: BarChart3, roles: ['ADMINISTRADOR'] },
   { label: 'Asistente IA', to: '/chatbot', icon: MessageCircle, roles: ['ADMINISTRADOR', 'PACIENTE'] },
 ]
 
@@ -95,7 +96,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               <NavLink
                 key={item.to}
                 to={item.to}
-                end={item.to === '/'}
+                end={item.to === '/' || item.to === '/informes'}
                 onClick={() => {
                   if (window.innerWidth < 1024) onClose()
                 }}
