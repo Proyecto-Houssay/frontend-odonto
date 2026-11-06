@@ -1,116 +1,86 @@
-import React from 'react'
+import type { ElementType } from 'react'
 import { NavLink } from 'react-router-dom'
-import {
-  LayoutDashboard,
-  Users,
-  Stethoscope,
-  Calendar,
-  ClipboardList,
-  UserCheck,
-  BarChart3,
-  X,
-  HeartPulse
-} from 'lucide-react'
+import { BarChart3, CalendarDays, ClipboardCheck, ClipboardList, LayoutDashboard, MessageCircle, Stethoscope, Users, UserRoundCog, X } from 'lucide-react'
+import { useAuth } from '../../auth/useAuth'
+import { roleFromToken, type UserRole } from '../../auth/role'
+import { NovadentBrand } from '../brand/NovadentBrand'
 
 interface SidebarProps {
   isOpen: boolean
   onClose: () => void
 }
 
-interface NavItem {
-  label: string
-  to: string
-  icon: React.ElementType
-}
+type StaffRole = Exclude<UserRole, 'PACIENTE'>
+type NavItem = { label: string; to: string; icon: ElementType; roles: StaffRole[] }
 
+const STAFF_ROLES: StaffRole[] = ['ADMINISTRADOR', 'ODONTOLOGO', 'RECEPCIONISTA']
 const navItems: NavItem[] = [
-  { label: 'Inicio', to: '/', icon: LayoutDashboard },
-  { label: 'Pacientes', to: '/pacientes', icon: Users },
-  { label: 'Odontólogos', to: '/odontologos', icon: Stethoscope },
-  { label: 'Turnos', to: '/turnos', icon: Calendar },
-  { label: 'Historias Clínicas', to: '/historias-clinicas', icon: ClipboardList },
-  { label: 'Odontograma', to: '/odontograma', icon: ClipboardList },
-  { label: 'Gestión de Usuarios', to: '/usuarios', icon: UserCheck },
-  { label: 'Informes y Caja', to: '/informes', icon: BarChart3 },
+  { label: 'Inicio', to: '/', icon: LayoutDashboard, roles: STAFF_ROLES },
+  { label: 'Pacientes', to: '/pacientes', icon: Users, roles: STAFF_ROLES },
+  { label: 'Turnos', to: '/turnos', icon: CalendarDays, roles: STAFF_ROLES },
+  { label: 'Odontólogos', to: '/odontologos', icon: Stethoscope, roles: STAFF_ROLES },
+  { label: 'Historias Clínicas', to: '/historias-clinicas', icon: ClipboardList, roles: ['ADMINISTRADOR', 'ODONTOLOGO'] },
+  { label: 'Odontograma', to: '/odontograma', icon: ClipboardList, roles: STAFF_ROLES },
+  { label: 'Seguimiento', to: '/seguimiento', icon: ClipboardCheck, roles: ['ADMINISTRADOR', 'ODONTOLOGO'] },
+  { label: 'Gestión de Usuarios', to: '/usuarios', icon: UserRoundCog, roles: ['ADMINISTRADOR'] },
+  { label: 'Informes (demo)', to: '/informes', icon: BarChart3, roles: ['ADMINISTRADOR'] },
+  { label: 'Asistente IA', to: '/chatbot', icon: MessageCircle, roles: ['ADMINISTRADOR'] },
 ]
 
-export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
-  return (
-    <>
-      {/* Backdrop para móviles */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden"
-          onClick={onClose}
-          aria-hidden="true"
-        />
-      )}
+const plannedByRole: Record<StaffRole, { label: string; icon: ElementType }[]> = {
+  ADMINISTRADOR: [],
+  ODONTOLOGO: [],
+  RECEPCIONISTA: [
+    { label: 'Confirmaciones', icon: ClipboardCheck },
+  ],
+}
 
-      {/* Menú lateral */}
-      <aside
-        className={`fixed top-0 left-0 z-50 h-full w-64 bg-slate-900 text-slate-100 flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:z-auto ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        {/* Cabecera del Sidebar */}
-        <div className="h-16 flex items-center justify-between px-6 border-b border-slate-800">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md">
-              <HeartPulse className="w-6 h-6" />
-            </div>
-            <div>
-              <span className="font-bold text-lg text-white tracking-wide">Novadent</span>
-              <p className="text-xs text-slate-400">Sistema Odontológico</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 lg:hidden"
-            aria-label="Cerrar menú"
-          >
-            <X className="w-6 h-6" />
-          </button>
+const roleLabel: Record<StaffRole, string> = {
+  ADMINISTRADOR: 'Administración',
+  ODONTOLOGO: 'Odontología',
+  RECEPCIONISTA: 'Recepción',
+}
+
+export function Sidebar({ isOpen, onClose }: SidebarProps) {
+  const { session } = useAuth()
+  const role = session?.role || roleFromToken(session?.token || '')
+  const staffRole = role && role !== 'PACIENTE' ? role : null
+
+  return <>
+    {isOpen ? <div className="fixed inset-0 z-40 bg-slate-900/45 backdrop-blur-sm lg:hidden" onClick={onClose} aria-hidden="true" /> : null}
+    <aside className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-white/70 bg-white/85 shadow-xl shadow-slate-900/10 backdrop-blur-xl transition-transform duration-300 lg:static lg:z-auto lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className="flex items-start justify-between gap-2 border-b border-blue-100 px-5 py-6">
+        <NovadentBrand compact />
+        <button type="button" onClick={onClose} className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 lg:hidden" aria-label="Cerrar menú"><X className="h-5 w-5" /></button>
+      </div>
+      <nav aria-label="Navegación principal" className="flex-1 overflow-y-auto px-4 py-5">
+        <p className="px-3 text-[0.7rem] font-bold uppercase tracking-[0.16em] text-slate-500">Espacio de {staffRole ? roleLabel[staffRole] : 'trabajo'}</p>
+        <div className="mt-3 space-y-1">
+          {navItems.filter(item => staffRole && item.roles.includes(staffRole)).map(({ label, to, icon: Icon }) =>
+            <NavLink key={to} to={to} end={to === '/'} onClick={() => { if (window.innerWidth < 1024) onClose() }}
+              className={({ isActive }) => `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${isActive ? 'bg-blue-600 text-white shadow-sm shadow-blue-900/15' : 'text-slate-700 hover:bg-blue-50 hover:text-blue-800'}`}>
+              <Icon aria-hidden="true" className="h-5 w-5 shrink-0" />
+              <span>{label}</span>
+            </NavLink>,
+          )}
         </div>
-
-        {/* Lista de navegación */}
-        <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
-          <p className="px-3 text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-            Módulos del Sistema
-          </p>
-          {navItems.map((item) => {
-            const Icon = item.icon
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === '/'}
-                onClick={() => {
-                  if (window.innerWidth < 1024) onClose()
-                }}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                  }`
-                }
-              >
-                <Icon className="w-5 h-5 flex-shrink-0" />
-                <span>{item.label}</span>
-              </NavLink>
-            )
-          })}
-        </nav>
-
-        {/* Pie del Sidebar */}
-        <div className="p-4 border-t border-slate-800">
-          <div className="bg-slate-800/60 rounded-xl p-3 text-xs text-slate-400 flex flex-col gap-1">
-            <span className="font-semibold text-slate-200">Sprint 1 - Novadent</span>
-            <span>Versión 0.1.0 (Desarrollo)</span>
-          </div>
+        {staffRole && plannedByRole[staffRole].length ? <div className="mt-8 border-t border-slate-200 pt-5">
+          <p className="px-3 text-[0.7rem] font-bold uppercase tracking-[0.16em] text-slate-500">En preparación</p>
+          <ul className="mt-3 space-y-1">{plannedByRole[staffRole].map(({ label, icon: Icon }) =>
+            <li key={label} className="flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-500">
+              <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
+              <span>{label}</span>
+              <span className="ml-auto text-[0.6rem] font-semibold uppercase tracking-wide">Pronto</span>
+            </li>,
+          )}</ul>
+        </div> : null}
+      </nav>
+      <div className="border-t border-blue-100 p-4">
+        <div className="rounded-xl bg-blue-50 px-3 py-3 text-xs text-slate-600">
+          <p className="font-bold text-blue-900">{staffRole ? roleLabel[staffRole] : 'NovaDent'}</p>
+          <p className="mt-1 break-all">{session?.username || 'Sesión activa'}</p>
         </div>
-      </aside>
-    </>
-  )
+      </div>
+    </aside>
+  </>
 }
