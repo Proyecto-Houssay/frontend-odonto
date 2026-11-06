@@ -89,8 +89,10 @@ export function LoginPage() {
           : 'Ingresar a Novadent'
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-10 flex items-center justify-center">
-      <section className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-7 shadow-sm sm:p-9">
+    <main className="relative isolate flex min-h-dvh items-center justify-center bg-slate-900 px-4 py-8 sm:px-8 lg:justify-end lg:px-16 xl:px-28">
+      <img src="/images/novadent-consultorio.png" alt="" aria-hidden="true" className="absolute inset-0 -z-20 h-full w-full object-cover object-[34%_center] lg:object-center" />
+      <div aria-hidden="true" className="absolute inset-0 -z-10 bg-slate-950/30 lg:bg-linear-to-r lg:from-transparent lg:via-slate-900/5 lg:to-slate-950/40" />
+      <section className="w-full max-w-md rounded-3xl border border-white/80 bg-white/95 p-7 shadow-2xl shadow-slate-950/25 backdrop-blur-xl sm:p-9 lg:max-w-[480px] lg:bg-white/90">
         <div className="mb-7 flex items-center gap-3">
           <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600 text-white">
             <HeartPulse aria-hidden="true" className="h-7 w-7" />
