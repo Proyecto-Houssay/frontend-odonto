@@ -9,8 +9,7 @@ import {
   Calendar,
   BookOpen,
   RotateCcw,
-  Clock,
-  ShieldCheck
+  Clock
 } from 'lucide-react'
 import { askChatbot, type ChatMessage } from '../../lib/chatbot'
 import { useAuth } from '../../auth/useAuth'
@@ -40,7 +39,6 @@ export const ChatbotView: React.FC<{ compact?: boolean }> = ({ compact = false }
   ])
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [isVercelFallbackMode, setIsVercelFallbackMode] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -64,9 +62,6 @@ export const ChatbotView: React.FC<{ compact?: boolean }> = ({ compact = false }
 
     try {
       const { response, isFallback } = await askChatbot(textToSend, session?.token)
-      if (isFallback) {
-        setIsVercelFallbackMode(true)
-      }
 
       const botMsg: ChatMessage = {
         id: `bot-${Date.now()}`,
@@ -167,11 +162,6 @@ export const ChatbotView: React.FC<{ compact?: boolean }> = ({ compact = false }
         </div>
 
         <div className="flex items-center gap-2">
-          {isVercelFallbackMode && (
-            <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded bg-emerald-950/80 text-emerald-300 border border-emerald-700/50">
-              <ShieldCheck className="w-3 h-3" /> Preview Vercel Activa
-            </span>
-          )}
           <button
             type="button"
             onClick={handleReset}
@@ -193,26 +183,26 @@ export const ChatbotView: React.FC<{ compact?: boolean }> = ({ compact = false }
             key={i}
             type="button"
             onClick={() => handleSend(sq.text)}
-            disabled={isLoading}
-            className="whitespace-nowrap px-3 py-1 bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-full border border-slate-200 hover:border-blue-300 transition-colors shadow-2xs font-medium"
+            className="whitespace-nowrap px-2.5 py-1 rounded-full bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 hover:border-blue-300 transition-colors shadow-2xs"
           >
             {sq.text}
           </button>
         ))}
       </div>
 
-      {/* Contenedor de mensajes */}
-      <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4 bg-slate-50/50">
+      {/* Lista de Mensajes */}
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-slate-50/50">
         {messages.map((msg) => {
           const isUser = msg.role === 'user'
+
           return (
             <div
               key={msg.id}
               className={`flex items-start gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
             >
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-2xs ${
-                  isUser ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-100'
+                className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-white text-xs shadow-2xs ${
+                  isUser ? 'bg-blue-600' : 'bg-slate-800'
                 }`}
               >
                 {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
@@ -225,14 +215,9 @@ export const ChatbotView: React.FC<{ compact?: boolean }> = ({ compact = false }
                     : 'bg-white text-slate-800 border border-slate-200 rounded-tl-none'
                 }`}
               >
-                {!isUser && msg.intencion && (
+                {!isUser && msg.intencion && renderBadge(msg.intencion) && (
                   <div className="mb-2 flex items-center gap-2">
                     {renderBadge(msg.intencion)}
-                    {msg.isFallback && (
-                      <span className="text-[10px] text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded font-mono">
-                        Base RAG Local
-                      </span>
-                    )}
                   </div>
                 )}
 
