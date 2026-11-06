@@ -1,15 +1,12 @@
 import React from 'react'
 import {
-  Sparkles,
   ShieldCheck,
-  Stethoscope,
   HeartPulse,
   BadgeAlert,
   Calendar,
   BadgeDollarSign,
   PhoneCall,
-  Clock,
-  ChevronDown
+  Clock
 } from 'lucide-react'
 import { ChatbotView } from '../components/chatbot/ChatbotView'
 
@@ -102,43 +99,6 @@ export const ChatbotPage: React.FC = () => {
           </span>
         </div>
       </div>
-
-      {/* Ficha Técnica y Arquitectura RAG (Desplegable para docentes y evaluadores) */}
-      <details className="group rounded-2xl border border-slate-200 bg-white p-5 text-slate-600 text-xs shadow-2xs transition-all">
-        <summary className="cursor-pointer font-bold text-slate-800 text-sm flex items-center justify-between list-none">
-          <div className="flex items-center gap-2">
-            <Stethoscope className="w-4 h-4 text-blue-600" />
-            <span>Ficha Técnica y Arquitectura RAG (Aporte Excepcional: Josue)</span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-semibold">
-              Spring AI
-            </span>
-          </div>
-          <ChevronDown className="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform" />
-        </summary>
-
-        <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <p className="font-semibold text-slate-700 mb-1 flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-amber-500" /> Stack Tecnológico:
-            </p>
-            <ul className="list-disc list-inside space-y-1 text-slate-600">
-              <li><strong>Backend:</strong> Spring Boot 3.5.6 + Spring AI (VectorStore + OpenAI / Ollama).</li>
-              <li><strong>Document Ingestion:</strong> Ingesta de Markdown estructurado de protocolos de urgencia y nomenclador oficial.</li>
-              <li><strong>Endpoints REST:</strong> <code>POST /api/chatbot/ask</code> y <code>POST /api/chatbot/knowledge</code>.</li>
-            </ul>
-          </div>
-          <div>
-            <p className="font-semibold text-slate-700 mb-1 flex items-center gap-1">
-              <ShieldCheck className="w-3 h-3 text-emerald-600" /> Beneficios Clínicos y Operativos:
-            </p>
-            <ul className="list-disc list-inside space-y-1 text-slate-600">
-              <li>Reduce el 70% de consultas telefónicas y por WhatsApp a recepción.</li>
-              <li>Respuestas 100% verificables con citas documentales sin riesgo de alucinación médica.</li>
-              <li>Modo híbrido resiliente: fallback local autónomo para demostraciones en vivo y Vercel Preview.</li>
-            </ul>
-          </div>
-        </div>
-      </details>
     </div>
   )
 }
