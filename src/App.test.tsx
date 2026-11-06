@@ -30,7 +30,7 @@ describe('App authentication and role navigation', () => {
 
     render(<App />)
 
-    expect(await screen.findByRole('link', { name: 'Informes', exact: true })).toHaveAttribute('href', '/informes')
+    expect(await screen.findByRole('link', { name: /^Informes$/ })).toHaveAttribute('href', '/informes')
     expect(screen.getByRole('link', { name: 'Informes (demo)' })).toHaveAttribute('href', '/informes/demo')
   })
 

@@ -64,7 +64,7 @@ function AppRoutes() {
         <Route path="centro-inteligente" element={<ClinicalRoute role={role}><CentroInteligentePage /></ClinicalRoute>} />
         <Route path="historias-clinicas" element={<ClinicalRoute role={role}><HistoriasClinicasPage /></ClinicalRoute>} />
         {role === 'ADMINISTRADOR' ? <Route path="usuarios" element={<UsuariosPage />} /> : null}
-        {role !== 'PACIENTE' ? <Route path="informes" element={<ReportsPage />} /> : null}
+        <Route path="informes" element={<ReportsPage />} />
         {role === 'ADMINISTRADOR' ? <Route path="informes/demo" element={<InformesPage />} /> : null}
         {role === 'ADMINISTRADOR' ? <Route path="chatbot" element={<ChatbotPage />} /> : null}
         <Route path="*" element={<NotFoundPage />} />

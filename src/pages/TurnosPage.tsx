@@ -101,6 +101,17 @@ function startOfWeek(date: Date) {
   start.setHours(0, 0, 0, 0)
   return start
 }
+function addMonthsClamped(date: Date, offset: number) {
+  const target = new Date(date.getFullYear(), date.getMonth() + offset, 1, 12)
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate()
+  target.setDate(Math.min(date.getDate(), lastDay))
+  return target
+}
+function monthRangeLabel(date: Date) {
+  const first = new Date(date.getFullYear(), date.getMonth(), 1, 12)
+  const last = new Date(date.getFullYear(), date.getMonth() + 1, 0, 12)
+  return `${formatDate(first, { day: 'numeric', month: 'short' })} – ${formatDate(last, { day: 'numeric', month: 'short', year: 'numeric' })}`
+}
 function formatDate(date: Date, options: Intl.DateTimeFormatOptions) {
   return new Intl.DateTimeFormat('es-AR', options).format(date)
 }
@@ -132,6 +143,11 @@ export function TurnosPage({ token }: { token: string }) {
   const [bookingError, setBookingError] = useState('')
   const [bookingSuccess, setBookingSuccess] = useState('')
   const [week, setWeek] = useState(() => startOfWeek(new Date()))
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const current = new Date()
+    return new Date(current.getFullYear(), current.getMonth(), 1, 12)
+  })
+  const [viewMode, setViewMode] = useState<'week' | 'month'>('week')
   const [selectedDay, setSelectedDay] = useState(dateKey(new Date()))
   const [dentistFilter, setDentistFilter] = useState('all')
   const [loading, setLoading] = useState(true)
@@ -145,9 +161,14 @@ export function TurnosPage({ token }: { token: string }) {
     setLoading(true)
     setLoadError('')
     try {
-      const weekEnd = new Date(week)
-      weekEnd.setDate(week.getDate() + 6)
-      const from = dateKey(week), through = dateKey(weekEnd)
+      const periodStart = viewMode === 'month'
+        ? new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1, 12)
+        : week
+      const periodEnd = viewMode === 'month'
+        ? new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0, 12)
+        : new Date(week)
+      if (viewMode === 'week') periodEnd.setDate(week.getDate() + 6)
+      const from = dateKey(periodStart), through = dateKey(periodEnd)
       const filter = dentistFilter === 'all' ? '' : `&odontologoId=${encodeURIComponent(dentistFilter)}`
       const [turnos, profesionales, virtuales] = await Promise.all([
         getJson<Appointment[]>('/turnos', token),
@@ -178,7 +199,7 @@ export function TurnosPage({ token }: { token: string }) {
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'No se pudo cargar la agenda.')
     } finally { setLoading(false) }
-  }, [week, dentistFilter, token])
+  }, [week, calendarMonth, viewMode, dentistFilter, token])
 
   useEffect(() => { void loadAgenda() }, [loadAgenda])
 
@@ -187,6 +208,16 @@ export function TurnosPage({ token }: { token: string }) {
     day.setDate(week.getDate() + i)
     return day
   }), [week])
+  const monthDays = useMemo(() => {
+    const first = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1, 12)
+    const last = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0, 12)
+    const start = startOfWeek(first)
+    const end = startOfWeek(last)
+    end.setDate(end.getDate() + 6)
+    const days: Date[] = []
+    for (const day = new Date(start); day <= end; day.setDate(day.getDate() + 1)) days.push(new Date(day))
+    return days
+  }, [calendarMonth])
   const visibleAppointments = useMemo(() => appointments.filter((appointment) =>
     appointment.fecha === selectedDay,
   ).sort((a, b) => a.hora.localeCompare(b.hora)), [appointments, selectedDay, dentistFilter])
@@ -212,6 +243,18 @@ export function TurnosPage({ token }: { token: string }) {
     const nextSelected = new Date(selectedDay + 'T12:00:00')
     nextSelected.setDate(nextSelected.getDate() + offset * 7)
     setSelectedDay(dateKey(nextSelected))
+  }
+
+  const jumpPeriod = (offset: number) => {
+    if (viewMode === 'week') {
+      jumpWeek(offset)
+      return
+    }
+    const selectedDate = new Date(`${selectedDay}T12:00:00`)
+    const nextDate = addMonthsClamped(selectedDate, offset)
+    setSelectedDay(dateKey(nextDate))
+    setWeek(startOfWeek(nextDate))
+    setCalendarMonth(new Date(nextDate.getFullYear(), nextDate.getMonth(), 1, 12))
   }
 
   const findAvailableSlots = async () => {
@@ -302,6 +345,7 @@ export function TurnosPage({ token }: { token: string }) {
       const appointmentDate = new Date(`${appointmentForm.fecha}T12:00:00`)
       setWeek(startOfWeek(appointmentDate))
       setSelectedDay(appointmentForm.fecha)
+      setCalendarMonth(new Date(appointmentDate.getFullYear(), appointmentDate.getMonth(), 1, 12))
       setAppointmentSuccess('Turno presencial registrado correctamente.')
       setAppointmentForm({ pacienteId: '', odontologoId: '', fecha: dateKey(new Date()), hora: '', motivo: '' })
       setShowAppointmentForm(false)
@@ -348,19 +392,22 @@ export function TurnosPage({ token }: { token: string }) {
       <div className={`grid items-start gap-5 ${chatOpen ? '2xl:grid-cols-[minmax(0,1fr)_360px]' : 'grid-cols-1'}`}>
         <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-col gap-4 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-            <div><p className="text-xs font-medium uppercase tracking-wider text-slate-400">Vista semanal</p><h2 className="mt-1 text-lg font-bold capitalize text-slate-800">{formatDate(week, { month: 'long', year: 'numeric' })}</h2></div>
+            <div><p className="text-xs font-medium uppercase tracking-wider text-slate-400">Vista {viewMode === 'month' ? 'mensual' : 'semanal'}</p><h2 className="mt-1 text-lg font-bold capitalize text-slate-800">{viewMode === 'month' ? monthRangeLabel(calendarMonth) : formatDate(week, { month: 'long', year: 'numeric' })}</h2></div>
             <div className="flex flex-wrap items-center gap-2">
               <label className="relative"><span className="sr-only">Filtrar por odontólogo</span><Stethoscope className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} /><select value={dentistFilter} onChange={(event) => setDentistFilter(event.target.value)} className="max-w-48 rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-700 outline-none focus:border-teal-500"><option value="all">Todo el equipo</option>{dentists.map((dentist) => <option key={dentist.id} value={dentist.id}>Dra./Dr. {dentist.apellido}</option>)}</select></label>
-              <div className="flex rounded-lg border border-slate-200 p-0.5"><button onClick={() => jumpWeek(-1)} aria-label="Semana anterior" className="rounded-md p-2 text-slate-500 hover:bg-slate-100"><ArrowLeft size={16} /></button><button onClick={() => { setWeek(startOfWeek(new Date())); setSelectedDay(dateKey(new Date())) }} className="px-2 text-xs font-semibold text-slate-600 hover:text-teal-700">Hoy</button><button onClick={() => jumpWeek(1)} aria-label="Semana siguiente" className="rounded-md p-2 text-slate-500 hover:bg-slate-100"><ArrowRight size={16} /></button></div>
+              <div role="group" aria-label="Vista de agenda" className="flex rounded-lg border border-slate-200 p-0.5"><button type="button" aria-pressed={viewMode === 'week'} onClick={() => { setWeek(startOfWeek(new Date(`${selectedDay}T12:00:00`))); setViewMode('week') }} className={`rounded-md px-2 py-1.5 text-xs font-semibold ${viewMode === 'week' ? 'bg-teal-50 text-teal-700' : 'text-slate-500 hover:bg-slate-100'}`}>Semana</button><button type="button" aria-pressed={viewMode === 'month'} onClick={() => { const selected = new Date(`${selectedDay}T12:00:00`); setCalendarMonth(new Date(selected.getFullYear(), selected.getMonth(), 1, 12)); setViewMode('month') }} className={`rounded-md px-2 py-1.5 text-xs font-semibold ${viewMode === 'month' ? 'bg-teal-50 text-teal-700' : 'text-slate-500 hover:bg-slate-100'}`}>Mes</button></div>
+              <div className="flex rounded-lg border border-slate-200 p-0.5"><button onClick={() => jumpPeriod(-1)} aria-label="Período anterior" className="rounded-md p-2 text-slate-500 hover:bg-slate-100"><ArrowLeft size={16} /></button><button onClick={() => { const today = new Date(); setWeek(startOfWeek(today)); setCalendarMonth(new Date(today.getFullYear(), today.getMonth(), 1, 12)); setSelectedDay(dateKey(today)) }} className="px-2 text-xs font-semibold text-slate-600 hover:text-teal-700">Hoy</button><button onClick={() => jumpPeriod(1)} aria-label="Período siguiente" className="rounded-md p-2 text-slate-500 hover:bg-slate-100"><ArrowRight size={16} /></button></div>
               {!chatOpen && <button onClick={() => setChatOpen(true)} className="inline-flex items-center gap-2 rounded-lg bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700"><Sparkles size={15} /> Asistente</button>}
             </div>
           </div>
 
-          <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50/70">
-            {weekDays.map((day, index) => {
+          {viewMode === 'month' && <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50/70">{weekdays.map((day) => <span key={day} className="px-1 py-2 text-center text-[10px] font-semibold uppercase text-slate-400">{day}</span>)}</div>}
+          <div className={viewMode === 'month' ? 'grid grid-cols-7 border-b border-slate-100 bg-white' : 'grid grid-cols-7 border-b border-slate-100 bg-slate-50/70'}>
+            {(viewMode === 'month' ? monthDays : weekDays).map((day, index) => {
               const key = dateKey(day), isSelected = key === selectedDay, isToday = key === dateKey(new Date())
               const count = appointments.filter((appointment) => appointment.fecha === key).length
-              return <button key={key} onClick={() => setSelectedDay(key)} className={`relative flex min-h-[78px] flex-col items-center justify-center gap-1 border-r border-slate-100 px-1 transition last:border-r-0 ${isSelected ? 'bg-teal-50' : 'hover:bg-white'}`}><span className={`text-[11px] font-semibold uppercase ${isSelected ? 'text-teal-700' : 'text-slate-400'}`}>{weekdays[index]}</span><span className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${isSelected ? 'bg-teal-700 text-white' : isToday ? 'border border-teal-200 text-teal-700' : 'text-slate-700'}`}>{day.getDate()}</span><span className="text-[10px] text-slate-400">{count ? `${count} ${count === 1 ? 'turno' : 'turnos'}` : '—'}</span></button>
+              const dayIsInMonth = day.getMonth() === calendarMonth.getMonth()
+              return <button key={key} onClick={() => { setSelectedDay(key); setWeek(startOfWeek(day)); if (day.getMonth() !== calendarMonth.getMonth() || day.getFullYear() !== calendarMonth.getFullYear()) setCalendarMonth(new Date(day.getFullYear(), day.getMonth(), 1, 12)) }} aria-label={`Seleccionar ${formatDate(day, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`} aria-pressed={isSelected} className={`relative flex ${viewMode === 'month' ? 'min-h-[64px]' : 'min-h-[78px]'} flex-col items-center justify-center gap-1 border-r border-b border-slate-100 px-1 transition last:border-r-0 ${isSelected ? 'bg-teal-50' : 'hover:bg-slate-50'} ${viewMode === 'month' && !dayIsInMonth ? 'opacity-45' : ''}`}><span className={`text-[11px] font-semibold uppercase ${isSelected ? 'text-teal-700' : 'text-slate-400'}`}>{viewMode === 'week' ? weekdays[index] : ''}</span><span className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${isSelected ? 'bg-teal-700 text-white' : isToday ? 'border border-teal-200 text-teal-700' : 'text-slate-700'}`}>{day.getDate()}</span><span className="text-[10px] text-slate-400">{count ? `${count} ${count === 1 ? 'turno' : 'turnos'}` : '—'}</span></button>
             })}
           </div>
 
