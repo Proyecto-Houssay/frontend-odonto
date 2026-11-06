@@ -1,6 +1,6 @@
 import type { ElementType } from 'react'
 import { NavLink } from 'react-router-dom'
-import { BarChart3, CalendarDays, ClipboardCheck, ClipboardList, LayoutDashboard, MessageCircle, Stethoscope, Users, UserRoundCog, X } from 'lucide-react'
+import { BarChart3, CalendarDays, ClipboardCheck, ClipboardList, LayoutDashboard, MessageCircle, Sparkles, Stethoscope, Users, UserRoundCog, Video, X } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { roleFromToken, type UserRole } from '../../auth/role'
 import { NovadentBrand } from '../brand/NovadentBrand'
@@ -18,6 +18,8 @@ const navItems: NavItem[] = [
   { label: 'Inicio', to: '/', icon: LayoutDashboard, roles: STAFF_ROLES },
   { label: 'Pacientes', to: '/pacientes', icon: Users, roles: STAFF_ROLES },
   { label: 'Turnos', to: '/turnos', icon: CalendarDays, roles: STAFF_ROLES },
+  { label: 'Teletriaje', to: '/teletriaje', icon: Video, roles: STAFF_ROLES },
+  { label: 'Centro inteligente', to: '/centro-inteligente', icon: Sparkles, roles: ['ADMINISTRADOR', 'ODONTOLOGO'] },
   { label: 'Odontólogos', to: '/odontologos', icon: Stethoscope, roles: STAFF_ROLES },
   { label: 'Historias Clínicas', to: '/historias-clinicas', icon: ClipboardList, roles: ['ADMINISTRADOR', 'ODONTOLOGO'] },
   { label: 'Odontograma', to: '/odontograma', icon: ClipboardList, roles: STAFF_ROLES },

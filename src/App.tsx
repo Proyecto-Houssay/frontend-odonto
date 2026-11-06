@@ -12,6 +12,8 @@ import { OdontologosPage } from './pages/OdontologosPage'
 import { HistoriasClinicasPage } from './pages/HistoriasClinicasPage'
 import { UsuariosPage } from './pages/UsuariosPage'
 import { InformesPage } from './pages/InformesPage'
+import { TeletriajePage } from './pages/TeletriajePage'
+import { CentroInteligentePage } from './pages/CentroInteligentePage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { PortalPaciente } from './pages/PortalPaciente'
 import { SeguimientoPage } from './pages/SeguimientoPage'
@@ -57,6 +59,8 @@ function AppRoutes() {
         <Route path="pacientes/:pacienteId/odontograma" element={<ClinicalRoute role={role} allowReception><OdontogramaRoute demoMode={false} /></ClinicalRoute>} />
         <Route path="odontologos" element={<OdontologosPage />} />
         <Route path="turnos" element={<TurnosPage token={session.token} />} />
+        <Route path="teletriaje" element={<ClinicalRoute role={role} allowReception><TeletriajePage /></ClinicalRoute>} />
+        <Route path="centro-inteligente" element={<ClinicalRoute role={role}><CentroInteligentePage /></ClinicalRoute>} />
         <Route path="historias-clinicas" element={<ClinicalRoute role={role}><HistoriasClinicasPage /></ClinicalRoute>} />
         {role === 'ADMINISTRADOR' ? <Route path="usuarios" element={<UsuariosPage />} /> : null}
         {role === 'ADMINISTRADOR' ? <Route path="informes" element={<InformesPage />} /> : null}

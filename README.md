@@ -60,7 +60,9 @@ En producción se necesita un backend accesible por HTTPS y un reverse proxy o c
 | `/` | Dashboard | Estructura principal |
 | `/pacientes` | Pacientes | Vista del módulo |
 | `/odontologos` | Odontólogos | Vista del módulo |
-| `/turnos` | Turnos | Vista del módulo |
+| `/turnos` | Agenda inteligente | Turnos presenciales, teleconsultas y consulta de disponibilidad |
+| `/teletriaje` | Teletriaje | Cola prioritaria y reservas de teleconsulta |
+| `/centro-inteligente` | Centro de atención inteligente | Resumen, recorrido del paciente, seguimiento y lista de espera |
 | `/historias-clinicas` | Historias clínicas | Vista del módulo |
 | `/usuarios` | Usuarios | Vista del módulo |
 | `/informes` | Informes operativos | Datos de demostración (solo administración) |
@@ -79,12 +81,18 @@ Al abrir el frontend, iniciá sesión con una cuenta existente o usá **Crear un
 
 La pantalla **Pacientes** usa `GET`, `POST`, `PUT` y `DELETE /api/pacientes`, con los campos y validaciones que exige el backend. Crear y editar vuelven a cargar la lista para mostrar los datos confirmados por la API. Un DNI repetido o un paciente con registros vinculados se informa con el mensaje devuelto por el backend.
 
+## Teletriaje y centro de atención
+
+La agenda reúne turnos presenciales y teleconsultas, permite consultar disponibilidad, solicitar una teleconsulta con consentimiento informado y descargar recordatorios de calendario. La ruta `/teletriaje` muestra la cola de solicitudes y el flujo de validación y reserva. `/centro-inteligente` resume turnos y teletriaje, con prioridad orientativa, revisión humana, accesibilidad y privacidad.
+
+La prioridad sugerida no es un diagnóstico ni reemplaza la evaluación profesional. Las preferencias de lista de espera y marcas de seguimiento del centro inteligente son demostrativas y permanecen en la sesión del navegador; no generan reservas ni notificaciones.
+
 
 ## Odontograma académico
 
-La vista en `src/pages/Odontograma.jsx` es una demostración y no reemplaza la historia clínica. Para probarla, usar un paciente existente y un JWT vigente de rol `ODONTOLOGO` o `ADMINISTRADOR`, obtenido mediante `POST /api/auth/login` en Swagger. El login visual del dashboard no crea una sesión de API.
+La vista en `src/pages/Odontograma.jsx` es una demostración y no reemplaza la historia clínica. Para la ruta API, iniciá sesión en el frontend con un usuario `ODONTOLOGO` o `ADMINISTRADOR` y seleccioná un paciente existente. El componente recibe el JWT vigente de la sesión de la aplicación; no es necesario copiar el token desde Swagger.
 
-El token se ingresa en el campo enmascarado **Token Bearer** y permanece solo en memoria; no se guarda en `localStorage`. La pantalla permite seleccionar piezas, revisar la ficha del paciente, asignar condiciones, revisar un presupuesto ilustrativo, aceptar el consentimiento, firmar, guardar y generar un PDF. Solo una respuesta de guardado confirmada por la API indica persistencia; un PDF local se considera borrador.
+La pantalla permite seleccionar piezas, revisar la ficha del paciente, asignar condiciones, revisar un presupuesto ilustrativo, aceptar el consentimiento, firmar, guardar y generar un PDF. Solo una respuesta de guardado confirmada por la API indica persistencia; un PDF local se considera borrador.
 
 Tratamientos y precios son ilustrativos y requieren validación profesional. No hay cobros. El catálogo y consentimiento `academic-v1` se verifican con la API antes de firmar; si cambia el paciente, la selección o el consentimiento, se invalida la firma. La redimensión del canvas también revoca la captura y la aceptación.
 
