@@ -61,6 +61,8 @@ En producción se necesita un backend accesible por HTTPS y un reverse proxy o c
 | `/pacientes` | Pacientes | Vista del módulo |
 | `/odontologos` | Odontólogos | Vista del módulo |
 | `/turnos` | Turnos | Vista del módulo |
+| `/teletriaje` | Teletriaje | Cola prioritaria y reservas de teleconsulta |
+| `/centro-inteligente` | Centro de atención inteligente | Resumen, recorrido del paciente, seguimiento y lista de espera |
 | `/historias-clinicas` | Historias clínicas | Vista del módulo |
 | `/usuarios` | Usuarios | Vista del módulo |
 | `/informes` | Informes y caja | Placeholder |
@@ -68,6 +70,12 @@ En producción se necesita un backend accesible por HTTPS y un reverse proxy o c
 | `/pacientes/:pacienteId/odontograma` | Odontograma de paciente | Integración demostrativa |
 
 Las vistas de módulos se completan junto con sus historias de usuario y tareas técnicas. La estructura de rutas y el layout son compartidos.
+
+## Centro de atención inteligente
+
+La ruta `/centro-inteligente` reúne información de pacientes, turnos y teletriaje desde la API. Incluye indicadores operativos, el recorrido de un paciente, criterios visibles de prioridad, controles de accesibilidad y un panel de privacidad. La prioridad del teletriaje es orientativa y las señales de alarma requieren revisión humana; no se generan diagnósticos automáticos.
+
+La lista de espera consulta horarios disponibles por profesional y fecha. Las preferencias agregadas y las marcas de seguimiento son demostrativas y viven solo durante la sesión del navegador: todavía no se persisten en el backend, no envían notificaciones y no reservan turnos automáticamente. No ingreses información clínica en esas acciones de demostración.
 
 ## Odontograma académico
 

@@ -9,6 +9,7 @@ import { HistoriasClinicasPage } from './pages/HistoriasClinicasPage'
 import { UsuariosPage } from './pages/UsuariosPage'
 import { InformesPage } from './pages/InformesPage'
 import { TeletriajePage } from './pages/TeletriajePage'
+import { CentroInteligentePage } from './pages/CentroInteligentePage'
 import { NotFoundPage } from './pages/NotFoundPage'
 
 const Odontograma = lazy(() => import('./pages/Odontograma.jsx'))
@@ -31,6 +32,7 @@ export function App() {
           <Route path="odontologos" element={<OdontologosPage />} />
           <Route path="turnos" element={<TurnosPage />} />
           <Route path="teletriaje" element={<TeletriajePage />} />
+          <Route path="centro-inteligente" element={<CentroInteligentePage />} />
           <Route path="historias-clinicas" element={<HistoriasClinicasPage />} />
           <Route path="usuarios" element={<UsuariosPage />} />
           <Route path="informes" element={<InformesPage />} />

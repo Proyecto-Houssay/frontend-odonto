@@ -10,7 +10,8 @@ import {
   BarChart3,
   X,
   HeartPulse,
-  Video
+  Video,
+  Sparkles,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -30,6 +31,7 @@ const navItems: NavItem[] = [
   { label: 'Odontólogos', to: '/odontologos', icon: Stethoscope },
   { label: 'Turnos', to: '/turnos', icon: Calendar },
   { label: 'Teletriaje', to: '/teletriaje', icon: Video },
+  { label: 'Centro inteligente', to: '/centro-inteligente', icon: Sparkles },
   { label: 'Historias Clínicas', to: '/historias-clinicas', icon: ClipboardList },
   { label: 'Odontograma', to: '/odontograma', icon: ClipboardList },
   { label: 'Gestión de Usuarios', to: '/usuarios', icon: UserCheck },
