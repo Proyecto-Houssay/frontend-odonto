@@ -1,5 +1,6 @@
 import React from 'react'
-import { Menu, LogOut, Bell } from 'lucide-react'
+import { Menu, LogOut } from 'lucide-react'
+import { NotificationCenter } from './NotificationCenter'
 
 interface NavbarProps {
   onToggleSidebar: () => void
@@ -34,15 +35,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
 
       {/* Zona derecha: Notificaciones y Perfil */}
       <div className="flex items-center gap-2 sm:gap-4">
-        {/* Notificaciones */}
-        <button
-          type="button"
-          className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-700 relative"
-          aria-label="Notificaciones"
-        >
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full" />
-        </button>
+        <NotificationCenter />
 
         {/* Separador */}
         <div className="h-8 w-px bg-slate-200" />
