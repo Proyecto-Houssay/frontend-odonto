@@ -60,28 +60,40 @@ En producción se necesita un backend accesible por HTTPS y un reverse proxy o c
 | `/` | Dashboard | Estructura principal |
 | `/pacientes` | Pacientes | Vista del módulo |
 | `/odontologos` | Odontólogos | Vista del módulo |
-| `/turnos` | Turnos | Vista del módulo |
+| `/turnos` | Agenda inteligente | Turnos presenciales, teleconsultas y consulta de disponibilidad |
 | `/teletriaje` | Teletriaje | Cola prioritaria y reservas de teleconsulta |
 | `/centro-inteligente` | Centro de atención inteligente | Resumen, recorrido del paciente, seguimiento y lista de espera |
 | `/historias-clinicas` | Historias clínicas | Vista del módulo |
 | `/usuarios` | Usuarios | Vista del módulo |
-| `/informes` | Informes y caja | Placeholder |
+| `/informes` | Informes e inventario | Datos de API para administración, odontología y recepción; acciones financieras y de inventario limitadas por rol |
+| `/informes/demo` | Informes operativos (demo) | Datos de demostración (solo administración) |
+| `/chatbot` | Asistente IA | Chat RAG con citas; disponible en el portal del paciente y para administración |
 | `/odontograma` | Odontograma académico | Integración demostrativa |
 | `/pacientes/:pacienteId/odontograma` | Odontograma de paciente | Integración demostrativa |
 
 Las vistas de módulos se completan junto con sus historias de usuario y tareas técnicas. La estructura de rutas y el layout son compartidos.
 
-## Centro de atención inteligente
 
-La ruta `/centro-inteligente` reúne información de pacientes, turnos y teletriaje desde la API. Incluye indicadores operativos, el recorrido de un paciente, criterios visibles de prioridad, controles de accesibilidad y un panel de privacidad. La prioridad del teletriaje es orientativa y las señales de alarma requieren revisión humana; no se generan diagnósticos automáticos.
+## Inicio de sesión y pacientes
 
-La lista de espera consulta horarios disponibles por profesional y fecha. Las preferencias agregadas y las marcas de seguimiento son demostrativas y viven solo durante la sesión del navegador: todavía no se persisten en el backend, no envían notificaciones y no reservan turnos automáticamente. No ingreses información clínica en esas acciones de demostración.
+Al abrir el frontend, iniciá sesión con una cuenta existente o usá **Crear una cuenta**. El alta pública llama `POST /api/auth/register`; si SMTP no está configurado, la cuenta igualmente se crea y la pantalla indica claramente que el correo no se envió. La aplicación llama `POST /api/auth/login` y conserva el JWT en `sessionStorage` de esta pestaña hasta cerrar sesión o vencer (15 minutos). El botón **Cerrar sesión** elimina esa sesión.
+
+**Recuperar contraseña:** elegí **¿Olvidaste tu contraseña?**, ingresá el correo y seguí el enlace recibido para establecer una clave nueva. El mensaje no confirma si el correo pertenece a una cuenta. Para que los correos lleguen, configurá SMTP en el `.env` privado del backend y reinicialo; la guía está en el README del backend. Sin SMTP, la pantalla avisa que el envío no está configurado y no simula que se mandó un correo. El enlace por defecto apunta a `http://localhost:5174`; si Vite usa otro puerto, definí `APP_FRONTEND_BASE_URL` en el entorno del backend.
+
+La pantalla **Pacientes** usa `GET`, `POST`, `PUT` y `DELETE /api/pacientes`, con los campos y validaciones que exige el backend. Crear y editar vuelven a cargar la lista para mostrar los datos confirmados por la API. Un DNI repetido o un paciente con registros vinculados se informa con el mensaje devuelto por el backend.
+
+## Teletriaje y centro de atención
+
+La agenda reúne turnos presenciales y teleconsultas, permite consultar disponibilidad, solicitar una teleconsulta con consentimiento informado y descargar recordatorios de calendario. La ruta `/teletriaje` muestra la cola de solicitudes y el flujo de validación y reserva. `/centro-inteligente` resume turnos y teletriaje, con prioridad orientativa, revisión humana, accesibilidad y privacidad.
+
+La prioridad sugerida no es un diagnóstico ni reemplaza la evaluación profesional. Las preferencias de lista de espera y marcas de seguimiento del centro inteligente son demostrativas y permanecen en la sesión del navegador; no generan reservas ni notificaciones.
+
 
 ## Odontograma académico
 
-La vista en `src/pages/Odontograma.jsx` es una demostración y no reemplaza la historia clínica. Para probarla, usar un paciente existente y un JWT vigente de rol `ODONTOLOGO` o `ADMINISTRADOR`, obtenido mediante `POST /api/auth/login` en Swagger. El login visual del dashboard no crea una sesión de API.
+La vista en `src/pages/Odontograma.jsx` es una demostración y no reemplaza la historia clínica. Para la ruta API, iniciá sesión en el frontend con un usuario `ODONTOLOGO` o `ADMINISTRADOR` y seleccioná un paciente existente. El componente recibe el JWT vigente de la sesión de la aplicación; no es necesario copiar el token desde Swagger.
 
-El token se ingresa en el campo enmascarado **Token Bearer** y permanece solo en memoria; no se guarda en `localStorage`. La pantalla permite seleccionar piezas, revisar la ficha del paciente, asignar condiciones, revisar un presupuesto ilustrativo, aceptar el consentimiento, firmar, guardar y generar un PDF. Solo una respuesta de guardado confirmada por la API indica persistencia; un PDF local se considera borrador.
+La pantalla permite seleccionar piezas, revisar la ficha del paciente, asignar condiciones, revisar un presupuesto ilustrativo, aceptar el consentimiento, firmar, guardar y generar un PDF. Solo una respuesta de guardado confirmada por la API indica persistencia; un PDF local se considera borrador.
 
 Tratamientos y precios son ilustrativos y requieren validación profesional. No hay cobros. El catálogo y consentimiento `academic-v1` se verifican con la API antes de firmar; si cambia el paciente, la selección o el consentimiento, se invalida la firma. La redimensión del canvas también revoca la captura y la aceptación.
 
@@ -102,6 +114,12 @@ docs/
 ## Trabajo con el backend
 
 La API debe estar levantada localmente para usar las funciones conectadas. Confirmar las rutas y roles vigentes en Swagger antes de integrar un módulo. Manejar los estados de carga, vacío, error, validación, falta de autorización y éxito; no reemplazar silenciosamente errores de API con mocks.
+
+Los informes operativos del prototipo muestran cifras estáticas de demostración, claramente marcadas. No se consultan ni se guardan en el backend. Finanzas, cobros y caja quedaron fuera del alcance.
+
+Las cuentas creadas desde el registro público reciben el rol `PACIENTE` y acceden a su portal, no a las rutas internas del personal. `/informes` está disponible para usuarios autenticados del personal; la edición de inventario y el registro de movimientos se ofrecen solo a `ADMINISTRADOR`, mientras que `RECEPCIONISTA` puede consultar cobros. `/informes/demo` y la gestión de usuarios son solo para `ADMINISTRADOR`. Estas restricciones de interfaz no sustituyen la autorización obligatoria del backend.
+
+La vista conectada de informes utiliza el cliente compartido y el proxy `/api` de Vite. Espera los recursos `/api/reports/inventario`, `/api/reports/atenciones`, `/api/reports/anual`, `/api/reports/cobros`, `/api/reports/ganancias` y `/api/finanzas/movimientos`; confirmá que el backend integrado exponga y autorice cada operación antes de considerar el módulo listo. El chatbot conserva el cliente y la sesión compartidos, sin requerir una URL API independiente.
 
 No incluir contraseñas, tokens, archivos `.env` ni datos personales reales en commits.
 

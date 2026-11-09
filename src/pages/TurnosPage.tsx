@@ -39,14 +39,14 @@ function authToken() {
     return stored ? (JSON.parse(stored) as { token?: string }).token : undefined
   } catch { return undefined }
 }
-async function getJson<T>(path: string): Promise<T> {
-  const token = authToken()
+async function getJson<T>(path: string, sessionToken?: string): Promise<T> {
+  const token = sessionToken || authToken()
   const response = await fetch(`/api${path}`, { headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token.replace(/^Bearer\s+/i, '')}` } : {}) } })
   if (!response.ok) throw new Error(response.status === 401 ? 'Iniciá sesión para consultar la agenda.' : `No se pudo cargar la agenda (HTTP ${response.status}).`)
   return response.json() as Promise<T>
 }
-async function postJson<T>(path: string, body: unknown): Promise<T> {
-  const token = authToken()
+async function postJson<T>(path: string, body: unknown, sessionToken?: string): Promise<T> {
+  const token = sessionToken || authToken()
   const response = await fetch(`/api${path}`, {
     method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token.replace(/^Bearer\s+/i, '')}` } : {}) },
@@ -58,8 +58,8 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
   }
   return response.json() as Promise<T>
 }
-async function askJosue(message: string) {
-  const token = authToken()
+async function askJosue(message: string, sessionToken?: string) {
+  const token = sessionToken || authToken()
   try {
     const response = await fetch('/api/chatbot/ask', {
       method: 'POST',
@@ -101,6 +101,17 @@ function startOfWeek(date: Date) {
   start.setHours(0, 0, 0, 0)
   return start
 }
+function addMonthsClamped(date: Date, offset: number) {
+  const target = new Date(date.getFullYear(), date.getMonth() + offset, 1, 12)
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate()
+  target.setDate(Math.min(date.getDate(), lastDay))
+  return target
+}
+function monthRangeLabel(date: Date) {
+  const first = new Date(date.getFullYear(), date.getMonth(), 1, 12)
+  const last = new Date(date.getFullYear(), date.getMonth() + 1, 0, 12)
+  return `${formatDate(first, { day: 'numeric', month: 'short' })} – ${formatDate(last, { day: 'numeric', month: 'short', year: 'numeric' })}`
+}
 function formatDate(date: Date, options: Intl.DateTimeFormatOptions) {
   return new Intl.DateTimeFormat('es-AR', options).format(date)
 }
@@ -111,13 +122,19 @@ function stateColor(state?: string) {
   return 'bg-sky-50 text-sky-700 border-sky-100'
 }
 
-export function TurnosPage() {
+export function TurnosPage({ token }: { token: string }) {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [dentists, setDentists] = useState<Dentist[]>([])
   const [availableSlots, setAvailableSlots] = useState<string[]>([])
   const [availabilityLoading, setAvailabilityLoading] = useState(false)
   const [availabilityError, setAvailabilityError] = useState('')
   const [patients, setPatients] = useState<PatientOption[]>([])
+  const [showAppointmentForm, setShowAppointmentForm] = useState(false)
+  const [appointmentPatients, setAppointmentPatients] = useState<PatientOption[]>([])
+  const [appointmentForm, setAppointmentForm] = useState({ pacienteId: '', odontologoId: '', fecha: dateKey(new Date()), hora: '', motivo: '' })
+  const [appointmentSaving, setAppointmentSaving] = useState(false)
+  const [appointmentError, setAppointmentError] = useState('')
+  const [appointmentSuccess, setAppointmentSuccess] = useState('')
   const [selectedSlot, setSelectedSlot] = useState<{ fecha: string; hora: string; odontologoId: number } | null>(null)
   const [selectedPatientId, setSelectedPatientId] = useState('')
   const [bookingReason, setBookingReason] = useState('')
@@ -126,6 +143,11 @@ export function TurnosPage() {
   const [bookingError, setBookingError] = useState('')
   const [bookingSuccess, setBookingSuccess] = useState('')
   const [week, setWeek] = useState(() => startOfWeek(new Date()))
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const current = new Date()
+    return new Date(current.getFullYear(), current.getMonth(), 1, 12)
+  })
+  const [viewMode, setViewMode] = useState<'week' | 'month'>('week')
   const [selectedDay, setSelectedDay] = useState(dateKey(new Date()))
   const [dentistFilter, setDentistFilter] = useState('all')
   const [loading, setLoading] = useState(true)
@@ -139,14 +161,19 @@ export function TurnosPage() {
     setLoading(true)
     setLoadError('')
     try {
-      const weekEnd = new Date(week)
-      weekEnd.setDate(week.getDate() + 6)
-      const from = dateKey(week), through = dateKey(weekEnd)
+      const periodStart = viewMode === 'month'
+        ? new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1, 12)
+        : week
+      const periodEnd = viewMode === 'month'
+        ? new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0, 12)
+        : new Date(week)
+      if (viewMode === 'week') periodEnd.setDate(week.getDate() + 6)
+      const from = dateKey(periodStart), through = dateKey(periodEnd)
       const filter = dentistFilter === 'all' ? '' : `&odontologoId=${encodeURIComponent(dentistFilter)}`
       const [turnos, profesionales, virtuales] = await Promise.all([
-        getJson<Appointment[]>('/turnos'),
-        getJson<Dentist[]>('/odontologos'),
-        getJson<TeleAppointment[]>(`/teletriaje/citas/agenda?desde=${from}&hasta=${through}${filter}`),
+        getJson<Appointment[]>('/turnos', token),
+        getJson<Dentist[]>('/odontologos', token),
+        getJson<TeleAppointment[]>(`/teletriaje/citas/agenda?desde=${from}&hasta=${through}${filter}`, token),
       ])
       const citasVirtuales = Array.isArray(virtuales) ? virtuales : []
       const turnosVirtuales = new Set(citasVirtuales.map((cita) => cita.turnoId))
@@ -172,7 +199,7 @@ export function TurnosPage() {
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'No se pudo cargar la agenda.')
     } finally { setLoading(false) }
-  }, [week, dentistFilter])
+  }, [week, calendarMonth, viewMode, dentistFilter, token])
 
   useEffect(() => { void loadAgenda() }, [loadAgenda])
 
@@ -181,6 +208,16 @@ export function TurnosPage() {
     day.setDate(week.getDate() + i)
     return day
   }), [week])
+  const monthDays = useMemo(() => {
+    const first = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1, 12)
+    const last = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0, 12)
+    const start = startOfWeek(first)
+    const end = startOfWeek(last)
+    end.setDate(end.getDate() + 6)
+    const days: Date[] = []
+    for (const day = new Date(start); day <= end; day.setDate(day.getDate() + 1)) days.push(new Date(day))
+    return days
+  }, [calendarMonth])
   const visibleAppointments = useMemo(() => appointments.filter((appointment) =>
     appointment.fecha === selectedDay,
   ).sort((a, b) => a.hora.localeCompare(b.hora)), [appointments, selectedDay, dentistFilter])
@@ -194,7 +231,7 @@ export function TurnosPage() {
     setChat((current) => [...current, { role: 'user', text: clean }])
     setQuestion('')
     setChatBusy(true)
-    const result = await askJosue(clean)
+    const result = await askJosue(clean, token)
     setChat((current) => [...current, { role: 'assistant', text: result.respuesta, answer: result }])
     setChatBusy(false)
   }
@@ -208,6 +245,18 @@ export function TurnosPage() {
     setSelectedDay(dateKey(nextSelected))
   }
 
+  const jumpPeriod = (offset: number) => {
+    if (viewMode === 'week') {
+      jumpWeek(offset)
+      return
+    }
+    const selectedDate = new Date(`${selectedDay}T12:00:00`)
+    const nextDate = addMonthsClamped(selectedDate, offset)
+    setSelectedDay(dateKey(nextDate))
+    setWeek(startOfWeek(nextDate))
+    setCalendarMonth(new Date(nextDate.getFullYear(), nextDate.getMonth(), 1, 12))
+  }
+
   const findAvailableSlots = async () => {
     if (dentistFilter === 'all') {
       setAvailabilityError('Elegí un profesional para calcular sus horarios disponibles.')
@@ -217,7 +266,7 @@ export function TurnosPage() {
     setAvailabilityError('')
     setAvailableSlots([])
     try {
-      const result = await getJson<AvailabilityResponse>(`/turnos/disponibilidad/fecha/${selectedDay}?odontologoId=${encodeURIComponent(dentistFilter)}`)
+      const result = await getJson<AvailabilityResponse>(`/turnos/disponibilidad/fecha/${selectedDay}?odontologoId=${encodeURIComponent(dentistFilter)}`, token)
       setAvailableSlots(result.horariosDisponibles || [])
     } catch (error) {
       setAvailabilityError(error instanceof Error ? error.message : 'No se pudieron consultar los horarios.')
@@ -230,7 +279,7 @@ export function TurnosPage() {
     setSelectedSlot({ fecha: selectedDay, hora, odontologoId: Number(dentistFilter) })
     setBookingConsent(false)
     try {
-      const foundPatients = await getJson<PatientOption[]>('/pacientes')
+      const foundPatients = await getJson<PatientOption[]>('/pacientes', token)
       setPatients(Array.isArray(foundPatients) ? foundPatients : [])
     } catch (error) {
       setBookingError(error instanceof Error ? error.message : 'No se pudo cargar la lista de pacientes.')
@@ -252,7 +301,7 @@ export function TurnosPage() {
           odontologoId: selectedSlot.odontologoId, fecha: selectedSlot.fecha, hora: selectedSlot.hora,
           motivo: bookingReason.trim(), consentimientoInformado: true, requiereVideollamada: true,
         },
-      })
+      }, token)
       setBookingSuccess(`Teleconsulta confirmada para el ${result.fecha} a las ${result.hora.slice(0, 5)}. ${result.enlaceFuncional ? 'El enlace de videollamada está listo.' : 'La sala virtual queda pendiente de configuración.'}`)
       setSelectedSlot(null)
       setAvailableSlots([])
@@ -266,6 +315,47 @@ export function TurnosPage() {
     } finally { setBookingBusy(false) }
   }
 
+  const openAppointmentForm = async () => {
+    setAppointmentError('')
+    setAppointmentSuccess('')
+    setShowAppointmentForm((open) => !open)
+    if (appointmentPatients.length) return
+    try {
+      const foundPatients = await getJson<PatientOption[]>('/pacientes', token)
+      setAppointmentPatients(Array.isArray(foundPatients) ? foundPatients : [])
+    } catch (error) {
+      setAppointmentError(error instanceof Error ? error.message : 'No se pudo cargar la lista de pacientes.')
+    }
+  }
+
+  const createAppointment = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setAppointmentSaving(true)
+    setAppointmentError('')
+    setAppointmentSuccess('')
+    try {
+      await postJson<Appointment>('/turnos', {
+        pacienteId: Number(appointmentForm.pacienteId),
+        odontologoId: Number(appointmentForm.odontologoId),
+        fecha: appointmentForm.fecha,
+        hora: appointmentForm.hora,
+        motivo: appointmentForm.motivo.trim(),
+        estado: 'PENDIENTE',
+      }, token)
+      const appointmentDate = new Date(`${appointmentForm.fecha}T12:00:00`)
+      setWeek(startOfWeek(appointmentDate))
+      setSelectedDay(appointmentForm.fecha)
+      setCalendarMonth(new Date(appointmentDate.getFullYear(), appointmentDate.getMonth(), 1, 12))
+      setAppointmentSuccess('Turno presencial registrado correctamente.')
+      setAppointmentForm({ pacienteId: '', odontologoId: '', fecha: dateKey(new Date()), hora: '', motivo: '' })
+      setShowAppointmentForm(false)
+    } catch (error) {
+      setAppointmentError(error instanceof Error ? error.message : 'No se pudo registrar el turno.')
+    } finally {
+      setAppointmentSaving(false)
+    }
+  }
+
   return (
     <div className="space-y-6 pb-8">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -274,10 +364,24 @@ export function TurnosPage() {
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">Agenda inteligente</h1>
           <p className="mt-1 text-sm text-slate-500">Turnos, teleconsulta y asistencia en un solo lugar.</p>
         </div>
-        <a href="/teletriaje" className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"><Video size={17} /> Solicitar teleconsulta <ArrowRight size={16} /></a>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => void openAppointmentForm()} className="inline-flex items-center justify-center gap-2 rounded-xl border border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-teal-800 shadow-sm transition hover:bg-teal-50"><CalendarDays size={17} /> Nuevo turno presencial</button>
+          <a href="/teletriaje" className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"><Video size={17} /> Solicitar teleconsulta <ArrowRight size={16} /></a>
+        </div>
       </header>
 
       {bookingSuccess && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{bookingSuccess}</div>}
+      {appointmentSuccess && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{appointmentSuccess}</div>}
+      {showAppointmentForm && <form onSubmit={(event) => void createAppointment(event)} className="grid gap-4 rounded-2xl border border-teal-100 bg-white p-5 shadow-sm sm:grid-cols-2">
+        <h2 className="text-lg font-bold text-slate-900 sm:col-span-2">Registrar turno presencial</h2>
+        <label className="grid gap-1 text-sm font-medium text-slate-700">Paciente<select required value={appointmentForm.pacienteId} onChange={(event) => setAppointmentForm({ ...appointmentForm, pacienteId: event.target.value })} className="rounded-lg border border-slate-200 bg-white px-3 py-2"><option value="">Seleccionar paciente</option>{appointmentPatients.map((patient) => <option key={patient.id} value={patient.id}>{patient.nombre} {patient.apellido}</option>)}</select></label>
+        <label className="grid gap-1 text-sm font-medium text-slate-700">Odontólogo<select required value={appointmentForm.odontologoId} onChange={(event) => setAppointmentForm({ ...appointmentForm, odontologoId: event.target.value })} className="rounded-lg border border-slate-200 bg-white px-3 py-2"><option value="">Seleccionar odontólogo</option>{dentists.filter((dentist) => dentist.activo !== false).map((dentist) => <option key={dentist.id} value={dentist.id}>{dentist.nombre} {dentist.apellido}</option>)}</select></label>
+        <label className="grid gap-1 text-sm font-medium text-slate-700">Fecha<input required type="date" min={dateKey(new Date())} value={appointmentForm.fecha} onChange={(event) => setAppointmentForm({ ...appointmentForm, fecha: event.target.value })} className="rounded-lg border border-slate-200 px-3 py-2" /></label>
+        <label className="grid gap-1 text-sm font-medium text-slate-700">Hora<input required type="time" value={appointmentForm.hora} onChange={(event) => setAppointmentForm({ ...appointmentForm, hora: event.target.value })} className="rounded-lg border border-slate-200 px-3 py-2" /></label>
+        <label className="grid gap-1 text-sm font-medium text-slate-700 sm:col-span-2">Motivo<input required maxLength={200} value={appointmentForm.motivo} onChange={(event) => setAppointmentForm({ ...appointmentForm, motivo: event.target.value })} className="rounded-lg border border-slate-200 px-3 py-2" /></label>
+        {appointmentError && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 sm:col-span-2">{appointmentError}</p>}
+        <div className="flex gap-2 sm:col-span-2"><button type="submit" disabled={appointmentSaving || !appointmentPatients.length} className="rounded-lg bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{appointmentSaving ? 'Guardando…' : 'Guardar turno'}</button><button type="button" onClick={() => setShowAppointmentForm(false)} className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700">Cancelar</button></div>
+      </form>}
 
       <section className="grid gap-3 sm:grid-cols-3">
         <SummaryCard icon={<CalendarDays size={18} />} label="Turnos próximos" value={String(upcomingCount)} detail="Citas en agenda" color="teal" />
@@ -288,19 +392,22 @@ export function TurnosPage() {
       <div className={`grid items-start gap-5 ${chatOpen ? '2xl:grid-cols-[minmax(0,1fr)_360px]' : 'grid-cols-1'}`}>
         <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-col gap-4 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-            <div><p className="text-xs font-medium uppercase tracking-wider text-slate-400">Vista semanal</p><h2 className="mt-1 text-lg font-bold capitalize text-slate-800">{formatDate(week, { month: 'long', year: 'numeric' })}</h2></div>
+            <div><p className="text-xs font-medium uppercase tracking-wider text-slate-400">Vista {viewMode === 'month' ? 'mensual' : 'semanal'}</p><h2 className="mt-1 text-lg font-bold capitalize text-slate-800">{viewMode === 'month' ? monthRangeLabel(calendarMonth) : formatDate(week, { month: 'long', year: 'numeric' })}</h2></div>
             <div className="flex flex-wrap items-center gap-2">
               <label className="relative"><span className="sr-only">Filtrar por odontólogo</span><Stethoscope className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} /><select value={dentistFilter} onChange={(event) => setDentistFilter(event.target.value)} className="max-w-48 rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-700 outline-none focus:border-teal-500"><option value="all">Todo el equipo</option>{dentists.map((dentist) => <option key={dentist.id} value={dentist.id}>Dra./Dr. {dentist.apellido}</option>)}</select></label>
-              <div className="flex rounded-lg border border-slate-200 p-0.5"><button onClick={() => jumpWeek(-1)} aria-label="Semana anterior" className="rounded-md p-2 text-slate-500 hover:bg-slate-100"><ArrowLeft size={16} /></button><button onClick={() => { setWeek(startOfWeek(new Date())); setSelectedDay(dateKey(new Date())) }} className="px-2 text-xs font-semibold text-slate-600 hover:text-teal-700">Hoy</button><button onClick={() => jumpWeek(1)} aria-label="Semana siguiente" className="rounded-md p-2 text-slate-500 hover:bg-slate-100"><ArrowRight size={16} /></button></div>
+              <div role="group" aria-label="Vista de agenda" className="flex rounded-lg border border-slate-200 p-0.5"><button type="button" aria-pressed={viewMode === 'week'} onClick={() => { setWeek(startOfWeek(new Date(`${selectedDay}T12:00:00`))); setViewMode('week') }} className={`rounded-md px-2 py-1.5 text-xs font-semibold ${viewMode === 'week' ? 'bg-teal-50 text-teal-700' : 'text-slate-500 hover:bg-slate-100'}`}>Semana</button><button type="button" aria-pressed={viewMode === 'month'} onClick={() => { const selected = new Date(`${selectedDay}T12:00:00`); setCalendarMonth(new Date(selected.getFullYear(), selected.getMonth(), 1, 12)); setViewMode('month') }} className={`rounded-md px-2 py-1.5 text-xs font-semibold ${viewMode === 'month' ? 'bg-teal-50 text-teal-700' : 'text-slate-500 hover:bg-slate-100'}`}>Mes</button></div>
+              <div className="flex rounded-lg border border-slate-200 p-0.5"><button onClick={() => jumpPeriod(-1)} aria-label="Período anterior" className="rounded-md p-2 text-slate-500 hover:bg-slate-100"><ArrowLeft size={16} /></button><button onClick={() => { const today = new Date(); setWeek(startOfWeek(today)); setCalendarMonth(new Date(today.getFullYear(), today.getMonth(), 1, 12)); setSelectedDay(dateKey(today)) }} className="px-2 text-xs font-semibold text-slate-600 hover:text-teal-700">Hoy</button><button onClick={() => jumpPeriod(1)} aria-label="Período siguiente" className="rounded-md p-2 text-slate-500 hover:bg-slate-100"><ArrowRight size={16} /></button></div>
               {!chatOpen && <button onClick={() => setChatOpen(true)} className="inline-flex items-center gap-2 rounded-lg bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700"><Sparkles size={15} /> Asistente</button>}
             </div>
           </div>
 
-          <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50/70">
-            {weekDays.map((day, index) => {
+          {viewMode === 'month' && <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50/70">{weekdays.map((day) => <span key={day} className="px-1 py-2 text-center text-[10px] font-semibold uppercase text-slate-400">{day}</span>)}</div>}
+          <div className={viewMode === 'month' ? 'grid grid-cols-7 border-b border-slate-100 bg-white' : 'grid grid-cols-7 border-b border-slate-100 bg-slate-50/70'}>
+            {(viewMode === 'month' ? monthDays : weekDays).map((day, index) => {
               const key = dateKey(day), isSelected = key === selectedDay, isToday = key === dateKey(new Date())
               const count = appointments.filter((appointment) => appointment.fecha === key).length
-              return <button key={key} onClick={() => setSelectedDay(key)} className={`relative flex min-h-[78px] flex-col items-center justify-center gap-1 border-r border-slate-100 px-1 transition last:border-r-0 ${isSelected ? 'bg-teal-50' : 'hover:bg-white'}`}><span className={`text-[11px] font-semibold uppercase ${isSelected ? 'text-teal-700' : 'text-slate-400'}`}>{weekdays[index]}</span><span className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${isSelected ? 'bg-teal-700 text-white' : isToday ? 'border border-teal-200 text-teal-700' : 'text-slate-700'}`}>{day.getDate()}</span><span className="text-[10px] text-slate-400">{count ? `${count} ${count === 1 ? 'turno' : 'turnos'}` : '—'}</span></button>
+              const dayIsInMonth = day.getMonth() === calendarMonth.getMonth()
+              return <button key={key} onClick={() => { setSelectedDay(key); setWeek(startOfWeek(day)); if (day.getMonth() !== calendarMonth.getMonth() || day.getFullYear() !== calendarMonth.getFullYear()) setCalendarMonth(new Date(day.getFullYear(), day.getMonth(), 1, 12)) }} aria-label={`Seleccionar ${formatDate(day, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`} aria-pressed={isSelected} className={`relative flex ${viewMode === 'month' ? 'min-h-[64px]' : 'min-h-[78px]'} flex-col items-center justify-center gap-1 border-r border-b border-slate-100 px-1 transition last:border-r-0 ${isSelected ? 'bg-teal-50' : 'hover:bg-slate-50'} ${viewMode === 'month' && !dayIsInMonth ? 'opacity-45' : ''}`}><span className={`text-[11px] font-semibold uppercase ${isSelected ? 'text-teal-700' : 'text-slate-400'}`}>{viewMode === 'week' ? weekdays[index] : ''}</span><span className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${isSelected ? 'bg-teal-700 text-white' : isToday ? 'border border-teal-200 text-teal-700' : 'text-slate-700'}`}>{day.getDate()}</span><span className="text-[10px] text-slate-400">{count ? `${count} ${count === 1 ? 'turno' : 'turnos'}` : '—'}</span></button>
             })}
           </div>
 
