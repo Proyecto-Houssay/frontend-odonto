@@ -20,6 +20,10 @@ vi.mock('./pages/DashboardHome', () => ({
   DashboardHome: () => <h1>Bienvenido al Sistema Odontológico Novadent</h1>,
 }))
 
+vi.mock('./components/layout/NotificationCenter', () => ({
+  NotificationCenter: () => null,
+}))
+
 vi.mock('react-signature-canvas', async () => {
   const { forwardRef, useImperativeHandle } = await import('react')
   return {
