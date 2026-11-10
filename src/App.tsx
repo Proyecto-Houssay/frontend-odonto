@@ -19,6 +19,7 @@ import { NotFoundPage } from './pages/NotFoundPage'
 import { SeguimientoPage } from './pages/SeguimientoPage'
 import { ChatbotPage } from './pages/ChatbotPage'
 import { DrAnniePage } from './pages/DrAnniePage'
+import { PortalPaciente } from './pages/PortalPaciente'
 
 const Odontograma = lazy(() => import('./pages/Odontograma.jsx'))
 function OdontogramaRoute({ demoMode, backendMode = false }: { demoMode: boolean; backendMode?: boolean }) {
@@ -46,7 +47,7 @@ function AppRoutes() {
 
   if (!session || hasPasswordResetToken) return <LoginPage />
   const role = session.role
-  if (role === 'PACIENTE') return <DrAnniePage />
+  if (role === 'PACIENTE') return <PortalPaciente token={session.token} onLogout={logout} />
 
   return (
     <Routes>
