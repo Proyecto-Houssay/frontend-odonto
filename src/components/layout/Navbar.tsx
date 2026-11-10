@@ -1,7 +1,8 @@
-import { LogOut, Menu } from 'lucide-react'
+import { LogOut, Menu, Moon, Sun } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { roleFromToken } from '../../auth/role'
 import { NotificationCenter } from './NotificationCenter'
+import { useTheme } from '../../lib/useTheme'
 
 interface NavbarProps {
   onToggleSidebar: () => void
@@ -16,6 +17,7 @@ const labels = {
 
 export function Navbar({ onToggleSidebar }: NavbarProps) {
   const { session, logout } = useAuth()
+  const { theme, toggleTheme } = useTheme()
   const role = session?.role || roleFromToken(session?.token || '')
   const initials = (session?.username || 'U').slice(0, 2).toUpperCase()
 
@@ -30,7 +32,19 @@ export function Navbar({ onToggleSidebar }: NavbarProps) {
           <h1 className="truncate text-lg font-extrabold text-slate-950 sm:text-xl">Tu espacio de trabajo</h1>
         </div>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
+        {/* Selector de Modo Oscuro / Modo Claro */}
+        <button
+          type="button"
+          onClick={toggleTheme}
+          aria-label={theme === 'dark' ? 'Activar modo claro' : 'Activar modo oscuro'}
+          title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+          className="flex h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-white/80 px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-blue-600"
+        >
+          {theme === 'dark' ? <Sun size={17} className="text-amber-500" /> : <Moon size={17} className="text-slate-600" />}
+          <span className="hidden md:inline">{theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}</span>
+        </button>
+
         <NotificationCenter />
         <div className="flex items-center gap-2 rounded-xl border border-blue-100 bg-blue-50/80 p-1.5 pr-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white">{initials}</span>
