@@ -231,20 +231,23 @@ export function ChatbotPage({ compact = false }: { compact?: boolean } = {}) {
               {message.actions.map(action => <Link key={action.to} to={action.to} className="inline-flex min-h-8 items-center rounded-lg border border-blue-300 bg-white/90 px-3 py-1.5 text-xs font-semibold text-blue-900 hover:bg-blue-50">{action.label}</Link>)}
             </div>}
             {!!message.citations?.length && (
-              <div className="mt-3 border-t border-slate-300 pt-2.5">
-                <h2 className="mb-1.5 text-xs font-bold uppercase tracking-wide">Fuentes</h2>
-                <ul className="space-y-1.5">
+              <details className="mt-3 border-t border-blue-200/60 pt-2 text-xs text-slate-700">
+                <summary className="inline-flex cursor-pointer select-none items-center gap-1.5 font-semibold text-blue-700 hover:text-blue-900">
+                  <ShieldCheck size={14} className="text-blue-600" />
+                  <span>Fuentes oficiales consultadas ({message.citations.length})</span>
+                </summary>
+                <ul className="mt-2 space-y-2 rounded-xl border border-blue-100 bg-white/80 p-2.5 shadow-sm">
                   {message.citations.map((citation, index) => (
-                    <li key={citation.id || String(index)}>
-                      <span className="text-xs font-semibold">{citation.documento} · versión {citation.version}</span>
-                      <details className="mt-1 text-xs">
-                        <summary className="cursor-pointer">Ver fragmento citado</summary>
-                        <p className="mt-1 rounded-lg bg-white/70 p-2 leading-5">{citation.fragmento}</p>
+                    <li key={citation.id || String(index)} className="border-b border-blue-50 pb-1.5 last:border-none last:pb-0">
+                      <span className="font-semibold text-slate-800">{citation.documento} · versión {citation.version}</span>
+                      <details className="mt-1 text-slate-600">
+                        <summary className="cursor-pointer text-[0.75rem] text-blue-600 hover:underline">Ver fragmento citado</summary>
+                        <p className="mt-1 rounded-md border border-slate-100 bg-white p-2 leading-relaxed text-slate-700">{citation.fragmento}</p>
                       </details>
                     </li>
                   ))}
                 </ul>
-              </div>
+              </details>
             )}
           </article>
         ))}
