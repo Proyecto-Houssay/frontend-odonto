@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, type ReactNode } from 'react'
-import { BrowserRouter, Link, Routes, Route, useParams } from 'react-router-dom'
+import { BrowserRouter, Link, Navigate, Routes, Route, useParams } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthProvider'
 import { useAuth } from './auth/useAuth'
 import type { UserRole } from './auth/role'
@@ -68,7 +68,7 @@ function AppRoutes() {
         {role === 'ADMINISTRADOR' ? <Route path="usuarios" element={<UsuariosPage />} /> : null}
         <Route path="informes" element={<ReportsPage />} />
         {role === 'ADMINISTRADOR' ? <Route path="informes/demo" element={<InformesPage />} /> : null}
-        {role === 'ADMINISTRADOR' ? <Route path="chatbot" element={<ChatbotPage />} /> : null}
+        <Route path="chatbot" element={role === 'ADMINISTRADOR' ? <ChatbotPage /> : <Navigate to="/" replace />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

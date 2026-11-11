@@ -14,7 +14,7 @@ export type AuthSession = {
 
 export type AuthContextValue = {
   session: AuthSession | null
-  login: (usernameOrEmail: string, password: string) => Promise<void>
+  login: (usernameOrEmail: string, password: string) => Promise<AppRole>
   logout: () => void
 }
 

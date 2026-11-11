@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { HeartPulse, LoaderCircle } from 'lucide-react'
 import { ApiError, apiRequest } from '../lib/api'
 import { useAuth } from '../auth/useAuth'
@@ -9,6 +10,7 @@ type RegistrationResponse = { emailSent: boolean; message: string }
 type PasswordResetResponse = { message: string; emailConfigured: boolean }
 
 export function LoginPage() {
+  const navigate = useNavigate()
   const { login } = useAuth()
   const [resetToken, setResetToken] = useState(() => new URLSearchParams(window.location.search).get('token'))
   const [mode, setMode] = useState<AccessMode>(() => resetToken ? 'reset' : 'login')
@@ -38,7 +40,10 @@ export function LoginPage() {
     setNotice('')
     try {
       if (mode === 'login') {
-        await login(usernameOrEmail.trim(), password)
+        const role = await login(usernameOrEmail.trim(), password)
+        if (role === 'ODONTOLOGO') {
+          navigate('/', { replace: true })
+        }
       } else if (mode === 'register') {
         const response = await apiRequest<RegistrationResponse>('/auth/register', {
           method: 'POST',
