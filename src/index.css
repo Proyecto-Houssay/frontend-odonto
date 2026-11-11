@@ -51,6 +51,148 @@
 }
 
 /* ==========================================================================
+   MODO CLARO REDISEÑADO (Glassmorphism sutil sobre el fondo de la clínica)
+   Paleta:
+   - Left Sidebar: Soft Ice Blue (#DCE6F1 / rgba(220, 230, 241, 0.90)) + blur(12px) + border-r (#CBD5E1)
+   - Main Cards & Containers: Darkened Off-White / Cool Light Gray (#E2E8F0 / rgba(226, 232, 240, 0.86)) + blur(12px)
+   - Card Borders: Medium Slate Gray (#94A3B8) 1px solid
+   - Data Dividers: Soft Slate Gray (#CBD5E1) 1px solid
+   - Primary Typography: Deep Charcoal Slate (#1E293B)
+   - Secondary Typography: Medium Slate (#475569)
+   - Accent Color: Clinical Royal Blue (#1D4ED8) con soft blue tint (#DBEAFE)
+   ========================================================================== */
+html:not([data-theme="dark"]),
+html[data-theme="light"] {
+  color: #1E293B;
+}
+
+/* 1. Left Sidebar */
+html:not([data-theme="dark"]) aside,
+html[data-theme="light"] aside {
+  background-color: rgba(220, 230, 241, 0.90) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-right: 1px solid #CBD5E1 !important;
+  box-shadow: 4px 0 24px rgba(15, 23, 42, 0.04) !important;
+}
+
+html:not([data-theme="dark"]) aside .border-b,
+html:not([data-theme="dark"]) aside .border-t,
+html[data-theme="light"] aside .border-b,
+html[data-theme="light"] aside .border-t {
+  border-color: #CBD5E1 !important;
+}
+
+html:not([data-theme="dark"]) aside nav a.active,
+html:not([data-theme="dark"]) aside nav a[aria-current="page"],
+html[data-theme="light"] aside nav a.active,
+html[data-theme="light"] aside nav a[aria-current="page"] {
+  background-color: #DBEAFE !important;
+  color: #1D4ED8 !important;
+  border: 1px solid rgba(29, 78, 216, 0.3) !important;
+  font-weight: 700 !important;
+  box-shadow: 0 1px 4px rgba(29, 78, 216, 0.12) !important;
+}
+
+html:not([data-theme="dark"]) aside nav a:not(.active):not([aria-current="page"]):hover,
+html[data-theme="light"] aside nav a:not(.active):not([aria-current="page"]):hover {
+  background-color: rgba(219, 234, 254, 0.6) !important;
+  color: #1D4ED8 !important;
+}
+
+/* 2. Main Cards & Containers */
+html:not([data-theme="dark"]) header,
+html[data-theme="light"] header {
+  background-color: rgba(226, 232, 240, 0.86) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-bottom: 1px solid #94A3B8 !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04) !important;
+}
+
+html:not([data-theme="dark"]) .bg-white,
+html:not([data-theme="dark"]) [class*="bg-white/"],
+html:not([data-theme="dark"]) .odontogram-card,
+html:not([data-theme="dark"]) .patient-chart-card,
+html[data-theme="light"] .bg-white,
+html[data-theme="light"] [class*="bg-white/"],
+html[data-theme="light"] .odontogram-card,
+html[data-theme="light"] .patient-chart-card {
+  background-color: rgba(226, 232, 240, 0.86) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid #94A3B8 !important;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05) !important;
+}
+
+/* 3. Card Borders & Data Dividers */
+html:not([data-theme="dark"]) .border-slate-200,
+html:not([data-theme="dark"]) .border-slate-300,
+html:not([data-theme="dark"]) .border-white\/70,
+html[data-theme="light"] .border-slate-200,
+html[data-theme="light"] .border-slate-300,
+html[data-theme="light"] .border-white\/70 {
+  border-color: #94A3B8 !important;
+}
+
+html:not([data-theme="dark"]) .divide-y > :not([hidden]) ~ :not([hidden]),
+html:not([data-theme="dark"]) .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+html:not([data-theme="dark"]) .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
+html:not([data-theme="dark"]) .divide-blue-100 > :not([hidden]) ~ :not([hidden]),
+html:not([data-theme="dark"]) tbody tr,
+html[data-theme="light"] .divide-y > :not([hidden]) ~ :not([hidden]),
+html[data-theme="light"] .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+html[data-theme="light"] .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
+html[data-theme="light"] .divide-blue-100 > :not([hidden]) ~ :not([hidden]),
+html[data-theme="light"] tbody tr {
+  border-color: #CBD5E1 !important;
+}
+
+html:not([data-theme="dark"]) thead th,
+html[data-theme="light"] thead th {
+  border-bottom: 1px solid #CBD5E1 !important;
+  background-color: rgba(220, 230, 241, 0.5) !important;
+  color: #475569 !important;
+}
+
+/* 4. Primary Typography (Titles & Numbers): Deep Charcoal Slate (#1E293B) */
+html:not([data-theme="dark"]) :is(h1, h2, h3, h4, h5, h6, .text-slate-950, .text-slate-900, .text-slate-800, .text-blue-950, .text-blue-900),
+html[data-theme="light"] :is(h1, h2, h3, h4, h5, h6, .text-slate-950, .text-slate-900, .text-slate-800, .text-blue-950, .text-blue-900) {
+  color: #1E293B !important;
+}
+
+/* 5. Secondary Typography (Subtitles, labels & timestamps): Medium Slate (#475569) */
+html:not([data-theme="dark"]) :is(.text-slate-700, .text-slate-600, .text-slate-500, label:not([class*="text-blue"]), .odontogram-page p),
+html[data-theme="light"] :is(.text-slate-700, .text-slate-600, .text-slate-500, label:not([class*="text-blue"]), .odontogram-page p) {
+  color: #475569 !important;
+}
+
+/* 6. Accent Color: Clinical Royal Blue (#1D4ED8) with soft blue tint (#DBEAFE) */
+html:not([data-theme="dark"]) :is(a:not([class*="text-white"]):not([class*="bg-"]):not([class*="btn"]), .text-blue-600, .text-blue-700, .text-blue-800),
+html[data-theme="light"] :is(a:not([class*="text-white"]):not([class*="bg-"]):not([class*="btn"]), .text-blue-600, .text-blue-700, .text-blue-800) {
+  color: #1D4ED8 !important;
+}
+
+html:not([data-theme="dark"]) :is(.bg-blue-50, [class*="bg-blue-50/"], .bg-blue-100),
+html[data-theme="light"] :is(.bg-blue-50, [class*="bg-blue-50/"], .bg-blue-100) {
+  background-color: #DBEAFE !important;
+  color: #1D4ED8 !important;
+  border-color: #CBD5E1 !important;
+}
+
+html:not([data-theme="dark"]) :is(.border-blue-100, .border-blue-200),
+html[data-theme="light"] :is(.border-blue-100, .border-blue-200) {
+  border-color: #CBD5E1 !important;
+}
+
+html:not([data-theme="dark"]) span[class*="rounded-full"][class*="blue"],
+html[data-theme="light"] span[class*="rounded-full"][class*="blue"] {
+  background-color: #DBEAFE !important;
+  color: #1D4ED8 !important;
+  border: 1px solid rgba(29, 78, 216, 0.25) !important;
+}
+
+/* ==========================================================================
    MODO OSCURO GLOBAL (Staff Dashboard + Portal del Paciente)
    ========================================================================== */
 html[data-theme="dark"] .clinic-backdrop,
