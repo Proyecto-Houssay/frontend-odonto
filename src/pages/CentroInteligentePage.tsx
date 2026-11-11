@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import {
   Activity, Accessibility, AlertTriangle, ArrowRight, CalendarClock, Check, CheckCircle2,
   CircleHelp, Eye, HeartHandshake, History, LoaderCircle, LockKeyhole,
   RefreshCw, ShieldCheck, Sparkles, Stethoscope, Users, Video,
 } from 'lucide-react'
+import { AuthContext } from '../auth/context'
 
 type Patient = { id: number; nombre: string; apellido: string; dni?: string }
 type Dentist = { id: number; nombre: string; apellido: string; activo?: boolean; especialidad?: { nombre: string } }
@@ -24,15 +25,8 @@ const SESSION_KEY = 'novadent.auth.session'
 const FOLLOWUP_KEY = 'novadent.followup.done'
 const privacyCopy = 'La prioridad del teletriaje es una orientación para ordenar la atención. No es un diagnóstico ni reemplaza la evaluación de un profesional.'
 
-function token() {
+function authToken() {
   try { return (JSON.parse(sessionStorage.getItem(SESSION_KEY) || '{}') as { token?: string }).token } catch { return undefined }
-}
-
-async function api<T>(path: string): Promise<T> {
-  const bearer = token()
-  const response = await fetch(`/api${path}`, { headers: { Accept: 'application/json', ...(bearer ? { Authorization: `Bearer ${bearer.replace(/^Bearer\s+/i, '')}` } : {}) } })
-  if (!response.ok) throw new Error(response.status === 401 ? 'Iniciá sesión para ver datos de la agenda.' : `No se pudieron cargar los datos (HTTP ${response.status}).`)
-  return response.json() as Promise<T>
 }
 
 function dateKey(date: Date) {
@@ -50,7 +44,17 @@ function Panel({ children, className = '' }: { children: React.ReactNode; classN
   return <section className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${className}`}>{children}</section>
 }
 
-export function CentroInteligentePage() {
+export function CentroInteligentePage({ token: propToken }: { token?: string } = {}) {
+  const auth = useContext(AuthContext)
+  const activeToken = propToken || auth?.session?.token?.replace(/^Bearer\s+/i, '') || authToken()
+
+  const api = useCallback(async <T,>(path: string): Promise<T> => {
+    const bearer = activeToken
+    const response = await fetch(`/api${path}`, { headers: { Accept: 'application/json', ...(bearer ? { Authorization: `Bearer ${bearer.replace(/^Bearer\s+/i, '')}` } : {}) } })
+    if (!response.ok) throw new Error(response.status === 401 ? 'Iniciá sesión para ver datos de la agenda.' : `No se pudieron cargar los datos (HTTP ${response.status}).`)
+    return response.json() as Promise<T>
+  }, [activeToken])
+
   const [tab, setTab] = useState<Tab>('resumen')
   const [patients, setPatients] = useState<Patient[]>([])
   const [dentists, setDentists] = useState<Dentist[]>([])
@@ -76,28 +80,42 @@ export function CentroInteligentePage() {
     setLoading(true); setError('')
     try {
       const today = new Date()
-      const until = new Date(today); until.setDate(until.getDate() + 90)
-      const [patientsData, dentistsData, turnosData, triageData, teleData] = await Promise.all([
-        api<Patient[]>('/pacientes'), api<Dentist[]>('/odontologos'), api<Appointment[]>('/turnos'),
+      const until = new Date(today); until.setDate(until.getDate() + 30)
+      const [patientsRes, dentistsRes, turnosRes, triageRes, teleRes] = await Promise.allSettled([
+        api<Patient[]>('/pacientes'),
+        api<Dentist[]>('/odontologos'),
+        api<Appointment[]>('/turnos'),
         api<Triage[]>('/teletriaje/solicitudes'),
         api<Array<{ turnoId: number; fecha: string; hora: string; estadoTurno?: string; pacienteId?: number; pacienteNombre?: string; odontologoId?: number; odontologoNombre?: string }>>(`/teletriaje/citas/agenda?desde=${dateKey(today)}&hasta=${dateKey(until)}`),
       ])
+
+      const patientsData = patientsRes.status === 'fulfilled' && Array.isArray(patientsRes.value) ? patientsRes.value : []
+      const dentistsData = dentistsRes.status === 'fulfilled' && Array.isArray(dentistsRes.value) ? dentistsRes.value : []
+      const turnosData = turnosRes.status === 'fulfilled' && Array.isArray(turnosRes.value) ? turnosRes.value : []
+      const triageData = triageRes.status === 'fulfilled' && Array.isArray(triageRes.value) ? triageRes.value : []
+      const teleData = teleRes.status === 'fulfilled' && Array.isArray(teleRes.value) ? teleRes.value : []
+
+      if (patientsRes.status === 'rejected' && turnosRes.status === 'rejected') {
+        const firstErr = patientsRes.reason || turnosRes.reason
+        throw firstErr instanceof Error ? firstErr : new Error('No se pudieron sincronizar los datos de la agenda.')
+      }
+
       const virtualIds = new Set(teleData.map((item) => item.turnoId))
       const teleAppointments: Appointment[] = teleData.map((item) => ({
         id: item.turnoId, fecha: item.fecha, hora: item.hora, estado: item.estadoTurno || 'Confirmado', telemedicina: true,
         paciente: item.pacienteNombre ? { id: item.pacienteId || 0, nombre: item.pacienteNombre, apellido: '' } : undefined,
         odontologo: item.odontologoNombre ? { id: item.odontologoId || 0, nombre: item.odontologoNombre, apellido: '' } : undefined,
       }))
-      setPatients(Array.isArray(patientsData) ? patientsData : [])
-      setDentists(Array.isArray(dentistsData) ? dentistsData : [])
-      const allTurns = Array.isArray(turnosData) ? turnosData.filter((item) => !virtualIds.has(item.id)) : []
+      setPatients(patientsData)
+      setDentists(dentistsData)
+      const allTurns = turnosData.filter((item) => !virtualIds.has(item.id))
       setAppointments([...allTurns, ...teleAppointments].sort((a, b) => `${a.fecha}${a.hora}`.localeCompare(`${b.fecha}${b.hora}`)))
-      setTriage(Array.isArray(triageData) ? triageData : [])
+      setTriage(triageData)
       setSelectedPatientId((current) => current || String(patientsData[0]?.id || ''))
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'No se pudo conectar con la agenda.')
     } finally { setLoading(false) }
-  }, [])
+  }, [api])
 
   useEffect(() => { void load() }, [load])
   useEffect(() => {
