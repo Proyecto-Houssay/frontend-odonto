@@ -959,7 +959,7 @@ export const TeletriajePage: React.FC<TeletriajePageProps> = ({ initialRole, ini
                     className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                   />
                   <span className="text-xs text-slate-600">
-                    Generar enlace de sala virtual si el proveedor está habilitado (TR-49).
+                    Generar enlace de sala virtual si el proveedor de video está disponible.
                   </span>
                 </label>
               </div>
@@ -977,7 +977,7 @@ export const TeletriajePage: React.FC<TeletriajePageProps> = ({ initialRole, ini
                   disabled={loading}
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs"
                 >
-                  {loading ? 'Confirmando...' : 'Confirmar Reserva en BE'}
+                  {loading ? 'Confirmando...' : 'Confirmar Reserva'}
                 </button>
               </div>
             </form>
