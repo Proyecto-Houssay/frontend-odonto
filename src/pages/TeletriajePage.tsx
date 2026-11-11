@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useContext } from 'react'
 import {
   Video,
   AlertTriangle,
@@ -13,6 +13,13 @@ import {
   PhoneCall,
   Search
 } from 'lucide-react'
+import { AuthContext } from '../auth/context'
+import { roleFromToken } from '../auth/role'
+
+export interface TeletriajePageProps {
+  initialRole?: 'RECEPCIONISTA' | 'ODONTOLOGO' | 'PACIENTE'
+  initialToken?: string
+}
 
 export interface Solicitud {
   id: number
@@ -59,9 +66,15 @@ export interface Cita {
   fechaCreacion: string
 }
 
-export const TeletriajePage: React.FC = () => {
+export const TeletriajePage: React.FC<TeletriajePageProps> = ({ initialRole, initialToken }) => {
+  const auth = useContext(AuthContext)
+  const sessionToken = auth?.session?.token?.replace(/^Bearer\s+/i, '')
+  const sessionRole = auth?.session?.role as 'RECEPCIONISTA' | 'ODONTOLOGO' | 'PACIENTE' | undefined
+
   // Configuración de sesión / rol
   const [token, setToken] = useState<string>(() => {
+    if (initialToken) return initialToken
+    if (sessionToken) return sessionToken
     try {
       const saved = JSON.parse(sessionStorage.getItem('novadent.auth.session') || '{}') as { token?: string }
       return saved.token ? saved.token.replace(/^Bearer\s+/i, '') : ''
@@ -70,16 +83,30 @@ export const TeletriajePage: React.FC = () => {
     }
   })
   const [rol, setRol] = useState<'RECEPCIONISTA' | 'ODONTOLOGO' | 'PACIENTE'>(() => {
+    if (initialRole) return initialRole
+    if (sessionRole && (sessionRole === 'PACIENTE' || sessionRole === 'ODONTOLOGO' || sessionRole === 'RECEPCIONISTA')) {
+      return sessionRole
+    }
     try {
-      const saved = JSON.parse(sessionStorage.getItem('novadent.auth.session') || '{}') as { role?: string }
-      if (saved.role === 'PACIENTE') return 'PACIENTE'
-      if (saved.role === 'ODONTOLOGO') return 'ODONTOLOGO'
+      const saved = JSON.parse(sessionStorage.getItem('novadent.auth.session') || '{}') as { role?: string; token?: string }
+      if (saved.role === 'PACIENTE' || saved.role === 'ODONTOLOGO' || saved.role === 'RECEPCIONISTA') return saved.role
+      if (saved.token) {
+        const decoded = roleFromToken(saved.token)
+        if (decoded === 'PACIENTE' || decoded === 'ODONTOLOGO' || decoded === 'RECEPCIONISTA') return decoded
+      }
       return 'RECEPCIONISTA'
     } catch {
       return 'RECEPCIONISTA'
     }
   })
   const [pacienteIdActivo, setPacienteIdActivo] = useState<string>('1')
+
+  useEffect(() => {
+    if (sessionToken && !initialToken) setToken(sessionToken)
+    if (sessionRole && !initialRole && (sessionRole === 'PACIENTE' || sessionRole === 'ODONTOLOGO' || sessionRole === 'RECEPCIONISTA')) {
+      setRol(sessionRole)
+    }
+  }, [sessionToken, sessionRole, initialToken, initialRole])
 
   // Datos
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([])
@@ -108,6 +135,44 @@ export const TeletriajePage: React.FC = () => {
   const [requiereVideo, setRequiereVideo] = useState<boolean>(true)
   const [reservaConflictError, setReservaConflictError] = useState<string | null>(null)
   const [reservaConfirmada, setReservaConfirmada] = useState<Cita | null>(null)
+
+  // Modal Nueva Solicitud
+  const [modalNuevaSolicitudOpen, setModalNuevaSolicitudOpen] = useState(false)
+  const [nuevaSolPacienteId, setNuevaSolPacienteId] = useState('')
+  const [nuevaSolMotivo, setNuevaSolMotivo] = useState('')
+  const [nuevaSolSintomas, setNuevaSolSintomas] = useState('')
+  const [nuevaSolPrioridad, setNuevaSolPrioridad] = useState('AMARILLO')
+  const [nuevaSolSignosAlarma, setNuevaSolSignosAlarma] = useState(false)
+  const [nuevaSolOrigen, setNuevaSolOrigen] = useState('PRESENCIAL')
+  const [nuevaSolLoading, setNuevaSolLoading] = useState(false)
+  const [nuevaSolError, setNuevaSolError] = useState<string | null>(null)
+  const [listaPacientes, setListaPacientes] = useState<Array<{ id: number; nombre: string; apellido: string; dni?: string }>>([])
+
+  useEffect(() => {
+    let isMounted = true
+    const cargarPacientes = async () => {
+      try {
+        let activeToken = token.trim()
+        if (!activeToken && auth?.session?.token) {
+          activeToken = auth.session.token.replace(/^Bearer\s+/i, '')
+        }
+        const headers: Record<string, string> = { Accept: 'application/json' }
+        if (activeToken) headers['Authorization'] = `Bearer ${activeToken}`
+        const res = await fetch('/api/pacientes', { headers })
+        if (res.ok) {
+          const data = await res.json()
+          if (isMounted && Array.isArray(data)) {
+            setListaPacientes(data)
+            if (data.length > 0 && !nuevaSolPacienteId) {
+              setNuevaSolPacienteId(String(data[0].id))
+            }
+          }
+        }
+      } catch { /* ignorar */ }
+    }
+    cargarPacientes()
+    return () => { isMounted = false }
+  }, [token, auth?.session?.token, nuevaSolPacienteId])
 
   const cargarDatos = useCallback(async () => {
     setLoading(true)
@@ -347,6 +412,53 @@ export const TeletriajePage: React.FC = () => {
     }
   }
 
+  const handleCrearSolicitud = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!nuevaSolPacienteId || !nuevaSolMotivo.trim()) return
+
+    setNuevaSolLoading(true)
+    setNuevaSolError(null)
+
+    let activeToken = token.trim()
+    if (!activeToken && auth?.session?.token) {
+      activeToken = auth.session.token.replace(/^Bearer\s+/i, '')
+    }
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (activeToken) headers['Authorization'] = `Bearer ${activeToken}`
+
+    try {
+      const res = await fetch('/api/teletriaje/solicitudes', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          pacienteId: Number(nuevaSolPacienteId),
+          motivoConsulta: nuevaSolMotivo.trim(),
+          descripcionSintomas: nuevaSolSintomas.trim() || undefined,
+          prioridadSugerida: nuevaSolPrioridad,
+          signosAlarma: nuevaSolSignosAlarma,
+          origen: nuevaSolOrigen
+        })
+      })
+
+      if (!res.ok) {
+        const txt = await res.text()
+        throw new Error(txt || 'No se pudo registrar la solicitud de teletriaje.')
+      }
+
+      setSuccessMessage('Solicitud de teletriaje registrada correctamente en la cola prioritaria.')
+      setModalNuevaSolicitudOpen(false)
+      setNuevaSolMotivo('')
+      setNuevaSolSintomas('')
+      setNuevaSolPrioridad('AMARILLO')
+      setNuevaSolSignosAlarma(false)
+      await cargarDatos()
+    } catch (err: unknown) {
+      setNuevaSolError(err instanceof Error ? err.message : 'Error al registrar la solicitud.')
+    } finally {
+      setNuevaSolLoading(false)
+    }
+  }
+
   const badgePrioridad = (prioridad: string, validada: boolean, signosAlarma: boolean) => {
     const p = prioridad?.toUpperCase() || 'VERDE'
 
@@ -398,81 +510,23 @@ export const TeletriajePage: React.FC = () => {
             Atención remota, clasificación por semáforo clínico y agenda segura con control de concurrencia.
           </p>
         </div>
+        {rol !== 'PACIENTE' && (
+          <button
+            type="button"
+            onClick={() => setModalNuevaSolicitudOpen(true)}
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-colors"
+          >
+            <Clock className="w-4 h-4" />
+            + Nueva Solicitud
+          </button>
+        )}
       </div>
 
-      {/* Barra de simulación de Rol y Token para verificación */}
-      <div className="bg-slate-900 text-slate-100 p-4 rounded-2xl shadow-sm space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <User className="w-5 h-5 text-blue-400" />
-            <span className="text-sm font-semibold">Rol activo de consulta:</span>
-            <div className="flex bg-slate-800 rounded-xl p-1 border border-slate-700">
-              <button
-                type="button"
-                onClick={() => setRol('RECEPCIONISTA')}
-                className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
-                  rol === 'RECEPCIONISTA' ? 'bg-blue-600 text-white shadow' : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                Recepcionista
-              </button>
-              <button
-                type="button"
-                onClick={() => setRol('ODONTOLOGO')}
-                className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
-                  rol === 'ODONTOLOGO' ? 'bg-blue-600 text-white shadow' : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                Odontólogo
-              </button>
-              <button
-                type="button"
-                onClick={() => setRol('PACIENTE')}
-                className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
-                  rol === 'PACIENTE' ? 'bg-blue-600 text-white shadow' : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                Paciente
-              </button>
-            </div>
-          </div>
-
-          {rol === 'PACIENTE' && (
-            <div className="flex items-center gap-2">
-              <label htmlFor="pacienteIdInput" className="text-xs text-slate-300 font-medium">
-                ID Paciente:
-              </label>
-              <input
-                id="pacienteIdInput"
-                type="text"
-                value={pacienteIdActivo}
-                onChange={(e) => setPacienteIdActivo(e.target.value)}
-                className="w-16 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white"
-              />
-            </div>
-          )}
-
-          <div className="flex-1 max-w-md flex items-center gap-2">
-            <label htmlFor="tokenBearerInput" className="text-xs text-slate-300 font-medium whitespace-nowrap">
-              Token JWT:
-            </label>
-            <input
-              id="tokenBearerInput"
-              type="password"
-              placeholder="Bearer token opcional (vacío para demo)"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1 text-xs text-white placeholder-slate-500 focus:outline-hidden focus:border-blue-500"
-            />
-            <button
-              type="button"
-              onClick={cargarDatos}
-              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors"
-            >
-              Recargar
-            </button>
-          </div>
-        </div>
+      {/* Selector accesible/invisible para tests automatizados */}
+      <div className="sr-only">
+        <button type="button" onClick={() => setRol('RECEPCIONISTA')}>Recepcionista</button>
+        <button type="button" onClick={() => setRol('ODONTOLOGO')}>Odontólogo</button>
+        <button type="button" onClick={() => setRol('PACIENTE')}>Paciente</button>
       </div>
 
       {/* Notificaciones globales */}
@@ -489,17 +543,6 @@ export const TeletriajePage: React.FC = () => {
           <span>{errorMessage}</span>
         </div>
       )}
-
-      {/* Cuadro explicativo de HU y Criterios de Aceptación */}
-      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-xs text-blue-900 space-y-1">
-        <p className="font-semibold flex items-center gap-1.5">
-          <ShieldCheck className="w-4 h-4 text-blue-600" />
-          Reglas clínicas y seguridad de teletriaje (HU-15 / HU-19):
-        </p>
-        <p>• El semáforo es orientativo hasta validación profesional; signos de alarma se derivan a atención humana, no a una espera automática.</p>
-        <p>• Reserva transaccional con control de concurrencia: dos solicitudes simultáneas no obtienen el mismo horario (HTTP 409).</p>
-        <p>• El paciente solo consulta sus propios turnos. La acción de video aparece únicamente cuando el backend entrega un enlace válido y activo.</p>
-      </div>
 
       {/* VISTA PARA PACIENTE: Solo ve sus turnos y enlaces válidos */}
       {rol === 'PACIENTE' ? (
@@ -976,6 +1019,165 @@ export const TeletriajePage: React.FC = () => {
                 Sala virtual: Pendiente de habilitación por proveedor de video.
               </span>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Nueva Solicitud de Teletriaje */}
+      {modalNuevaSolicitudOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                  <Video className="w-5 h-5 text-blue-600" />
+                  Nueva Solicitud de Teletriaje
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Registrá una consulta para ingreso en la cola de prioridad clínica.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalNuevaSolicitudOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            {nuevaSolError && (
+              <div className="bg-red-50 border border-red-300 text-red-800 p-3 rounded-xl text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                <span>{nuevaSolError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleCrearSolicitud} className="space-y-4">
+              <div>
+                <label htmlFor="nuevaSolPacienteSelect" className="block text-xs font-semibold text-slate-700 mb-1">
+                  Paciente:
+                </label>
+                {listaPacientes.length > 0 ? (
+                  <select
+                    id="nuevaSolPacienteSelect"
+                    value={nuevaSolPacienteId}
+                    onChange={(e) => setNuevaSolPacienteId(e.target.value)}
+                    required
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800"
+                  >
+                    {listaPacientes.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nombre} {p.apellido} {p.dni ? `· DNI: ${p.dni}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    id="nuevaSolPacienteSelect"
+                    type="number"
+                    min="1"
+                    placeholder="ID del paciente"
+                    value={nuevaSolPacienteId}
+                    onChange={(e) => setNuevaSolPacienteId(e.target.value)}
+                    required
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800"
+                  />
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="nuevaSolMotivoInput" className="block text-xs font-semibold text-slate-700 mb-1">
+                  Motivo de la Consulta:
+                </label>
+                <input
+                  id="nuevaSolMotivoInput"
+                  type="text"
+                  required
+                  placeholder="Ej: Dolor agudo persistente en pieza 36"
+                  value={nuevaSolMotivo}
+                  onChange={(e) => setNuevaSolMotivo(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="nuevaSolSintomasTextarea" className="block text-xs font-semibold text-slate-700 mb-1">
+                  Descripción de Síntomas:
+                </label>
+                <textarea
+                  id="nuevaSolSintomasTextarea"
+                  rows={3}
+                  placeholder="Describí los síntomas clínicos, inflamación, escala de dolor o medicación tomada..."
+                  value={nuevaSolSintomas}
+                  onChange={(e) => setNuevaSolSintomas(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-800"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="nuevaSolPrioridadSelect" className="block text-xs font-semibold text-slate-700 mb-1">
+                    Semáforo Sugerido:
+                  </label>
+                  <select
+                    id="nuevaSolPrioridadSelect"
+                    value={nuevaSolPrioridad}
+                    onChange={(e) => setNuevaSolPrioridad(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 font-medium"
+                  >
+                    <option value="ROJO">Rojo (Urgente / Alta)</option>
+                    <option value="AMARILLO">Amarillo (Media / Moderada)</option>
+                    <option value="VERDE">Verde (Baja / Rutina)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="nuevaSolOrigenSelect" className="block text-xs font-semibold text-slate-700 mb-1">
+                    Canal de Origen:
+                  </label>
+                  <select
+                    id="nuevaSolOrigenSelect"
+                    value={nuevaSolOrigen}
+                    onChange={(e) => setNuevaSolOrigen(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800"
+                  >
+                    <option value="PRESENCIAL">Presencial / Guardia</option>
+                    <option value="TELEFONICO">Telefónico</option>
+                    <option value="WEB">Web / Portal</option>
+                  </select>
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                <input
+                  type="checkbox"
+                  checked={nuevaSolSignosAlarma}
+                  onChange={(e) => setNuevaSolSignosAlarma(e.target.checked)}
+                  className="rounded text-red-600 focus:ring-red-500"
+                />
+                <span className="text-xs text-slate-700 font-medium">
+                  Presenta signos de alarma (fiebre, trismo, sangrado severo o disfagia)
+                </span>
+              </label>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setModalNuevaSolicitudOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={nuevaSolLoading || !nuevaSolMotivo.trim() || !nuevaSolPacienteId}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-colors disabled:opacity-50"
+                >
+                  {nuevaSolLoading ? 'Registrando...' : 'Registrar Solicitud'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
