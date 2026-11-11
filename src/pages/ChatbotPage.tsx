@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronDown, ShieldCheck, Sparkles, Stethoscope } from 'lucide-react'
 import { ApiError, apiRequest } from '../lib/api'
 import { useAuth } from '../auth/useAuth'
+import { ChatbotAgendaCard, type AgendaAsistente, type ReservaChatbotResponse } from '../components/chatbot/ChatbotAgendaCard'
 
 type Citation = { id: string; documento: string; version: string; fragmento: string }
 type ChatResponse = {
@@ -11,6 +12,7 @@ type ChatResponse = {
   timestamp: string
   citas?: Citation[]
   accionesSugeridas?: string[]
+  agenda?: AgendaAsistente
 }
 type TurnoPropio = { id: number; fecha: string; hora: string; motivo: string; estado: string; odontologoNombre: string }
 type ChatAction = { to: string; label: string }
@@ -21,21 +23,33 @@ type Message = {
   citations?: Citation[]
   actions?: ChatAction[]
   noEvidence?: boolean
+  agenda?: AgendaAsistente
 }
 
 const NO_EVIDENCE = 'No tengo información suficiente'
-const LOCAL_GREETING_RESPONSE = '¡Hola! Soy el asistente de NovaDent. Puedo ayudarte a consultar tu próximo turno registrado, abrir tu odontograma o responder consultas cuando haya fuentes aprobadas de la clínica. No brindo diagnósticos ni invento horarios o precios.'
+const LOCAL_GREETING_RESPONSE = '¡Hola! Soy el asistente de NovaDent. Puedo ayudarte a consultar los doctores disponibles, ver horarios libres y sacar un turno, consultar tu próximo turno registrado o abrir tu odontograma. No brindo diagnósticos ni invento precios.'
 const SCHEDULE_FALLBACK_RESPONSE = 'Ahora no puedo confirmar los horarios ni la disponibilidad porque no hay una fuente vigente aprobada. Consultá tus turnos registrados o comunicate con recepción.'
 
 const ACTIONS: Record<string, ChatAction> = {
   '/mis-turnos': { to: '/mis-turnos', label: 'Ver mis turnos' },
   '/mi-odontograma': { to: '/mi-odontograma', label: 'Ver mi odontograma' },
   '/': { to: '/', label: 'Registrar una observación' },
+  '/turnos': { to: '/turnos', label: 'Ir a Turnos' },
+  '/odontologos': { to: '/odontologos', label: 'Ver Odontólogos' },
 }
 
-const SUGGESTIONS = [
+const PATIENT_SUGGESTIONS = [
   '¿Cuándo es mi próximo turno?',
-  '¿Qué horarios tienen disponibles?',
+  '¿Qué turnos tienen disponibles?',
+  '¿Qué doctores disponibles hay?',
+  'Quiero sacar un turno',
+  'Hola, ¿en qué me podés ayudar?',
+] as const
+
+const STAFF_SUGGESTIONS = [
+  '¿Qué turnos tienen disponibles?',
+  '¿Qué doctores disponibles hay?',
+  'Quiero sacar un turno',
   'Hola, ¿en qué me podés ayudar?',
 ] as const
 
@@ -54,7 +68,7 @@ function limpiarTexto(text: string) {
 function esSaludoLocal(text: string) {
   const clean = limpiarTexto(text)
   if (!clean) return false
-  if (/\b(turno|cita|horario|disponib|precio|costo|obra social|dolor|diente|odontograma|tratamiento|implante|limpieza)\b/.test(clean)) {
+  if (/\b(turno|turnos|cita|citas|horario|horarios|disponib|doctor|doctora|doctores|odontologo|odontologa|odontologos|profesional|profesionales|dentista|medico|sacar|reservar|agendar|precio|costo|obra social|dolor|diente|odontograma|tratamiento|implante|limpieza)\b/.test(clean)) {
     return false
   }
   return /^(hola|buenas|buen dia|buenos dias|buenas tardes|buenas noches|que tal|como estas|gracias|muchas gracias|ayuda)(\s+(como estas|que tal|buen dia|buenos dias|buenas tardes|buenas noches|gracias|por favor|asistente|novadent))*$/.test(clean)
@@ -88,9 +102,13 @@ function respuestaTurnos(turnos: TurnoPropio[]): string {
     .filter(item => item.estado !== 'CANCELADO')
     .filter(item => new Date(item.fecha + 'T' + item.hora).getTime() >= now.getTime())
     .sort((a, b) => new Date(a.fecha + 'T' + a.hora).getTime() - new Date(b.fecha + 'T' + b.hora).getTime())[0]
-  if (!next) return 'No tenés turnos futuros registrados en tu ficha. Para confirmar o solicitar uno, consultá con recepción.'
+  if (!next) return 'No tenés turnos futuros registrados en tu ficha. Si querés sacar uno ahora, preguntame por los turnos disponibles.'
   return 'Tu próximo turno registrado es el ' + formatoFecha(next.fecha) + ' a las ' + next.hora.slice(0, 5)
     + ' hs (' + next.motivo + '), con ' + next.odontologoNombre + '.'
+}
+
+function notifyTurnoBooked() {
+  window.dispatchEvent(new CustomEvent('novadent:turno-booked'))
 }
 
 export function ChatbotPage({ compact = false }: { compact?: boolean } = {}) {
@@ -98,6 +116,26 @@ export function ChatbotPage({ compact = false }: { compact?: boolean } = {}) {
   const [messages, setMessages] = useState<Message[]>([])
   const [question, setQuestion] = useState('')
   const [loading, setLoading] = useState(false)
+  const conversationRef = useRef<HTMLElement | null>(null)
+
+  const isStaff = Boolean(session?.role && session.role !== 'PACIENTE')
+  const suggestions = isStaff ? STAFF_SUGGESTIONS : PATIENT_SUGGESTIONS
+
+  useEffect(() => {
+    if (conversationRef.current) {
+      conversationRef.current.scrollTop = conversationRef.current.scrollHeight
+    }
+  }, [messages])
+
+  function handleAgendaBooked(reserva: ReservaChatbotResponse) {
+    notifyTurnoBooked()
+    setMessages(current => [...current, {
+      id: createMessageId(),
+      role: 'assistant',
+      text: reserva.mensaje,
+      actions: [isStaff ? ACTIONS['/turnos'] : ACTIONS['/mis-turnos']],
+    }])
+  }
 
   async function sendQuestion(rawText: string) {
     const text = rawText.trim()
@@ -107,18 +145,21 @@ export function ChatbotPage({ compact = false }: { compact?: boolean } = {}) {
     setMessages(current => [...current, { id: createMessageId(), role: 'user', text }])
 
     if (esSaludoLocal(text)) {
+      const greetingActions = isStaff
+        ? [ACTIONS['/turnos'], ACTIONS['/odontologos']]
+        : [ACTIONS['/mis-turnos'], ACTIONS['/mi-odontograma'], ACTIONS['/']]
       setMessages(current => [...current, {
         id: createMessageId(),
         role: 'assistant',
         text: LOCAL_GREETING_RESPONSE,
-        actions: [ACTIONS['/mis-turnos'], ACTIONS['/mi-odontograma'], ACTIONS['/']],
+        actions: greetingActions,
       }])
       return
     }
 
     setLoading(true)
     try {
-      if (preguntaTurnoPropio(text)) {
+      if (preguntaTurnoPropio(text) && !isStaff) {
         try {
           const turnos = await apiRequest<TurnoPropio[]>('/portal-paciente/turnos', { token: session.token })
           setMessages(current => [...current, {
@@ -149,18 +190,23 @@ export function ChatbotPage({ compact = false }: { compact?: boolean } = {}) {
               ? SCHEDULE_FALLBACK_RESPONSE
               : 'Ahora no hay fuentes aprobadas disponibles para responder esa consulta y no voy a inventar datos. Podés consultar tus turnos o tu odontograma desde tu cuenta.')
           : response.respuesta
+        const defaultScheduleAction = isStaff ? ACTIONS['/turnos'] : ACTIONS['/mis-turnos']
         const actions = providerFailed
-          ? (isSchedule ? [ACTIONS['/mis-turnos']] : [ACTIONS['/mis-turnos'], ACTIONS['/mi-odontograma']])
+          ? (isSchedule ? [defaultScheduleAction] : [defaultScheduleAction, ACTIONS['/mi-odontograma']])
           : (accionesDesde(response.accionesSugeridas).length > 0
               ? accionesDesde(response.accionesSugeridas)
-              : (isSchedule ? [ACTIONS['/mis-turnos']] : []))
+              : (isSchedule ? [defaultScheduleAction] : []))
+        if (!providerFailed && response.agenda?.turnoConfirmado) {
+          notifyTurnoBooked()
+        }
         setMessages(current => [...current, {
           id: createMessageId(),
           role: 'assistant',
           text: answer,
           citations: providerFailed ? [] : response.citas ?? [],
           actions,
-          noEvidence: !providerFailed && !response.citas?.length && answer.startsWith(NO_EVIDENCE),
+          noEvidence: !providerFailed && !response.citas?.length && !response.agenda && answer.startsWith(NO_EVIDENCE),
+          agenda: providerFailed ? undefined : response.agenda,
         }])
       }
     } catch {
@@ -174,7 +220,7 @@ export function ChatbotPage({ compact = false }: { compact?: boolean } = {}) {
           : isSchedule
             ? 'No pude conectar con el asistente y no puedo confirmar horarios ni disponibilidad sin una fuente vigente aprobada. Podés revisar tus turnos registrados o comunicarte con recepción.'
             : 'No pude conectar con el asistente y no voy a inventar una respuesta. Probá de nuevo más tarde o usá las opciones de tu cuenta.',
-        actions: [ACTIONS['/mis-turnos'], ACTIONS['/mi-odontograma']],
+        actions: isStaff ? [ACTIONS['/turnos'], ACTIONS['/odontologos']] : [ACTIONS['/mis-turnos'], ACTIONS['/mi-odontograma']],
       }])
     } finally {
       setLoading(false)
@@ -193,12 +239,13 @@ export function ChatbotPage({ compact = false }: { compact?: boolean } = {}) {
           <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Asistente Novadent</p>
           <h1 className="text-xl font-bold text-slate-950 sm:text-2xl">Consultas con fuentes</h1>
           <p className="max-w-3xl text-xs leading-5 text-slate-600 sm:text-sm">
-            Responde consultas generales con documentos aprobados y muestra sus fuentes. No brinda diagnósticos ni reemplaza una consulta profesional.
+            Consultá doctores disponibles, horarios libres y sacá tu turno al instante, o hacé preguntas con documentos aprobados. No brinda diagnósticos ni reemplaza una consulta profesional.
           </p>
         </header>
       )}
 
       <section
+        ref={conversationRef}
         aria-label="Conversación"
         aria-live="polite"
         className="max-h-[340px] min-h-[200px] space-y-3 overflow-y-auto rounded-2xl border border-slate-200 bg-white/80 p-3.5 shadow-sm backdrop-blur-xl sm:max-h-[380px] sm:p-4"
@@ -206,10 +253,10 @@ export function ChatbotPage({ compact = false }: { compact?: boolean } = {}) {
         {messages.length === 0 && (
           <div className="space-y-2.5 rounded-xl border border-blue-100 bg-blue-50/80 p-3 text-xs text-blue-950 sm:text-sm">
             <p className="leading-5">
-              Escribí un saludo, consultá tu próximo turno o preguntá por información documentada. Los horarios y precios solo se informan si hay una fuente vigente aprobada.
+              Preguntá por los doctores disponibles, consultá qué turnos libres hay y sacá uno directamente desde acá, o revisá tu próximo turno registrado.
             </p>
             <div className="flex flex-wrap gap-1.5">
-              {SUGGESTIONS.map(item => (
+              {suggestions.map(item => (
                 <button
                   key={item}
                   type="button"
@@ -227,6 +274,14 @@ export function ChatbotPage({ compact = false }: { compact?: boolean } = {}) {
           <article key={message.id} className={'max-w-2xl rounded-2xl border p-3.5 ' + (message.role === 'user' ? 'ml-auto border-blue-600 bg-blue-700 text-white' : 'border-blue-100 bg-blue-50/90 text-slate-900')}>
             <p className="whitespace-pre-wrap text-sm leading-6">{message.text}</p>
             {message.noEvidence && <p className="mt-2.5 text-xs font-semibold text-amber-800">Sin evidencia suficiente en las fuentes.</p>}
+            {message.agenda && session && (
+              <ChatbotAgendaCard
+                agenda={message.agenda}
+                token={session.token}
+                compact={compact}
+                onBooked={handleAgendaBooked}
+              />
+            )}
             {!!message.actions?.length && <div className="mt-2.5 flex flex-wrap gap-2">
               {message.actions.map(action => <Link key={action.to} to={action.to} className="inline-flex min-h-8 items-center rounded-lg border border-blue-300 bg-white/90 px-3 py-1.5 text-xs font-semibold text-blue-900 hover:bg-blue-50">{action.label}</Link>)}
             </div>}
@@ -248,14 +303,14 @@ export function ChatbotPage({ compact = false }: { compact?: boolean } = {}) {
             )}
           </article>
         ))}
-        {loading && <p role="status" className="text-xs text-slate-500 sm:text-sm">Buscando fuentes y preparando respuesta…</p>}
+        {loading && <p role="status" className="text-xs text-slate-500 sm:text-sm">Consultando agenda y preparando respuesta…</p>}
       </section>
 
       <form onSubmit={submit} className="flex gap-2">
         <label className="sr-only" htmlFor="chat-question">Tu pregunta</label>
         <input id="chat-question" maxLength={1000} value={question}
           onChange={event => setQuestion(event.target.value)}
-          placeholder="Escribí tu pregunta…" disabled={loading}
+          placeholder="Preguntá por turnos disponibles, doctores o consultas…" disabled={loading}
           className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white/90 px-3.5 py-2.5 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100" />
         <button type="submit" disabled={loading || !question.trim()}
           className="rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50">Enviar</button>
@@ -280,9 +335,9 @@ export function ChatbotPage({ compact = false }: { compact?: boolean } = {}) {
                 <Sparkles className="h-3 w-3 text-amber-500" /> Stack Tecnológico:
               </p>
               <ul className="list-inside list-disc space-y-1 text-slate-600">
-                <li><strong>Backend:</strong> Spring Boot 3.5.6 + Spring AI (VectorStore + OpenAI).</li>
-                <li><strong>Fuentes controladas:</strong> solo documentos explícitamente aprobados e indexados.</li>
-                <li><strong>Endpoints REST:</strong> <code>POST /api/chatbot/ask</code> y <code>POST /api/chatbot/knowledge</code>.</li>
+                <li><strong>Backend:</strong> Spring Boot 3.5.6 + Spring AI (VectorStore + OpenAI) + Agenda en vivo.</li>
+                <li><strong>Fuentes controladas:</strong> doctores/turnos reales de BD y documentos aprobados.</li>
+                <li><strong>Endpoints REST:</strong> <code>POST /api/chatbot/ask</code>, <code>GET /api/chatbot/doctores</code>, <code>POST /api/chatbot/turnos/reservar</code>.</li>
               </ul>
             </div>
             <div>
@@ -291,8 +346,8 @@ export function ChatbotPage({ compact = false }: { compact?: boolean } = {}) {
               </p>
               <ul className="list-inside list-disc space-y-1 text-slate-600">
                 <li>Consultas de turnos propios aisladas en <code>GET /api/portal-paciente/turnos</code>.</li>
-                <li>Respuestas verificables con citas documentales sin inventar horarios, precios ni consejos médicos.</li>
-                <li>Respaldo local para saludos y navegación cuando el proveedor de IA no está configurado.</li>
+                <li>Reserva validada en tiempo real contra solapamientos y rol autenticado por JWT.</li>
+                <li>Respuestas verificables sin inventar horarios, precios ni consejos médicos.</li>
               </ul>
             </div>
           </div>

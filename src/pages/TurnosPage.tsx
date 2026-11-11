@@ -202,6 +202,11 @@ export function TurnosPage({ token }: { token: string }) {
   }, [week, calendarMonth, viewMode, dentistFilter, token])
 
   useEffect(() => { void loadAgenda() }, [loadAgenda])
+  useEffect(() => {
+    const onTurnoBooked = () => { void loadAgenda() }
+    window.addEventListener('novadent:turno-booked', onTurnoBooked)
+    return () => window.removeEventListener('novadent:turno-booked', onTurnoBooked)
+  }, [loadAgenda])
 
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => {
     const day = new Date(week)

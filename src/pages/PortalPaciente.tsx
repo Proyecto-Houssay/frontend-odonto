@@ -85,10 +85,17 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [openedAt] = useState(() => Date.now())
+  const [reloadKey, setReloadKey] = useState(0)
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     try { return localStorage.getItem('novadent-theme') === 'dark' ? 'dark' : 'light' }
     catch { return 'light' }
   })
+
+  useEffect(() => {
+    const onTurnoBooked = () => setReloadKey(value => value + 1)
+    window.addEventListener('novadent:turno-booked', onTurnoBooked)
+    return () => window.removeEventListener('novadent:turno-booked', onTurnoBooked)
+  }, [])
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -133,9 +140,10 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
         if (active) setLoading(false)
       }
     }
+    void reloadKey
     void load()
     return () => { active = false }
-  }, [token])
+  }, [token, reloadKey])
 
   async function crearPerfil(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

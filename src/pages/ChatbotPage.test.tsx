@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { ChatbotPage } from './ChatbotPage'
 
@@ -126,5 +126,76 @@ describe('ChatbotPage', () => {
 
     expect(await screen.findByText(/No pude conectar con el asistente/i)).not.toBeNull()
     expect(screen.getByRole('link', { name: 'Ver mis turnos' }).getAttribute('href')).toBe('/mis-turnos')
+  })
+
+  it('lists available doctors and allows booking a real appointment directly from the chatbot', async () => {
+    const slot = {
+      odontologoId: 3,
+      odontologoNombre: 'Laura Pérez',
+      especialidad: 'Ortodoncia',
+      fecha: '2099-11-12',
+      hora: '10:00:00',
+      etiquetaFecha: 'mañana 12/11',
+      etiquetaHora: '10:00',
+    }
+    fetchMock.mockImplementation((path: string, init?: RequestInit) => {
+      if (path === '/api/chatbot/ask') {
+        return Promise.resolve(response({
+          respuesta: '¡Hola! Sí, mirá, tenemos estos turnos disponibles:',
+          intencion: 'turno',
+          accionesSugeridas: ['/mis-turnos'],
+          citas: [],
+          agenda: {
+            requiereFichaPaciente: false,
+            esStaff: false,
+            doctores: [{ id: 3, nombre: 'Laura', apellido: 'Pérez', nombreCompleto: 'Laura Pérez', especialidad: 'Ortodoncia' }],
+            slotsDisponibles: [slot],
+            fechaConsultada: '2099-11-12',
+            odontologoConsultadoId: 3,
+          },
+        }))
+      }
+      if (path.startsWith('/api/chatbot/turnos/disponibles')) {
+        return Promise.resolve(response([slot]))
+      }
+      if (path === '/api/chatbot/turnos/reservar' && init?.method === 'POST') {
+        return Promise.resolve(response({
+          turnoId: 77,
+          fecha: '2099-11-12',
+          hora: '10:00:00',
+          motivo: 'Limpieza dental',
+          estado: 'PENDIENTE',
+          odontologoId: 3,
+          odontologoNombre: 'Laura Pérez',
+          pacienteId: 5,
+          pacienteNombre: 'Ana Nieto',
+          mensaje: '¡Listo! Tu turno quedó confirmado para el jueves 12 de noviembre a las 10:00 hs con Dr./Dra. Laura Pérez (Turno #77).',
+        }, 201))
+      }
+      throw new Error(`Unexpected path: ${path}`)
+    })
+
+    const bookedListener = vi.fn()
+    window.addEventListener('novadent:turno-booked', bookedListener)
+    render(<MemoryRouter><ChatbotPage /></MemoryRouter>)
+
+    fireEvent.change(screen.getByLabelText('Tu pregunta'), { target: { value: 'Hola, ¿qué turnos tienen disponibles?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar' }))
+
+    expect(await screen.findByText(/¡Hola! Sí, mirá, tenemos estos turnos disponibles/i)).not.toBeNull()
+    expect(screen.getByLabelText('Doctor disponible')).not.toBeNull()
+
+    const slotButton = await screen.findByRole('button', { name: '10:00' })
+    fireEvent.click(slotButton)
+    fireEvent.change(screen.getByLabelText('Motivo de la consulta'), { target: { value: 'Limpieza dental' } })
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar turno/i }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/chatbot/turnos/reservar', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ odontologoId: 3, fecha: '2099-11-12', hora: '10:00:00', motivo: 'Limpieza dental' }),
+    })))
+    expect(await screen.findByText(/Turno #77 confirmado/i)).not.toBeNull()
+    expect(bookedListener).toHaveBeenCalledTimes(1)
+    window.removeEventListener('novadent:turno-booked', bookedListener)
   })
 })
