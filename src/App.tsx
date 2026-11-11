@@ -55,7 +55,7 @@ function AppRoutes() {
         <Route index element={<DashboardHome role={role} token={session.token} />} />
         <Route path="pacientes" element={<PacientesPage />} />
         <Route path="seguimiento" element={<ClinicalRoute role={role}><SeguimientoPage token={session.token} role={role} /></ClinicalRoute>} />
-        <Route path="odontograma" element={<ClinicalRoute role={role} allowReception><OdontogramaRoute demoMode={false} backendMode /></ClinicalRoute>} />
+        <Route path="odontograma" element={<ClinicalRoute role={role} allowReception><OdontogramaRoute demoMode={false} /></ClinicalRoute>} />
         <Route path="odontograma/backend" element={<ClinicalRoute role={role} allowReception><OdontogramaRoute demoMode={false} backendMode /></ClinicalRoute>} />
         <Route path="odontograma/demo" element={<ClinicalRoute role={role}><OdontogramaRoute demoMode /></ClinicalRoute>} />
         <Route path="pacientes/:pacienteId/odontograma" element={<ClinicalRoute role={role} allowReception><OdontogramaRoute demoMode={false} /></ClinicalRoute>} />

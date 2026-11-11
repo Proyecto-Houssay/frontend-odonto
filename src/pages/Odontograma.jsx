@@ -103,7 +103,33 @@ export function createBudgetPdf(snapshot) {
   return doc
 }
 
-function ToothIcon({ color, lower, molar }) {
+const TOOTH_TYPES = {
+  1: 'Incisivo C.', 2: 'Incisivo L.', 3: 'Canino', 4: '1° Premolar',
+  5: '2° Premolar', 6: '1° Molar', 7: '2° Molar', 8: '3° Molar',
+}
+const QUADRANTS = {
+  1: 'Sup. der.', 2: 'Sup. izq.', 3: 'Inf. izq.', 4: 'Inf. der.',
+}
+
+function ToothIcon({ color, lower, molar, viewMode = '2d', number = 11 }) {
+  if (viewMode === '3d') {
+    return (
+      <svg viewBox="0 0 44 56" aria-hidden="true" focusable="false" style={{ transform: lower ? 'rotate(180deg)' : undefined }}>
+        <defs>
+          <linearGradient id={`enamel-${number}`} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#ffffff" />
+            <stop offset="60%" stopColor="#f1f7ff" />
+            <stop offset="100%" stopColor="#b8cee6" />
+          </linearGradient>
+        </defs>
+        <path d="M9 5 C4 7 4 17 7 25 L12 47 Q15 56 19 38 Q22 30 25 38 Q30 56 32 47 L38 25 C42 12 36 2 29 5 Q22 8 16 5 Z"
+          fill={color !== '#94a3b8' ? color : `url(#enamel-${number})`} fillOpacity={color !== '#94a3b8' ? 0.45 : 1}
+          stroke={color} strokeWidth="2.4" />
+        <path d={molar ? 'M12 13 Q16 20 22 14 Q28 20 33 13 M22 14 V26' : 'M12 13 Q22 19 33 13'} fill="none" stroke={color !== '#94a3b8' ? color : '#8298b2'} strokeWidth="1.6" />
+        <path d="M10 26 L15 43 M34 26 L29 43" fill="none" stroke="#ffffff" strokeWidth="1.1" opacity=".8" />
+      </svg>
+    )
+  }
   return <svg viewBox="0 0 44 56" aria-hidden="true" focusable="false" style={{ transform: lower ? 'rotate(180deg)' : undefined }}>
     <path d="M9 5 C4 7 4 17 7 25 L12 47 Q15 56 19 38 Q22 30 25 38 Q30 56 32 47 L38 25 C42 12 36 2 29 5 Q22 8 16 5 Z" fill={color} fillOpacity=".22" stroke={color} strokeWidth="2.4" />
     <path d={molar ? 'M12 13 Q16 20 22 14 Q28 20 33 13 M22 14 V26' : 'M12 13 Q22 19 33 13'} fill="none" stroke={color} strokeWidth="1.6" />
@@ -134,6 +160,13 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
   const [loadedFor, setLoadedFor] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [viewMode, setViewMode] = useState('2d')
+  const [labelMode, setLabelMode] = useState('fdi')
+  const [rotation, setRotation] = useState(0)
+  const [patientSearch, setPatientSearch] = useState('')
+  const [previousCharts, setPreviousCharts] = useState([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
   const signatureRef = useRef(null), signatureBox = useRef(null), savingRef = useRef(false), revision = useRef(0)
   const patientId = demoMode ? patientNumber(selectedDemoPatientId) : patientNumber(pacienteId ?? manualPatient)
   const selectedDemoPatient = demoPatients.find(patient => patient.id === patientId)
@@ -286,6 +319,53 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
       setLoadingPatients(false)
     }
   }
+
+  async function loadPatientHistory(targetPatientId) {
+    if (!targetPatientId || !bearer) return
+    setLoadingHistory(true)
+    try {
+      const response = await fetch(`${baseUrl}/odontograma?pacienteId=${targetPatientId}`, {
+        headers: { Authorization: `Bearer ${bearer}` }
+      })
+      if (response.ok) {
+        const data = await response.json()
+        if (Array.isArray(data)) {
+          setPreviousCharts(data.filter(d => Number.isSafeInteger(d.id)).sort((a,b) => Date.parse(b.creadoEn) - Date.parse(a.creadoEn)))
+          setShowHistory(true)
+        }
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingHistory(false)
+    }
+  }
+
+  async function loadPreviousChart(id) {
+    if (!bearer) return
+    setError('')
+    try {
+      const response = await fetch(`${baseUrl}/odontograma/${id}`, {
+        headers: { Authorization: `Bearer ${bearer}` }
+      })
+      if (!response.ok) throw new Error('No se pudo cargar el odontograma previo.')
+      const data = await response.json()
+      if (Array.isArray(data.dientes)) {
+        const newChart = {}
+        for (const t of data.dientes) {
+          if (ALL_TEETH.includes(t.numero) && CONDITION[t.afeccion]) {
+            newChart[t.numero] = t.afeccion
+          }
+        }
+        setChart(newChart)
+        revoke({ consent: true })
+        setNotice(`Odontograma #${id} cargado en la evaluación actual para revisión.`)
+      }
+    } catch (e) {
+      setError(e.message || 'Error al cargar el odontograma previo.')
+    }
+  }
+
   function capture() {
     if (!canSign) return
     if (!signatureRef.current || signatureRef.current.isEmpty()) { setError('Dibuje una firma antes de capturarla.'); return }
@@ -321,10 +401,19 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
     catch { setError('No se pudo generar el PDF. El odontograma y la firma se conservan.') }
   }
 
+  const filteredPatients = apiPatients.filter(p => !patientSearch || `${p.nombre} ${p.apellido} ${p.dni} ${p.id}`.toLowerCase().includes(patientSearch.toLowerCase()))
+  const selectedPatientData = apiPatients.find(p => String(p.id) === String(patientId))
+
   return <main className="odontogram-page">
     <style>{STYLES}</style>
-    <header className="odontogram-header"><div><p className="odontogram-eyebrow">NOVADENT · SIMULACIÓN ACADÉMICA</p><h1>Odontograma y presupuesto</h1>
-      <p>Evaluación manual de dentición permanente. Sin diagnóstico automático ni cobros.</p></div><span className="odontogram-badge">32 piezas · FDI</span></header>
+    <header className="odontogram-header">
+      <div>
+        <p className="odontogram-eyebrow">NOVADENT · ODONTOLOGÍA CLÍNICA</p>
+        <h1>Odontograma y presupuesto</h1>
+        <p>Evaluación clínica de dentición permanente, registro interactivo 2D / 3D y firma digital.</p>
+      </div>
+      <span className="odontogram-badge">32 piezas · FDI</span>
+    </header>
     <section className="odontogram-card odontogram-credentials" aria-label="Paciente y acceso">
       {demoMode ? <>
         <label>Paciente de prueba<select aria-label="Paciente de prueba" value={selectedDemoPatientId} onChange={event => { setSelectedDemoPatientId(event.target.value); setError('') }}>
@@ -341,9 +430,94 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
         <label>ID de paciente{pacienteId != null ? <input value={pacienteId} readOnly aria-label="ID de paciente" /> : <input type="text" inputMode="numeric" value={manualPatient} disabled={saving} onChange={e => setManualPatient(e.target.value)} aria-label="ID de paciente" placeholder="ID existente en la API" />}</label>
         {pacienteId == null && apiPatients.length > 0 ? <label>Paciente registrado<select aria-label="Paciente registrado" value={manualPatient} disabled={saving} onChange={e => { setManualPatient(e.target.value); setError('') }}><option value="">Seleccionar paciente…</option>{apiPatients.map(p => <option key={p.id} value={String(p.id)}>{p.nombre} {p.apellido} · DNI {p.dni} (ID {p.id})</option>)}</select></label> : null}
         {pacienteId == null && bearer ? <button type="button" disabled={loadingPatients || saving} onClick={loadApiPatients}>{loadingPatients ? 'Cargando pacientes…' : apiPatients.length > 0 ? 'Actualizar lista' : 'Elegir paciente de la lista'}</button> : null}
-        {!token ? <label>Token Bearer (solo en memoria)<input type="password" autoComplete="off" value={manualToken} disabled={saving} onChange={e => setManualToken(e.target.value)} aria-label="Token Bearer (solo en memoria)" placeholder="Pegue el JWT de Swagger" /></label> : <p>Token proporcionado por la aplicación (no se almacena).</p>}
+        {!token ? <label>Token Bearer (solo en memoria)<input type="password" autoComplete="off" value={manualToken} disabled={saving} onChange={e => setManualToken(e.target.value)} aria-label="Token Bearer (solo en memoria)" placeholder="Pegue el JWT de Swagger" /></label> : null}
         <p className="odontogram-access">{verified ? 'Catálogo verificado' : readOnly ? 'Se requiere una sesión válida para consultar el odontograma.' : 'Se requiere JWT clínico para verificar el catálogo y firmar.'}{!patientId ? ' Ingrese un ID de paciente positivo.' : ''}</p>
         {backendMode ? <p className="odontogram-local-api-notice" role="note">Este modo usa la API en <code>/api</code>. Para conectarse a MySQL local, ejecutá el frontend con Vite y Spring Boot en tu PC. Una página abierta desde Vercel no puede acceder al backend ni a la base local de tu computadora.</p> : null}
+
+        {/* Panel enriquecido de Pacientes y Casos Clínicos */}
+        {apiPatients.length > 0 ? (
+          <div className="odontogram-patients-panel">
+            <div className="odontogram-patients-header">
+              <div>
+                <h4>Expedientes de Pacientes y Casos Clínicos</h4>
+                <p className="odontogram-panel-subtitle">Seleccioná un paciente para evaluar sus piezas dentales y consultar su historial.</p>
+              </div>
+              <input
+                type="text"
+                className="odontogram-search-input"
+                placeholder="Buscar por nombre o DNI…"
+                value={patientSearch}
+                onChange={e => setPatientSearch(e.target.value)}
+              />
+            </div>
+            <div className="odontogram-patient-chips">
+              {filteredPatients.slice(0, 8).map(p => {
+                const isSelected = String(p.id) === String(patientId)
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={`odontogram-patient-chip ${isSelected ? 'is-selected' : ''}`}
+                    onClick={() => {
+                      setManualPatient(String(p.id))
+                      setError('')
+                      void loadPatientHistory(p.id)
+                    }}
+                  >
+                    <strong>{p.nombre} {p.apellido}</strong>
+                    <span>DNI {p.dni} · ID {p.id}</span>
+                  </button>
+                )
+              })}
+            </div>
+            {selectedPatientData ? (
+              <div className="odontogram-selected-case">
+                <div className="odontogram-case-header">
+                  <div>
+                    <h5>Caso activo: <strong>{selectedPatientData.nombre} {selectedPatientData.apellido}</strong> (ID {selectedPatientData.id})</h5>
+                    <p className="odontogram-case-meta">DNI: {selectedPatientData.dni} {selectedPatientData.telefono ? `· Tel: ${selectedPatientData.telefono}` : ''} {selectedPatientData.email ? `· ${selectedPatientData.email}` : ''}</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="odontogram-history-btn"
+                    onClick={() => {
+                      if (!showHistory && patientId) void loadPatientHistory(patientId)
+                      setShowHistory(v => !v)
+                    }}
+                  >
+                    {loadingHistory ? 'Consultando historial…' : showHistory ? 'Ocultar historial' : '📋 Ver odontogramas previos'}
+                  </button>
+                </div>
+                {showHistory ? (
+                  <div className="odontogram-history-list">
+                    {previousCharts.length === 0 ? (
+                      <p className="odontogram-empty-history">No hay odontogramas previos registrados para este paciente en el sistema.</p>
+                    ) : (
+                      previousCharts.map(hist => (
+                        <div key={hist.id} className="odontogram-history-item">
+                          <div>
+                            <strong>Odontograma #{hist.id}</strong>
+                            <span className="odontogram-history-date">Registrado: {formatPdfDate(hist.creadoEn, true)}</span>
+                            <div className="odontogram-history-total">Total estimado: {formatMoney(hist.totalPresupuesto)} ARS</div>
+                          </div>
+                          {!readOnly ? (
+                            <button
+                              type="button"
+                              className="odontogram-btn-small"
+                              onClick={() => void loadPreviousChart(hist.id)}
+                            >
+                              Cargar en odontograma
+                            </button>
+                          ) : null}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </>}
     </section>
     {error ? <p className="odontogram-error" role="alert">{error}</p> : null}
@@ -353,29 +527,117 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
     {readOnly && recordStatus === 'empty' ? <p role="status">Este paciente todavía no tiene odontogramas guardados.</p> : null}
     <div className="odontogram-workspace">
       <section className="odontogram-card" aria-label="Odontograma FDI">
-        <h2>Seleccione una pieza</h2><p>Vista del profesional: derecha del paciente a la izquierda. Seleccionar no registra una afección.</p>
-        <div className="odontogram-scroll" tabIndex={0} role="region" aria-label="Arcadas dentales, desplazamiento horizontal disponible">
-          <div className="odontogram-arches">{ARCHES.map((arch, index) => <div key={index}>
-            <h3>{index === 0 ? 'Arcada superior' : 'Arcada inferior'}</h3>
-            <div className={`odontogram-arch ${index === 1 ? 'odontogram-lower' : ''}`}>
-              {arch.map((number, position) => { const condition = readOnly ? persisted?.dientes.find(tooth => tooth.numero === number) : CONDITION[chart[number]], color = condition?.color || '#94a3b8'
-                const offset = Math.round(46 * Math.sin(Math.PI * position / 15))
-                return <button key={number} type="button" className={`odontogram-tooth ${selected === number ? 'odontogram-selected' : ''}`} style={{ marginTop: index === 0 ? 46 - offset : offset, '--tooth-color': color }}
-                  disabled={saving} aria-label={`Diente ${number}: ${condition?.nombre || 'Sin evaluar'}`} aria-pressed={selected === number} onClick={() => setSelected(number)}>
-                  <span>{number}</span><ToothIcon color={color} lower={index === 1} molar={number % 10 >= 6} /><small>{condition?.nombre || 'Sin evaluar'}</small>
-                </button>
-              })}
+        <div className="odontogram-card-header">
+          <div>
+            <h2>Seleccione una pieza</h2>
+            <p>Vista del profesional: derecha del paciente a la izquierda. Seleccionar no registra una afección.</p>
+          </div>
+          <div className="odontogram-view-controls">
+            <div className="odontogram-control-group">
+              <button
+                type="button"
+                className={`odontogram-toggle-btn ${viewMode === '3d' ? 'is-active' : ''}`}
+                aria-label={viewMode === '2d' ? 'Activar vista 3D interactiva' : 'Volver a vista 2D'}
+                aria-pressed={viewMode === '3d'}
+                onClick={() => setViewMode(v => v === '2d' ? '3d' : '2d')}
+              >
+                {viewMode === '2d' ? 'Vista 3D interactiva' : 'Vista 2D'}
+              </button>
+              <button
+                type="button"
+                className={`odontogram-toggle-btn ${labelMode === 'anatomical' ? 'is-active' : ''}`}
+                aria-label={labelMode === 'fdi' ? 'Mostrar nombres anatómicos' : 'Mostrar números FDI'}
+                aria-pressed={labelMode === 'anatomical'}
+                onClick={() => setLabelMode(v => v === 'fdi' ? 'anatomical' : 'fdi')}
+              >
+                {labelMode === 'fdi' ? 'Mostrar nombres anatómicos' : 'Mostrar números FDI'}
+              </button>
             </div>
-          </div>)}</div>
+            {viewMode === '3d' ? (
+              <div className="odontogram-rotation-box">
+                <label htmlFor="dental-arch-rotation">Rotar 3D ({rotation}°)</label>
+                <input
+                  id="dental-arch-rotation"
+                  aria-label="Rotar arcada dental"
+                  type="range"
+                  min="-24"
+                  max="24"
+                  value={rotation}
+                  onChange={e => setRotation(Number(e.target.value))}
+                />
+              </div>
+            ) : null}
+          </div>
         </div>
-        <div className="odontogram-legend" aria-label="Leyenda de afecciones">{CATALOG.map(item => <span key={item.afeccion}><i style={{ background: item.color }} />{item.nombre}</span>)}<span><i style={{ background: '#94a3b8' }} />Sin evaluar</span></div>
+
+        <div className={`odontogram-scroll ${viewMode === '3d' ? 'odontogram-scroll-3d' : ''}`} tabIndex={0} role="region" aria-label="Arcadas dentales, desplazamiento horizontal disponible">
+          <div className="odontogram-arches">
+            {ARCHES.map((arch, index) => {
+              const isUpper = index === 0
+              const archStyle = viewMode === '3d'
+                ? { transform: `perspective(1000px) rotateX(${isUpper ? 24 : -22}deg) rotateY(${rotation}deg)` }
+                : undefined
+              return (
+                <div key={index}>
+                  <h3>{isUpper ? 'Arcada superior' : 'Arcada inferior'}</h3>
+                  <div className={`odontogram-arch ${index === 1 ? 'odontogram-lower' : ''} ${viewMode === '3d' ? 'is-3d-arch' : ''}`} style={archStyle}>
+                    {arch.map((number, position) => {
+                      const condition = readOnly ? persisted?.dientes.find(tooth => tooth.numero === number) : CONDITION[chart[number]], color = condition?.color || '#94a3b8'
+                      const offset = Math.round(46 * Math.sin(Math.PI * position / 15))
+                      const arch3dOffset = Math.round(Math.abs(7.5 - (position % 8)) * 2)
+                      const toothStyle = viewMode === '3d'
+                        ? { transform: `translateY(${arch3dOffset}px) translateZ(12px) rotateX(-7deg)`, '--tooth-color': color }
+                        : { marginTop: index === 0 ? 46 - offset : offset, '--tooth-color': color }
+                      return (
+                        <button
+                          key={number}
+                          type="button"
+                          className={`odontogram-tooth ${selected === number ? 'odontogram-selected' : ''} ${viewMode === '3d' ? 'odontogram-tooth-3d' : ''}`}
+                          style={toothStyle}
+                          disabled={saving}
+                          aria-label={`Diente ${number}: ${condition?.nombre || 'Sin evaluar'}`}
+                          aria-pressed={selected === number}
+                          onClick={() => setSelected(number)}
+                        >
+                          <span>{labelMode === 'fdi' ? number : (TOOTH_TYPES[number % 10] || number)}</span>
+                          <ToothIcon color={color} lower={index === 1} molar={number % 10 >= 6} viewMode={viewMode} number={number} />
+                          <small>{labelMode === 'anatomical' ? (QUADRANTS[Math.floor(number / 10)] || condition?.nombre || 'Sin evaluar') : (condition?.nombre || 'Sin evaluar')}</small>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+        <div className="odontogram-legend" aria-label="Leyenda de afecciones">
+          {CATALOG.map(item => <span key={item.afeccion}><i style={{ background: item.color }} />{item.nombre}</span>)}
+          <span><i style={{ background: '#94a3b8' }} />Sin evaluar</span>
+        </div>
       </section>
+
       <section className="odontogram-card odontogram-diagnosis" aria-label="Ficha de la pieza seleccionada">
-        <p className="odontogram-eyebrow">FICHA DE LA PIEZA</p><h2>Diente {selected}</h2><p>{toothName(selected)}</p>
-        <dl><dt>Afección seleccionada</dt><dd>{diagnosis?.nombre || 'Sin evaluar'}</dd><dt>Descripción</dt><dd>{diagnosis?.descripcion || 'No se ha registrado una evaluación.'}</dd>
-          <dt>Tratamiento ilustrativo</dt><dd>{diagnosis?.tratamiento || 'A seleccionar por el profesional.'}</dd><dt>Costo estimado</dt><dd>{diagnosis ? `${formatMoney(diagnosis.costoEstimado)} ARS` : 'Sin estimar'}</dd></dl>
-        {!readOnly ? <><h3>Asignar afección</h3><div className="odontogram-conditions">{CATALOG.map(item => <button type="button" key={item.afeccion} disabled={saving} aria-label={`Asignar ${item.nombre}`} aria-pressed={chart[selected] === item.afeccion} onClick={() => assign(item.afeccion)}><i style={{ background: item.color }} />{item.nombre}</button>)}</div>
-          <button type="button" className="odontogram-link-button" disabled={!chart[selected] || saving} onClick={removeSelectedCondition}>Quitar marca del diente {selected}</button></> : null}
+        <p className="odontogram-eyebrow">FICHA DE LA PIEZA</p>
+        <h2>Diente {selected}</h2>
+        <p>{toothName(selected)}</p>
+        <dl>
+          <dt>Afección seleccionada</dt>
+          <dd>{diagnosis?.nombre || 'Sin evaluar'}</dd>
+          <dt>Descripción</dt>
+          <dd>{diagnosis?.descripcion || 'No se ha registrado una evaluación.'}</dd>
+          <dt>Tratamiento ilustrativo</dt>
+          <dd>{diagnosis?.tratamiento || 'A seleccionar por el profesional.'}</dd>
+          <dt>Costo estimado</dt>
+          <dd>{diagnosis ? `${formatMoney(diagnosis.costoEstimado)} ARS` : 'Sin estimar'}</dd>
+        </dl>
+        {!readOnly ? <>
+          <h3>Asignar afección</h3>
+          <div className="odontogram-conditions">
+            {CATALOG.map(item => <button type="button" key={item.afeccion} disabled={saving} aria-label={`Asignar ${item.nombre}`} aria-pressed={chart[selected] === item.afeccion} onClick={() => assign(item.afeccion)}><i style={{ background: item.color }} />{item.nombre}</button>)}
+          </div>
+          <button type="button" className="odontogram-link-button" disabled={!chart[selected] || saving} onClick={removeSelectedCondition}>Quitar marca del diente {selected}</button>
+        </> : null}
       </section>
     </div>
     <section className="odontogram-card" aria-label="Resumen a firmar"><h2>Presupuesto ilustrativo</h2><p>Solo incluye piezas marcadas explícitamente. Los valores requieren validación profesional.</p>
@@ -387,27 +649,209 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
       <p>{persisted.consentimientoAceptado ? 'Consentimiento aceptado' : 'Consentimiento no aceptado'} · versión {persisted.versionConsentimiento}</p>
       <p>{persisted.textoConsentimiento}</p>
       <p>La firma está reservada para odontología y administración.</p>
-    </section> : null : <section className="odontogram-card" aria-label="Consentimiento y firma"><h2>Consentimiento y firma</h2><p>Versión {demoMode ? `${VERSION} · demostración` : VERSION} · firma manuscrita electrónica</p><p>{consentText}</p>
-      <label className="odontogram-consent"><input type="checkbox" checked={accepted} disabled={(!verified && !demoMode) || !patientId || !teeth.length || saving} onChange={e => { revoke({ consent: false }); setAccepted(e.target.checked); setError('') }} />Acepto el consentimiento para este paciente y el presupuesto mostrado.</label>
+    </section> : null : <section className="odontogram-card" aria-label="Consentimiento y firma">
+      <h2>Consentimiento y firma</h2>
+      <p>Versión {demoMode ? `${VERSION} · demostración` : VERSION} · firma manuscrita electrónica</p>
+      <p>{consentText}</p>
+      <label className="odontogram-consent">
+        <input type="checkbox" checked={accepted} disabled={(!verified && !demoMode) || !patientId || !teeth.length || saving} onChange={e => { revoke({ consent: false }); setAccepted(e.target.checked); setError('') }} />
+        Acepto el consentimiento para este paciente y el presupuesto mostrado.
+      </label>
       <p id="signature-help">Revise el resumen, acepte el consentimiento y firme con mouse o con el dedo. Si cambia el área de firma, deberá volver a firmar.</p>
-      <div ref={signatureBox} className={`odontogram-signature ${!canSign ? 'odontogram-signature-disabled' : ''}`} aria-disabled={!canSign}>
-        <SignatureCanvas ref={signatureRef} clearOnResize={false} penColor="#172554" minWidth={0.6} maxWidth={2.4}
-          onBegin={() => { if (!canSign) { signatureRef.current?.clear(); return }; revoke({ consent: false, clearCanvas: false }) }}
-          onEnd={() => { if (!canSign) signatureRef.current?.clear() }}
-          canvasProps={{ width: 500, height: 180, className: 'odontogram-canvas', 'aria-label': 'Área para dibujar firma manuscrita', 'aria-describedby': 'signature-help' }} />
+
+      <div className="odontogram-signature-guide">
+        {!patientId ? (
+          <span className="odontogram-hint-tag hint-warning">⚠️ Seleccioná un paciente para habilitar la firma</span>
+        ) : visibleTeeth.length === 0 ? (
+          <span className="odontogram-hint-tag hint-warning">⚠️ Marcá al menos una pieza dental en el odontograma</span>
+        ) : !accepted ? (
+          <span className="odontogram-hint-tag hint-action">👉 Tildá "Acepto el consentimiento" o hacé clic en el recuadro para firmar</span>
+        ) : signature ? (
+          <span className="odontogram-hint-tag hint-success">✅ Firma capturada y vinculada al presupuesto actual</span>
+        ) : (
+          <span className="odontogram-hint-tag hint-ready">✍️ Dibujá tu firma en el recuadro y presioná "Capturar firma"</span>
+        )}
       </div>
-      <div className="odontogram-actions"><button type="button" disabled={!canSign} onClick={capture}>Capturar firma</button><button type="button" disabled={saving} onClick={() => { revoke({ consent: false }); setError(''); setNotice('Firma eliminada.') }}>Limpiar firma</button></div>
+
+      <div
+        ref={signatureBox}
+        className={`odontogram-signature ${!canSign ? 'odontogram-signature-disabled' : ''}`}
+        aria-disabled={!canSign}
+        onClick={() => {
+          if (!readOnly && patientId && teeth.length > 0 && !accepted && !saving) {
+            setAccepted(true)
+            setError('')
+            setNotice('Consentimiento activado al seleccionar la firma.')
+          }
+        }}
+      >
+        <SignatureCanvas
+          ref={signatureRef}
+          clearOnResize={false}
+          penColor="#0f172a"
+          minWidth={0.8}
+          maxWidth={2.8}
+          onBegin={() => {
+            if (!canSign) {
+              if (!readOnly && patientId && teeth.length > 0 && !accepted) {
+                setAccepted(true)
+              } else {
+                signatureRef.current?.clear()
+                return
+              }
+            }
+            revoke({ consent: false, clearCanvas: false })
+          }}
+          onEnd={() => { if (!canSign) signatureRef.current?.clear() }}
+          canvasProps={{ width: 500, height: 180, className: 'odontogram-canvas', 'aria-label': 'Área para dibujar firma manuscrita', 'aria-describedby': 'signature-help' }}
+        />
+      </div>
+
+      <div className="odontogram-actions">
+        <button type="button" className="odontogram-capture-btn" disabled={!canSign} onClick={capture}>Capturar firma</button>
+        <button type="button" disabled={saving} onClick={() => { revoke({ consent: false }); setError(''); setNotice('Firma eliminada.') }}>Limpiar firma</button>
+      </div>
       {signature ? <figure className="odontogram-preview"><img src={signature.png} alt="Vista previa de la firma capturada" /><figcaption>Firma vinculada al presupuesto actual.</figcaption></figure> : null}
-      <div className="odontogram-actions"><button type="button" className="odontogram-primary" disabled={demoMode || !canSign || !signature || !bearer || Boolean(saved)} onClick={save}>{demoMode ? 'Guardar requiere backend' : saving ? 'Guardando…' : 'Guardar odontograma'}</button>
-        <button type="button" disabled={!signature || !accepted || !patientId || !teeth.length || saving} onClick={download}>Descargar PDF con Firma</button></div>
+      <div className="odontogram-actions">
+        <button type="button" className="odontogram-primary" disabled={demoMode || !canSign || !signature || !bearer || Boolean(saved)} onClick={save}>{demoMode ? 'Guardar requiere backend' : saving ? 'Guardando…' : 'Guardar odontograma'}</button>
+        <button type="button" disabled={!signature || !accepted || !patientId || !teeth.length || saving} onClick={download}>Descargar PDF con Firma</button>
+      </div>
       <p>{demoMode ? 'El PDF se descarga como borrador académico firmado y no se guarda en MySQL ni en el backend. No es un comprobante de pago.' : 'El PDF puede descargarse como borrador firmado; solo se informa guardado tras recibir HTTP 201 y verificar la respuesta. No es un comprobante de pago.'}</p>
     </section>}
   </main>
 }
 
 const STYLES = `
-.odontogram-page{font-family:Inter,system-ui,sans-serif;color:#172554;max-width:1500px;margin:auto;padding:24px;line-height:1.5}
-.odontogram-page *{box-sizing:border-box}.odontogram-page h1{font-size:clamp(1.6rem,3vw,2.3rem);font-weight:750;margin:4px 0}.odontogram-page h2{font-size:1.2rem;font-weight:700;margin:0 0 8px}.odontogram-page h3{font-size:.95rem;font-weight:650;margin:10px 0}.odontogram-page p{margin:6px 0 14px;color:#475569}.odontogram-eyebrow{font-size:.7rem;letter-spacing:.12em;font-weight:700;color:#0f766e!important}.odontogram-header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:20px}.odontogram-badge{background:#ccfbf1;color:#115e59;padding:8px 14px;border-radius:24px;white-space:nowrap;font-weight:650;font-size:.85rem}.odontogram-card{min-width:0;border:1px solid #dbe3ee;border-radius:16px;padding:22px;background:white;margin-bottom:20px;box-shadow:0 3px 12px #17255406}.odontogram-credentials{display:flex;flex-wrap:wrap;gap:16px;align-items:end}.odontogram-credentials label{display:grid;gap:6px;flex:1;min-width:180px;font-size:.85rem;font-weight:600}.odontogram-credentials input{border:1px solid #94a3b8;border-radius:8px;padding:11px;width:100%;min-height:44px;color:#172554}.odontogram-access{width:100%;font-size:.8rem;margin:0!important}.odontogram-workspace{display:grid;grid-template-columns:1fr;gap:20px}.odontogram-page button{cursor:pointer;min-height:44px;border:1px solid #cbd5e1;border-radius:8px;padding:9px 14px;font-size:.9rem;background:white;color:#172554;font-weight:600}.odontogram-page button:disabled{opacity:.55;cursor:not-allowed}.odontogram-page button:focus-visible,.odontogram-page input:focus-visible,.odontogram-scroll:focus-visible{outline:3px solid #0d9488;outline-offset:3px}.odontogram-scroll{overflow-x:auto;padding:4px 3px 14px}.odontogram-arches{min-width:870px}.odontogram-arch{display:grid;grid-template-columns:repeat(16,minmax(48px,1fr));gap:4px;min-height:166px;align-items:start}.odontogram-page .odontogram-tooth{padding:5px 1px 7px;min-height:113px;border:1px solid transparent;background:#f8fafc;display:flex;align-items:center;flex-direction:column;gap:1px}.odontogram-tooth svg{width:38px;height:52px}.odontogram-tooth span{font-size:.88rem;font-weight:750}.odontogram-tooth small{font-size:.56rem;color:#334155;line-height:1.2}.odontogram-page .odontogram-selected{border:2px solid #0f766e;background:#f0fdfa;box-shadow:0 0 0 2px #ccfbf1}.odontogram-legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px;font-size:.8rem}.odontogram-legend span{display:flex;gap:6px;align-items:center}.odontogram-page i{display:inline-block;width:11px;height:11px;border-radius:50%;flex-shrink:0}.odontogram-diagnosis dt{font-size:.75rem;color:#64748b;margin-top:14px}.odontogram-diagnosis dd{margin:3px 0;font-size:.9rem}.odontogram-conditions{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.odontogram-conditions button{display:flex;align-items:center;gap:7px;padding:8px!important}.odontogram-conditions button[aria-pressed=true]{border-color:#0f766e;background:#f0fdfa}.odontogram-page .odontogram-link-button{border:0;text-decoration:underline;margin-top:10px;padding-left:0}.odontogram-estimate{list-style:none;padding:0;margin:18px 0}.odontogram-estimate li{display:grid;grid-template-columns:150px 1fr auto;gap:12px;border-bottom:1px solid #e2e8f0;padding:12px 0;font-size:.9rem}.odontogram-estimate span{color:#475569}.odontogram-total{display:flex;justify-content:space-between;gap:12px;padding:14px;background:#f0fdfa;border-radius:10px;font-size:1.15rem;color:#115e59!important}.odontogram-draft{font-size:.8rem;font-weight:650}.odontogram-consent{display:flex;gap:10px;align-items:center;font-weight:600;min-height:48px;margin:14px 0}.odontogram-consent input{width:22px;height:22px;flex-shrink:0}.odontogram-signature{border:1px dashed #64748b;border-radius:8px;width:100%;max-width:650px;height:182px;background:#f8fafc;overflow:hidden}.odontogram-canvas{display:block;width:100%;height:180px;touch-action:none}.odontogram-signature-disabled{pointer-events:none;opacity:.5}.odontogram-actions{display:flex;gap:12px;flex-wrap:wrap;margin:16px 0}.odontogram-page .odontogram-primary{background:#0f766e;border-color:#0f766e;color:white}.odontogram-preview{margin:16px 0}.odontogram-preview img{max-width:100%;max-height:150px;border:1px solid #cbd5e1;background:white}.odontogram-preview figcaption{font-size:.8rem;color:#64748b}.odontogram-error,.odontogram-notice{padding:14px;border-radius:8px}.odontogram-error{background:#fef2f2;color:#991b1b!important;border:1px solid #fecaca}.odontogram-notice{background:#ecfdf5;color:#065f46!important;border:1px solid #a7f3d0}@media(max-width:640px){.odontogram-page{padding:12px}.odontogram-card{padding:16px}.odontogram-header{display:block}.odontogram-badge{display:inline-block;margin:4px 0}.odontogram-conditions{grid-template-columns:1fr 1fr}.odontogram-estimate li{grid-template-columns:1fr auto}.odontogram-estimate span{grid-column:1/-1;grid-row:2}.odontogram-actions button{flex:1;min-width:145px}.odontogram-total{font-size:1rem}}
-.odontogram-credentials select{border:1px solid #94a3b8;border-radius:8px;padding:11px;width:100%;min-height:44px;color:#172554}.odontogram-demo-patient-form{display:flex;flex:2;flex-wrap:wrap;align-items:end;gap:8px;min-width:min(100%,320px)}.odontogram-demo-patient-form label{flex-basis:100%;min-width:0}.odontogram-demo-patient-form input{flex:1;min-width:180px}
-.odontogram-backend-link{display:inline-block;color:#0f766e;font-weight:700;text-decoration:underline;text-underline-offset:3px}.odontogram-local-api-notice{width:100%;padding:12px 14px;border:1px solid #bfdbfe;border-radius:8px;background:#eff6ff;color:#1e3a8a!important;font-size:.86rem}.odontogram-local-api-notice code{font-weight:700}
+.odontogram-page{font-family:Inter,system-ui,sans-serif;color:#1e293b;max-width:1500px;margin:auto;padding:24px;line-height:1.5}
+.odontogram-page *{box-sizing:border-box}.odontogram-page h1{font-size:clamp(1.6rem,3vw,2.3rem);font-weight:750;margin:4px 0}.odontogram-page h2{font-size:1.2rem;font-weight:700;margin:0 0 8px}.odontogram-page h3{font-size:.95rem;font-weight:650;margin:10px 0}.odontogram-page p{margin:6px 0 14px;color:#475569}.odontogram-eyebrow{font-size:.7rem;letter-spacing:.12em;font-weight:700;color:#0f766e!important}.odontogram-header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:20px}.odontogram-badge{background:#ccfbf1;color:#115e59;padding:8px 14px;border-radius:24px;white-space:nowrap;font-weight:650;font-size:.85rem}
+.odontogram-card{min-width:0;border:1px solid #dbe3ee;border-radius:18px;padding:22px;background:rgba(255,255,255,0.92);backdrop-filter:blur(10px);margin-bottom:20px;box-shadow:0 3px 12px #17255406}
+.odontogram-card-header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:14px;margin-bottom:12px}
+.odontogram-credentials{display:flex;flex-wrap:wrap;gap:16px;align-items:end}
+.odontogram-credentials label{display:grid;gap:6px;flex:1;min-width:180px;font-size:.85rem;font-weight:600}
+.odontogram-credentials input,.odontogram-credentials select{border:1px solid #94a3b8;border-radius:8px;padding:11px;width:100%;min-height:44px;color:#172554}
+.odontogram-access{width:100%;font-size:.8rem;margin:0!important}
+.odontogram-workspace{display:grid;grid-template-columns:1fr;gap:20px}
+.odontogram-page button{cursor:pointer;min-height:44px;border:1px solid #cbd5e1;border-radius:8px;padding:9px 14px;font-size:.9rem;background:white;color:#172554;font-weight:600}
+.odontogram-page button:disabled{opacity:.55;cursor:not-allowed}
+.odontogram-page button:focus-visible,.odontogram-page input:focus-visible,.odontogram-scroll:focus-visible{outline:3px solid #0d9488;outline-offset:3px}
+.odontogram-scroll{overflow-x:auto;padding:4px 3px 14px}
+.odontogram-arches{min-width:870px}
+.odontogram-arch{display:grid;grid-template-columns:repeat(16,minmax(48px,1fr));gap:4px;min-height:166px;align-items:start}
+.odontogram-page .odontogram-tooth{padding:5px 1px 7px;min-height:113px;border:1px solid transparent;background:#f8fafc;display:flex;align-items:center;flex-direction:column;gap:1px}
+.odontogram-tooth svg{width:38px;height:52px}
+.odontogram-tooth span{font-size:.88rem;font-weight:750}
+.odontogram-tooth small{font-size:.56rem;color:#334155;line-height:1.2;text-align:center;padding:0 2px}
+.odontogram-page .odontogram-selected{border:2px solid #0f766e;background:#f0fdfa;box-shadow:0 0 0 2px #ccfbf1}
+.odontogram-legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px;font-size:.8rem}
+.odontogram-legend span{display:flex;gap:6px;align-items:center}
+.odontogram-page i{display:inline-block;width:11px;height:11px;border-radius:50%;flex-shrink:0}
+.odontogram-diagnosis dt{font-size:.75rem;color:#64748b;margin-top:14px}
+.odontogram-diagnosis dd{margin:3px 0;font-size:.9rem}
+.odontogram-conditions{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.odontogram-conditions button{display:flex;align-items:center;gap:7px;padding:8px!important}
+.odontogram-conditions button[aria-pressed=true]{border-color:#0f766e;background:#f0fdfa}
+.odontogram-page .odontogram-link-button{border:0;text-decoration:underline;margin-top:10px;padding-left:0}
+.odontogram-estimate{list-style:none;padding:0;margin:18px 0}
+.odontogram-estimate li{display:grid;grid-template-columns:150px 1fr auto;gap:12px;border-bottom:1px solid #e2e8f0;padding:12px 0;font-size:.9rem}
+.odontogram-estimate span{color:#475569}
+.odontogram-total{display:flex;justify-content:space-between;gap:12px;padding:14px;background:#f0fdfa;border-radius:10px;font-size:1.15rem;color:#115e59!important}
+.odontogram-draft{font-size:.8rem;font-weight:650}
+.odontogram-consent{display:flex;gap:10px;align-items:center;font-weight:600;min-height:48px;margin:14px 0}
+.odontogram-consent input{width:22px;height:22px;flex-shrink:0}
+.odontogram-signature{border:1px dashed #64748b;border-radius:8px;width:100%;max-width:650px;height:182px;background:#f8fafc;overflow:hidden}
+.odontogram-canvas{display:block;width:100%;height:180px;touch-action:none}
+.odontogram-signature-disabled{opacity:.6;cursor:pointer}
+.odontogram-actions{display:flex;gap:12px;flex-wrap:wrap;margin:16px 0}
+.odontogram-page .odontogram-primary{background:#0f766e;border-color:#0f766e;color:white}
+.odontogram-preview{margin:16px 0}
+.odontogram-preview img{max-width:100%;max-height:150px;border:1px solid #cbd5e1;background:white}
+.odontogram-preview figcaption{font-size:.8rem;color:#64748b}
+.odontogram-error,.odontogram-notice{padding:14px;border-radius:8px}
+.odontogram-error{background:#fef2f2;color:#991b1b!important;border:1px solid #fecaca}
+.odontogram-notice{background:#ecfdf5;color:#065f46!important;border:1px solid #a7f3d0}
+.odontogram-demo-patient-form{display:flex;flex:2;flex-wrap:wrap;align-items:end;gap:8px;min-width:min(100%,320px)}
+.odontogram-demo-patient-form label{flex-basis:100%;min-width:0}
+.odontogram-demo-patient-form input{flex:1;min-width:180px}
+.odontogram-backend-link{display:inline-block;color:#0f766e;font-weight:700;text-decoration:underline;text-underline-offset:3px}
+.odontogram-local-api-notice{width:100%;padding:12px 14px;border:1px solid #bfdbfe;border-radius:8px;background:#eff6ff;color:#1e3a8a!important;font-size:.86rem}
+.odontogram-local-api-notice code{font-weight:700}
+
+/* Controles de Vista 2D / 3D */
+.odontogram-view-controls{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px}
+.odontogram-control-group{display:flex;gap:8px;flex-wrap:wrap}
+.odontogram-toggle-btn{border-radius:8px;padding:7px 12px!important;font-weight:600;font-size:0.82rem!important;border:1px solid #cbd5e1;background:#f8fafc;color:#1e293b;min-height:36px!important;transition:all 0.15s ease}
+.odontogram-toggle-btn.is-active{background:#0f766e!important;color:white!important;border-color:#0f766e!important}
+.odontogram-rotation-box{display:flex;align-items:center;gap:8px;font-size:0.82rem;font-weight:600;color:#0f766e;background:#f0fdfa;padding:5px 10px;border-radius:8px}
+.odontogram-rotation-box input{accent-color:#0f766e;width:120px;cursor:pointer}
+.odontogram-scroll-3d{perspective:1100px;overflow-x:auto;padding:12px 4px 20px}
+.is-3d-arch{transform-style:preserve-3d;transition:transform 0.2s ease}
+.odontogram-tooth-3d{border-radius:44% 44% 28% 28%!important;background:linear-gradient(145deg,rgba(255,255,255,0.98),rgba(224,236,250,0.9))!important;box-shadow:inset 2px 1px 3px rgba(255,255,255,0.95),0 5px 8px rgba(15,23,42,0.12)!important}
+.odontogram-tooth-3d:hover{transform:translateY(-2px) scale(1.03)!important;box-shadow:0 7px 12px rgba(15,23,42,0.18)!important}
+
+/* Panel de Pacientes y Casos */
+.odontogram-patients-panel{width:100%;margin-top:16px;border-top:1px solid #e2e8f0;padding-top:16px}
+.odontogram-patients-header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+.odontogram-patients-header h4{font-size:0.95rem;font-weight:700;color:#0f766e;margin:0}
+.odontogram-panel-subtitle{font-size:0.78rem;color:#64748b;margin:2px 0 0!important}
+.odontogram-search-input{min-height:38px!important;padding:6px 12px!important;border:1px solid #cbd5e1!important;border-radius:8px!important;font-size:0.85rem!important;max-width:280px}
+.odontogram-patient-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.odontogram-patient-chip{display:flex;flex-direction:column;align-items:start;text-align:left;padding:7px 12px!important;border-radius:10px!important;border:1px solid #e2e8f0!important;background:#f8fafc!important;font-size:0.8rem!important;min-height:auto!important;transition:all 0.15s ease}
+.odontogram-patient-chip:hover{border-color:#0f766e!important;background:#f0fdfa!important}
+.odontogram-patient-chip.is-selected{border-color:#0f766e!important;background:#ccfbf1!important;color:#115e59!important;box-shadow:0 0 0 2px #0f766e!important}
+.odontogram-patient-chip strong{font-size:0.85rem}
+.odontogram-patient-chip span{font-size:0.72rem;color:#64748b}
+.odontogram-selected-case{background:#f0fdfa;border:1px solid #99f6e4;border-radius:12px;padding:12px 16px;margin-top:6px}
+.odontogram-case-header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px}
+.odontogram-case-header h5{margin:0;font-size:0.92rem;color:#115e59}
+.odontogram-case-meta{font-size:0.76rem;color:#475569;margin:2px 0 0!important}
+.odontogram-history-btn{font-size:0.8rem!important;min-height:34px!important;padding:5px 12px!important;border-color:#0f766e!important;color:#0f766e!important;background:white!important}
+.odontogram-history-list{margin-top:10px;display:grid;gap:8px;border-top:1px dashed #99f6e4;padding-top:10px}
+.odontogram-history-item{display:flex;justify-content:space-between;align-items:center;background:white;padding:10px 14px;border-radius:8px;border:1px solid #ccfbf1;font-size:0.85rem}
+.odontogram-history-date{font-size:0.75rem;color:#64748b;margin-left:8px}
+.odontogram-history-total{font-size:0.8rem;font-weight:700;color:#0f766e;margin-top:2px}
+.odontogram-empty-history{font-size:0.78rem;font-style:italic;color:#64748b;margin:4px 0!important}
+.odontogram-btn-small{min-height:30px!important;padding:4px 10px!important;font-size:0.76rem!important;background:#0f766e!important;color:white!important;border-radius:6px!important;border:0!important}
+
+/* Guía visual de firma */
+.odontogram-signature-guide{margin-bottom:8px;font-size:0.82rem}
+.odontogram-hint-tag{display:inline-block;padding:5px 12px;border-radius:6px;font-weight:600}
+.hint-warning{background:#fef3c7;color:#92400e}
+.hint-action{background:#fef9c3;color:#854d0e;border:1px dashed #eab308}
+.hint-ready{background:#e0f2fe;color:#075985}
+.hint-success{background:#dcfce7;color:#166534}
+.odontogram-capture-btn{background:#0f766e!important;color:white!important;border-color:#0f766e!important}
+
+/* Dark mode overrides */
+html[data-theme="dark"] .odontogram-page{color:#f1f5f9}
+html[data-theme="dark"] .odontogram-card{background:rgba(15,23,42,0.88)!important;border-color:rgba(51,65,85,0.7)!important;box-shadow:0 4px 20px rgba(0,0,0,0.4)!important;color:#f1f5f9!important}
+html[data-theme="dark"] .odontogram-page p{color:#94a3b8!important}
+html[data-theme="dark"] .odontogram-page h1,html[data-theme="dark"] .odontogram-page h2,html[data-theme="dark"] .odontogram-page h3{color:#f8fafc!important}
+html[data-theme="dark"] .odontogram-credentials input,html[data-theme="dark"] .odontogram-credentials select{background:#0f172a!important;border-color:#334155!important;color:#f1f5f9!important}
+html[data-theme="dark"] .odontogram-tooth{background:#1e293b!important;border-color:#334155!important;color:#f1f5f9!important}
+html[data-theme="dark"] .odontogram-tooth small{color:#cbd5e1!important}
+html[data-theme="dark"] .odontogram-tooth-3d{background:linear-gradient(145deg,#1e3a56,#12263d)!important;border-color:#475569!important;color:#f1f5f9!important;box-shadow:0 6px 10px rgba(0,0,0,0.4)!important}
+html[data-theme="dark"] .odontogram-selected{background:#134e4a!important;border-color:#14b8a6!important;box-shadow:0 0 0 2px #0d9488!important}
+html[data-theme="dark"] .odontogram-conditions button{background:#0f172a!important;border-color:#334155!important;color:#f1f5f9!important}
+html[data-theme="dark"] .odontogram-page button{background:#1e293b;border-color:#475569;color:#f1f5f9}
+html[data-theme="dark"] .odontogram-page button:hover{background:#334155}
+html[data-theme="dark"] .odontogram-toggle-btn{background:#1e293b;border-color:#475569;color:#f1f5f9}
+html[data-theme="dark"] .odontogram-toggle-btn.is-active{background:#0f766e!important;color:white!important}
+html[data-theme="dark"] .odontogram-rotation-box{background:#134e4a;color:#5eead4}
+html[data-theme="dark"] .odontogram-patients-panel{border-color:#334155}
+html[data-theme="dark"] .odontogram-patients-header h4{color:#5eead4}
+html[data-theme="dark"] .odontogram-panel-subtitle{color:#94a3b8}
+html[data-theme="dark"] .odontogram-patient-chip{background:#1e293b!important;border-color:#334155!important;color:#f1f5f9!important}
+html[data-theme="dark"] .odontogram-patient-chip span{color:#94a3b8}
+html[data-theme="dark"] .odontogram-patient-chip.is-selected{background:#134e4a!important;border-color:#14b8a6!important;color:#5eead4!important}
+html[data-theme="dark"] .odontogram-selected-case{background:rgba(19,78,74,0.4);border-color:#14b8a6}
+html[data-theme="dark"] .odontogram-case-header h5{color:#5eead4}
+html[data-theme="dark"] .odontogram-case-meta{color:#cbd5e1}
+html[data-theme="dark"] .odontogram-history-item{background:#0f172a;border-color:#334155;color:#f1f5f9}
+html[data-theme="dark"] .odontogram-history-btn{background:#1e293b!important;color:#5eead4!important;border-color:#14b8a6!important}
+html[data-theme="dark"] .odontogram-signature{background:#ffffff!important;border-color:#64748b}
+html[data-theme="dark"] .odontogram-estimate li{border-color:#334155!important}
+html[data-theme="dark"] .odontogram-total{background:rgba(13,148,136,0.25)!important;border:1px solid rgba(20,184,166,0.4)!important;color:#5eead4!important}
+html[data-theme="dark"] .odontogram-badge{background:rgba(13,148,136,0.25);color:#5eead4;border:1px solid rgba(20,184,166,0.35)}
+
+@media(max-width:640px){.odontogram-page{padding:12px}.odontogram-card{padding:16px}.odontogram-header{display:block}.odontogram-badge{display:inline-block;margin:4px 0}.odontogram-conditions{grid-template-columns:1fr 1fr}.odontogram-estimate li{grid-template-columns:1fr auto}.odontogram-estimate span{grid-column:1/-1;grid-row:2}.odontogram-actions button{flex:1;min-width:145px}.odontogram-total{font-size:1rem}}
 `
