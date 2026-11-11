@@ -19,8 +19,7 @@ import { NotFoundPage } from './pages/NotFoundPage'
 import { PortalPaciente } from './pages/PortalPaciente'
 import { SeguimientoPage } from './pages/SeguimientoPage'
 import { ChatbotPage } from './pages/ChatbotPage'
-
-import { PortalPaciente } from './pages/PortalPaciente'
+import { DrAnniePage } from './pages/DrAnniePage'
 
 const Odontograma = lazy(() => import('./pages/Odontograma.jsx'))
 function OdontogramaRoute({ demoMode, backendMode = false }: { demoMode: boolean; backendMode?: boolean }) {
