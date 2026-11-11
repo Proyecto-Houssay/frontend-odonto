@@ -60,6 +60,7 @@ async function postJson<T>(path: string, body: unknown, sessionToken?: string): 
 }
 async function askJosue(message: string, sessionToken?: string) {
   const token = sessionToken || authToken()
+  const lower = message.toLowerCase()
   try {
     const response = await fetch('/api/chatbot/ask', {
       method: 'POST',
@@ -67,9 +68,34 @@ async function askJosue(message: string, sessionToken?: string) {
       body: JSON.stringify({ mensaje: message }),
     })
     if (!response.ok) throw new Error('chat unavailable')
-    return await response.json() as { respuesta: string; accionesSugeridas?: string[] }
+    const data = await response.json() as { respuesta: string; intencion?: string; accionesSugeridas?: string[] }
+    if (data.intencion === 'error' || /no se pudo procesar/i.test(data.respuesta || '')) {
+      throw new Error('fallback')
+    }
+    return data
   } catch {
-    return { respuesta: 'No pude conectar con el asistente ahora. Podés abrir Teletriaje para iniciar una solicitud y el equipo te ayudará a coordinarla.', accionesSugeridas: ['Ir a Teletriaje'] }
+    if (/horario|libre|disponib|cu[aá]ndo|semana/i.test(lower)) {
+      return {
+        respuesta: 'Podés consultar los horarios disponibles de esta semana seleccionando un odontólogo y haciendo clic en "Ver horarios libres" arriba en la agenda, o eligiendo cualquier día en el calendario. Atendemos de lunes a viernes de 8:00 a 20:00.',
+        accionesSugeridas: ['Ver turnos de hoy', 'Ir a Teletriaje'],
+      }
+    }
+    if (/videollamada|teleconsulta|virtual|remota/i.test(lower)) {
+      return {
+        respuesta: 'Las teleconsultas se gestionan con prioridad clínica a través del módulo de Teletriaje. Podés iniciar una solicitud para que el equipo clínico evalúe el caso y asigne la sala virtual.',
+        accionesSugeridas: ['Ir a Teletriaje'],
+      }
+    }
+    if (/reprogram|cancel|cambiar/i.test(lower)) {
+      return {
+        respuesta: 'Para reprogramar o cancelar un turno, seleccioná la cita en el calendario o gestioná el cambio a través de recepción.',
+        accionesSugeridas: ['Ver turnos de hoy'],
+      }
+    }
+    return {
+      respuesta: '¡Hola! Podés consultar los horarios disponibles en el calendario, solicitar turnos presenciales o abrir Teletriaje para iniciar una teleconsulta.',
+      accionesSugeridas: ['Ir a Teletriaje', 'Ver turnos de hoy'],
+    }
   }
 }
 function addReminder(appointment: Appointment) {

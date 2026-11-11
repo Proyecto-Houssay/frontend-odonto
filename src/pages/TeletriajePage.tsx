@@ -61,8 +61,24 @@ export interface Cita {
 
 export const TeletriajePage: React.FC = () => {
   // Configuración de sesión / rol
-  const [token, setToken] = useState<string>('')
-  const [rol, setRol] = useState<'RECEPCIONISTA' | 'ODONTOLOGO' | 'PACIENTE'>('RECEPCIONISTA')
+  const [token, setToken] = useState<string>(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem('novadent.auth.session') || '{}') as { token?: string }
+      return saved.token ? saved.token.replace(/^Bearer\s+/i, '') : ''
+    } catch {
+      return ''
+    }
+  })
+  const [rol, setRol] = useState<'RECEPCIONISTA' | 'ODONTOLOGO' | 'PACIENTE'>(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem('novadent.auth.session') || '{}') as { role?: string }
+      if (saved.role === 'PACIENTE') return 'PACIENTE'
+      if (saved.role === 'ODONTOLOGO') return 'ODONTOLOGO'
+      return 'RECEPCIONISTA'
+    } catch {
+      return 'RECEPCIONISTA'
+    }
+  })
   const [pacienteIdActivo, setPacienteIdActivo] = useState<string>('1')
 
   // Datos
@@ -98,11 +114,18 @@ export const TeletriajePage: React.FC = () => {
     setErrorStatus(null)
     setErrorMessage(null)
 
+    let activeToken = token.trim()
+    if (!activeToken) {
+      try {
+        const saved = JSON.parse(sessionStorage.getItem('novadent.auth.session') || '{}');
+        if (saved.token) activeToken = saved.token.replace(/^Bearer\s+/i, '');
+      } catch { /* ignorar */ }
+    }
     const headers: Record<string, string> = {
       'Content-Type': 'application/json'
     }
-    if (token.trim()) {
-      headers['Authorization'] = `Bearer ${token.trim()}`
+    if (activeToken) {
+      headers['Authorization'] = `Bearer ${activeToken}`
     }
 
     try {
@@ -195,8 +218,15 @@ export const TeletriajePage: React.FC = () => {
     setErrorMessage(null)
     setSuccessMessage(null)
 
+    let activeToken = token.trim()
+    if (!activeToken) {
+      try {
+        const saved = JSON.parse(sessionStorage.getItem('novadent.auth.session') || '{}');
+        if (saved.token) activeToken = saved.token.replace(/^Bearer\s+/i, '');
+      } catch { /* ignorar */ }
+    }
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-    if (token.trim()) headers['Authorization'] = `Bearer ${token.trim()}`
+    if (activeToken) headers['Authorization'] = `Bearer ${activeToken}`
 
     try {
       const res = await fetch(`/api/teletriaje/solicitudes/${solicitudParaValidar.id}/prioridad`, {
@@ -251,8 +281,15 @@ export const TeletriajePage: React.FC = () => {
     }
 
     setLoading(true)
+    let activeToken = token.trim()
+    if (!activeToken) {
+      try {
+        const saved = JSON.parse(sessionStorage.getItem('novadent.auth.session') || '{}');
+        if (saved.token) activeToken = saved.token.replace(/^Bearer\s+/i, '');
+      } catch { /* ignorar */ }
+    }
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-    if (token.trim()) headers['Authorization'] = `Bearer ${token.trim()}`
+    if (activeToken) headers['Authorization'] = `Bearer ${activeToken}`
 
     try {
       const res = await fetch(`/api/teletriaje/solicitudes/${solicitudParaReservar.id}/reservar`, {

@@ -5,6 +5,7 @@ import { ApiError, apiRequest } from '../lib/api'
 import { NovadentBrand } from '../components/brand/NovadentBrand'
 import { ChatbotPage } from './ChatbotPage'
 import { MiOdontograma } from './MiOdontograma'
+import { useTheme } from '../lib/useTheme'
 
 type Perfil = { id: number; nombre: string; apellido: string; dni: string; email: string; telefono?: string; fechaNacimiento: string }
 type Reporte = {
@@ -85,15 +86,7 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [openedAt] = useState(() => Date.now())
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    try { return localStorage.getItem('novadent-theme') === 'dark' ? 'dark' : 'light' }
-    catch { return 'light' }
-  })
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme
-    try { localStorage.setItem('novadent-theme', theme) } catch { /* Storage may be disabled by the browser. */ }
-  }, [theme])
+  const { theme, toggleTheme } = useTheme()
 
   useEffect(() => {
     let active = true
@@ -235,7 +228,7 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
         <header id="inicio" className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/70 bg-white/75 px-5 py-4 shadow-lg shadow-blue-950/5 backdrop-blur-xl sm:px-6">
           <div><p className="text-[0.7rem] font-bold uppercase tracking-[0.16em] text-blue-700">Portal del paciente</p><h1 className="mt-0.5 text-2xl font-extrabold tracking-tight text-blue-950 sm:text-3xl">{page.title}</h1><p className="mt-0.5 text-sm text-slate-600">{page.subtitle}</p></div>
           <div className="flex items-center gap-2">
-            <button type="button" onClick={() => setTheme(value => value === 'dark' ? 'light' : 'dark')} aria-label={theme === 'dark' ? 'Activar modo claro' : 'Activar modo oscuro'} className="flex min-h-10 items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/80 px-3 py-2 text-sm font-semibold text-blue-900 hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-blue-600">
+            <button type="button" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Activar modo claro' : 'Activar modo oscuro'} className="flex min-h-10 items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/80 px-3 py-2 text-sm font-semibold text-blue-900 hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-blue-600">
               {theme === 'dark' ? <Sun aria-hidden="true" size={16} /> : <Moon aria-hidden="true" size={16} />}{theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
             </button>
             <button type="button" onClick={onLogout} className="flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-red-50 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-blue-600"><LogOut size={16} /> Cerrar sesión</button>

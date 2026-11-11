@@ -50,53 +50,99 @@
   .patient-quadrant-teeth { grid-template-columns: repeat(8, minmax(0, 1fr)); }
 }
 
+/* ==========================================================================
+   MODO OSCURO GLOBAL (Staff Dashboard + Portal del Paciente)
+   ========================================================================== */
+html[data-theme="dark"] .clinic-backdrop,
 html[data-theme="dark"] .patient-portal-backdrop {
   background-color: #081525;
   background-image:
-    linear-gradient(125deg, rgba(3, 16, 32, .76), rgba(5, 23, 42, .68)),
+    linear-gradient(125deg, rgba(3, 16, 32, .88), rgba(5, 23, 42, .82)),
     url('/images/novadent-consultorio.png');
   color: #e2e8f0;
 }
 
-html[data-theme="dark"] .patient-portal-backdrop :is(header, aside, section, .patient-chart-card) {
-  border-color: rgba(148, 163, 184, .3) !important;
-  background-color: rgba(10, 27, 46, .84) !important;
+html[data-theme="dark"] header {
+  border-color: rgba(51, 65, 85, 0.6) !important;
+  background-color: rgba(15, 23, 42, 0.88) !important;
+  color: #f1f5f9;
+}
+
+html[data-theme="dark"] aside {
+  border-color: rgba(51, 65, 85, 0.6) !important;
+  background-color: rgba(15, 23, 42, 0.95) !important;
   color: #e2e8f0;
 }
-html[data-theme="dark"] .patient-portal-backdrop [class~="bg-white"],
-html[data-theme="dark"] .patient-portal-backdrop [class*="bg-white/"],
-html[data-theme="dark"] .patient-portal-backdrop [class*="bg-slate-50"],
-html[data-theme="dark"] .patient-portal-backdrop [class*="bg-slate-100"],
-html[data-theme="dark"] .patient-portal-backdrop [class*="bg-blue-50"],
-html[data-theme="dark"] .patient-portal-backdrop [class*="bg-green-50"] {
-  border-color: rgba(148, 163, 184, .28);
-  background-color: rgba(19, 42, 65, .88) !important;
+
+html[data-theme="dark"] .bg-white,
+html[data-theme="dark"] [class*="bg-white/"] {
+  border-color: rgba(51, 65, 85, 0.6) !important;
+  background-color: rgba(30, 41, 59, 0.92) !important;
+  color: #f1f5f9;
+}
+
+html[data-theme="dark"] .bg-slate-50,
+html[data-theme="dark"] [class*="bg-slate-50/"],
+html[data-theme="dark"] .bg-slate-100 {
+  border-color: rgba(51, 65, 85, 0.6) !important;
+  background-color: rgba(15, 23, 42, 0.75) !important;
   color: #e2e8f0;
 }
-html[data-theme="dark"] .patient-portal-backdrop [class~="text-slate-900"],
-html[data-theme="dark"] .patient-portal-backdrop [class~="text-slate-950"],
-html[data-theme="dark"] .patient-portal-backdrop [class~="text-slate-800"],
-html[data-theme="dark"] .patient-portal-backdrop [class~="text-slate-700"],
-html[data-theme="dark"] .patient-portal-backdrop [class~="text-slate-600"],
-html[data-theme="dark"] .patient-portal-backdrop [class~="text-slate-500"],
-html[data-theme="dark"] .patient-portal-backdrop [class~="text-blue-950"],
-html[data-theme="dark"] .patient-portal-backdrop [class~="text-blue-900"] { color: #dbeafe !important; }
-html[data-theme="dark"] .patient-portal-backdrop [class~="text-blue-800"],
-html[data-theme="dark"] .patient-portal-backdrop [class~="text-blue-700"] { color: #93c5fd !important; }
-html[data-theme="dark"] .patient-portal-backdrop [class~="text-green-900"],
-html[data-theme="dark"] .patient-portal-backdrop [class~="text-green-800"] { color: #86efac !important; }
-html[data-theme="dark"] .patient-portal-backdrop input:not([type="range"]),
-html[data-theme="dark"] .patient-portal-backdrop textarea,
-html[data-theme="dark"] .patient-portal-backdrop select { border-color: #475569; background: #11263d; color: #f1f5f9; }
-html[data-theme="dark"] .patient-portal-backdrop .patient-arch-heading,
-html[data-theme="dark"] .patient-portal-backdrop .patient-quadrant-heading { color: #bfdbfe; }
-html[data-theme="dark"] .patient-portal-backdrop .patient-3d-note { color: #cbd5e1; }
-html[data-theme="dark"] .patient-portal-backdrop .patient-tooth-button { border-color: #64748b; background: linear-gradient(145deg, #1e3a56, #12263d); color: #f1f5f9; }
-html[data-theme="dark"] .patient-portal-backdrop .patient-tooth-location { color: #cbd5e1; }
-html[data-theme="dark"] .patient-portal-backdrop .patient-tooth-button.is-selected { border-color: #60a5fa; background: #1d4ed8; }
-html[data-theme="dark"] .patient-portal-backdrop .patient-chart-control { border-color: #3b82f6; background: #173451; color: #dbeafe; }
-html[data-theme="dark"] .patient-portal-backdrop .patient-chart-control[aria-pressed="true"] { background: #2563eb; color: #fff; }
-html[data-theme="dark"] .patient-portal-backdrop .patient-rotation-control { background: #173451; color: #dbeafe; }
+
+html[data-theme="dark"] .bg-blue-50,
+html[data-theme="dark"] [class*="bg-blue-50/"] {
+  border-color: rgba(59, 130, 246, 0.3) !important;
+  background-color: rgba(30, 58, 138, 0.3) !important;
+}
+
+html[data-theme="dark"] .bg-amber-50,
+html[data-theme="dark"] [class*="bg-amber-50/"] {
+  border-color: rgba(217, 119, 6, 0.3) !important;
+  background-color: rgba(120, 53, 15, 0.3) !important;
+}
+
+html[data-theme="dark"] .border-slate-200,
+html[data-theme="dark"] .border-slate-100,
+html[data-theme="dark"] .border-slate-300 {
+  border-color: rgba(51, 65, 85, 0.55) !important;
+}
+
+html[data-theme="dark"] :is(h1, h2, h3, h4, .text-slate-950, .text-slate-900, .text-slate-800) {
+  color: #f1f5f9 !important;
+}
+
+html[data-theme="dark"] :is(.text-slate-700, .text-slate-600, .text-slate-500) {
+  color: #94a3b8 !important;
+}
+
+html[data-theme="dark"] :is(.text-blue-950, .text-blue-900) {
+  color: #dbeafe !important;
+}
+
+html[data-theme="dark"] :is(.text-blue-800, .text-blue-700) {
+  color: #93c5fd !important;
+}
+
+html[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] select {
+  border-color: #475569 !important;
+  background: #0f172a !important;
+  color: #f1f5f9 !important;
+}
+
+/* ==========================================================================
+   Modo oscuro específico para componentes odontológicos
+   ========================================================================== */
+html[data-theme="dark"] .patient-arch-heading,
+html[data-theme="dark"] .patient-quadrant-heading { color: #bfdbfe; }
+html[data-theme="dark"] .patient-3d-note { color: #cbd5e1; }
+html[data-theme="dark"] .patient-tooth-button { border-color: #64748b; background: linear-gradient(145deg, #1e3a56, #12263d); color: #f1f5f9; }
+html[data-theme="dark"] .patient-tooth-location { color: #cbd5e1; }
+html[data-theme="dark"] .patient-tooth-button.is-selected { border-color: #60a5fa; background: #1d4ed8; }
+html[data-theme="dark"] .patient-chart-control { border-color: #3b82f6; background: #173451; color: #dbeafe; }
+html[data-theme="dark"] .patient-chart-control[aria-pressed="true"] { background: #2563eb; color: #fff; }
+html[data-theme="dark"] .patient-rotation-control { background: #173451; color: #dbeafe; }
 
 @media (prefers-reduced-motion: reduce) {
   .patient-tooth-button, .patient-arch-3d { transition: none; }
