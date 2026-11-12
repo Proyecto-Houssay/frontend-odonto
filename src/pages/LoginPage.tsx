@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { HeartPulse, LoaderCircle } from 'lucide-react'
+import { Eye, EyeOff, HeartPulse, LoaderCircle } from 'lucide-react'
 import { ApiError, apiRequest } from '../lib/api'
 import { useAuth } from '../auth/useAuth'
 
@@ -212,10 +212,36 @@ function PasswordInput({
   value: string
   onChange: (value: string) => void
 }) {
+  const [showPassword, setShowPassword] = useState(false)
+
   return (
     <label className="block text-sm font-medium text-slate-700">
       {label}
-      <input autoComplete={autoComplete} className={inputClass} minLength={8} required type="password" value={value} onChange={event => onChange(event.target.value)} />
+      <div className="relative mt-1.5">
+        <input
+          autoComplete={autoComplete}
+          className="block min-h-11 w-full rounded-lg border border-slate-300 pl-3 pr-10 text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+          minLength={8}
+          required
+          type={showPassword ? 'text' : 'password'}
+          value={value}
+          onChange={event => onChange(event.target.value)}
+        />
+        <button
+          type="button"
+          onClick={() => setShowPassword(prev => !prev)}
+          className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600 focus:outline-none"
+          aria-label={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+          title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+          tabIndex={-1}
+        >
+          {showPassword ? (
+            <EyeOff aria-hidden="true" className="h-5 w-5" />
+          ) : (
+            <Eye aria-hidden="true" className="h-5 w-5" />
+          )}
+        </button>
+      </div>
     </label>
   )
 }

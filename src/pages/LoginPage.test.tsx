@@ -85,4 +85,18 @@ describe('account access', () => {
     })))
     expect(await screen.findByText('La contraseña se actualizó. Ya podés iniciar sesión.')).toBeInTheDocument()
   })
+
+  it('toggles password visibility when clicking the eye button', () => {
+    render(<App />)
+    const passwordInput = screen.getByLabelText('Contraseña') as HTMLInputElement
+    expect(passwordInput.type).toBe('password')
+
+    const toggleButton = screen.getByRole('button', { name: 'Ver contraseña' })
+    fireEvent.click(toggleButton)
+    expect(passwordInput.type).toBe('text')
+
+    const hideButton = screen.getByRole('button', { name: 'Ocultar contraseña' })
+    fireEvent.click(hideButton)
+    expect(passwordInput.type).toBe('password')
+  })
 })

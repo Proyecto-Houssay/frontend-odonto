@@ -3,6 +3,7 @@ import { CalendarDays, Camera, ClipboardList, FileUp, Home, LogOut, MessageCircl
 import { Link, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { ApiError, apiRequest } from '../lib/api'
 import { NovadentBrand } from '../components/brand/NovadentBrand'
+import { ChatbotFloatingWidget } from '../components/chatbot/ChatbotFloatingWidget'
 import { ChatbotPage } from './ChatbotPage'
 import { MiOdontograma } from './MiOdontograma'
 import { useTheme } from '../lib/useTheme'
@@ -360,6 +361,7 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
         </div>
       </div>
     </div>
+    {location.pathname !== '/chatbot' && <ChatbotFloatingWidget />}
   </main>
 }
 

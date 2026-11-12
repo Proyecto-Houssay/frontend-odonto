@@ -35,6 +35,9 @@ const ACTIONS: Record<string, ChatAction> = {
 
 const SUGGESTIONS = [
   '¿Cuándo es mi próximo turno?',
+  '¿Cuánto sale una limpieza dental?',
+  'Me duele la muela de juicio',
+  '¿Qué obras sociales atienden?',
   '¿Qué horarios tienen disponibles?',
   'Hola, ¿en qué me podés ayudar?',
 ] as const
