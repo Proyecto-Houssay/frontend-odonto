@@ -1,17 +1,29 @@
 # Novadent — Frontend
 
-Frontend del sistema de gestión odontológica. Esta aplicación presenta el dashboard compartido y las vistas base que cada integrante ampliará en su módulo.
+Interfaz web del sistema de gestión odontológica Novadent. Incluye el dashboard compartido, navegación por módulos y el odontograma académico integrado con la API. Los módulos que aún son placeholders se identifican como pendientes; no representan operaciones persistidas.
 
-## Stack
+## Tecnologías
 
-- React 19
-- TypeScript
-- Vite
-- Tailwind CSS v4
-- React Router DOM v7
-- Lucide React
+Versiones declaradas en `package.json` de la rama documentada:
 
-## Inicio rápido
+| Tecnología | Versión | Uso |
+|---|---|---|
+| React / React DOM | `^19.2.8` | Interfaz |
+| TypeScript | `~6.0.2` | Tipado estático |
+| Vite | `^8.3.0` | Servidor y build |
+| Tailwind CSS | `^4.3.3` | Estilos |
+| React Router DOM | `^7.18.3` | Navegación |
+| Lucide React | `^1.46.0` | Iconografía |
+| Vitest | `^5.0.5` | Pruebas |
+| Testing Library | `^16.3.3` / `^14.6.8` | Pruebas de interfaz |
+| jsPDF | `^4.2.1` | PDF académico |
+| React Signature Canvas | `^1.1.0-alpha.2` | Firma demostrativa |
+## Requisitos
+
+- Node.js y npm
+- Backend Spring Boot local para probar funciones conectadas a la API
+
+## Instalación y ejecución
 
 ```bash
 git clone https://github.com/Proyecto-Houssay/frontend-odonto.git
@@ -20,51 +32,90 @@ npm install
 npm run dev
 ```
 
-El servidor de desarrollo queda disponible en la URL que muestre Vite, normalmente `http://localhost:5173`.
+Vite muestra la URL local, normalmente `http://localhost:5173`. En desarrollo, las solicitudes `/api` se envían al backend en `http://localhost:8080`.
+
+Para apuntar a otro backend local en PowerShell:
+
+```powershell
+$env:ODONTO_API_TARGET = 'http://localhost:18080'
+npm run dev -- --port 15173
+```
+
+En producción se necesita un backend accesible por HTTPS y un reverse proxy o configuración equivalente. El frontend alojado en Vercel no puede acceder al backend que corre únicamente en la computadora del desarrollador.
 
 ## Comandos
 
-| Comando | Uso |
-|---|---|
+| Comando | Resultado |
+| --- | --- |
 | `npm run dev` | Inicia el servidor de desarrollo |
 | `npm run lint` | Ejecuta Oxlint |
-| `npm run build` | Ejecuta TypeScript y genera el build de producción |
-| `npm run preview` | Sirve localmente el build generado |
+| `npm test` | Ejecuta las pruebas con Vitest |
+| `npm run build` | Verifica TypeScript y genera `dist/` |
+| `npm run preview` | Sirve localmente el build |
 
-## Estructura principal
+## Rutas
+
+| Ruta | Módulo | Estado |
+| --- | --- | --- |
+| `/` | Dashboard | Estructura principal |
+| `/pacientes` | Pacientes | Vista del módulo |
+| `/odontologos` | Odontólogos | Vista del módulo |
+| `/turnos` | Turnos | Vista del módulo |
+| `/historias-clinicas` | Historias clínicas | Vista del módulo |
+| `/usuarios` | Usuarios | Vista del módulo |
+| `/informes` | Informes y caja | Placeholder |
+| `/odontograma` | Odontograma académico | Integración demostrativa |
+| `/pacientes/:pacienteId/odontograma` | Odontograma de paciente | Integración demostrativa |
+
+Las vistas de módulos se completan junto con sus historias de usuario y tareas técnicas. La estructura de rutas y el layout son compartidos.
+
+## Odontograma académico
+
+La vista en `src/pages/Odontograma.jsx` es una demostración y no reemplaza la historia clínica. Para probarla, usar un paciente existente y un JWT vigente de rol `ODONTOLOGO` o `ADMINISTRADOR`, obtenido mediante `POST /api/auth/login` en Swagger. El login visual del dashboard no crea una sesión de API.
+
+El token se ingresa en el campo enmascarado **Token Bearer** y permanece solo en memoria; no se guarda en `localStorage`. La pantalla permite seleccionar piezas, revisar la ficha del paciente, asignar condiciones, revisar un presupuesto ilustrativo, aceptar el consentimiento, firmar, guardar y generar un PDF. Solo una respuesta de guardado confirmada por la API indica persistencia; un PDF local se considera borrador.
+
+Tratamientos y precios son ilustrativos y requieren validación profesional. No hay cobros. El catálogo y consentimiento `academic-v1` se verifican con la API antes de firmar; si cambia el paciente, la selección o el consentimiento, se invalida la firma. La redimensión del canvas también revoca la captura y la aceptación.
+
+## Estructura del código
 
 ```text
 src/
-├── components/layout/   # DashboardLayout, Navbar y Sidebar
-├── pages/               # Dashboard y vistas de módulos
-├── App.tsx              # Router principal
-├── main.tsx             # Punto de entrada
+├── components/
+│   └── layout/          # DashboardLayout, Navbar y Sidebar
+├── pages/               # Dashboard, módulos y odontograma
+├── App.tsx              # Rutas principales
+├── main.tsx             # Punto de entrada React
 └── index.css            # Tailwind y estilos globales
 docs/
 └── braian-dashboard.md  # Alcance e integración del dashboard
 ```
 
-## Rutas del dashboard
+## Trabajo con el backend
 
-- `/` — Dashboard principal
-- `/pacientes` — Pacientes
-- `/odontologos` — Odontólogos
-- `/turnos` — Turnos
-- `/historias-clinicas` — Historias clínicas
-- `/usuarios` — Gestión de usuarios
-- `/informes` — Informes y caja (placeholder)
+En desarrollo, Vite reenvía `/api` a `http://localhost:8080`; para otro puerto se puede definir `ODONTO_API_TARGET`. El backend debe estar levantado y configurado con MySQL y `JWT_SECRET_BASE64`.
 
-Las rutas y el layout son infraestructura compartida. Cada integrante debe reemplazar solamente el contenido de su módulo y conservar el contrato de navegación.
+El inicio de sesión usa `POST /api/auth/login`, carga el perfil desde `GET /api/auth/me` y mantiene el JWT únicamente en memoria. Al recargar, se vuelve a iniciar sesión. El panel consulta pacientes, odontólogos y turnos; sus listados incluyen búsqueda, estados vacíos, errores de autenticación y actualización. Los módulos que todavía no tienen una vista conectada permanecen identificados como pendientes.
 
-## Flujo de trabajo
+Para probar la interfaz sin una cuenta, `npm run dev` muestra la pantalla de acceso. El alta inicial del administrador se configura en el backend; seguí las instrucciones del README del backend y no incluyas credenciales ni tokens en el repositorio.
 
-- `develop` es la base de integración.
-- Las ramas de trabajo son `Mateo`, `Kevin`, `Braian`, `Josue` e `Iris`.
-- Los Pull Requests deben apuntar a `develop` y vincular su HU/TR correspondiente.
-- No se deben publicar secretos ni archivos `.env`.
+No incluir contraseñas, tokens, archivos `.env` ni datos personales reales en commits.
 
-## Alcance actual
+## Flujo de trabajo del repositorio
 
-El dashboard contiene estructura, navegación y placeholders. Autenticación, permisos, CRUDs, informes reales y consumo de API quedan pendientes de sus respectivas HU/TR.
+- `develop` es la rama de integración definida por el equipo.
+- Las ramas de trabajo identifican a cada integrante.
+- Los Pull Requests se revisan antes de integrarse a `develop` y deben vincular la HU/TR correspondiente.
+- Cerrar una issue requiere verificar sus criterios de aceptación y las pruebas relevantes.
 
-Para conocer el límite de integración con el backend, consultar [`docs/braian-dashboard.md`](docs/braian-dashboard.md) y la [wiki del proyecto](https://github.com/Proyecto-Houssay/backend-odonto/wiki).
+## Documentación
+
+- [Alcance del dashboard de Braian](docs/braian-dashboard.md)
+- [Wiki del frontend Novadent](https://github.com/Proyecto-Houssay/frontend-odonto/wiki)
+- [Arquitectura](https://github.com/Proyecto-Houssay/frontend-odonto/wiki/Arquitectura-Frontend)
+- [Tecnologías y ejecución](https://github.com/Proyecto-Houssay/frontend-odonto/wiki/Tecnologias-y-Ejecucion)
+- [Product Backlog](https://github.com/Proyecto-Houssay/frontend-odonto/wiki/Product-Backlog)
+- [Flujo de trabajo](https://github.com/Proyecto-Houssay/frontend-odonto/wiki/Flujo-de-Trabajo)
+- [Repositorio del backend](https://github.com/Proyecto-Houssay/backend-odonto)
+
+La Wiki está publicada y organiza la arquitectura, el stack, el backlog y los sprints del frontend.
