@@ -3,6 +3,7 @@ import { ArrowUpRight, CalendarDays, ClipboardCheck, ClipboardList, Stethoscope,
 import { Link } from 'react-router-dom'
 import type { UserRole } from '../auth/role'
 import { apiRequest } from '../lib/api'
+import { FaceCheckin } from '../components/FaceCheckin'
 
 type StaffRole = Exclude<UserRole, 'PACIENTE'>
 type Shortcut = { title: string; action: string; description: string; to: string; icon: typeof Users }
@@ -57,7 +58,9 @@ const DASHBOARDS: Record<StaffRole, Dashboard> = {
   },
 }
 
-export function DashboardHome({ role, token = '' }: { role: UserRole | null; token?: string }) {
+type CheckinPatient = { id: number; nombre?: string; apellido?: string; dni?: string; telefono?: string | null; email?: string; fechaNacimiento?: string; demo?: boolean }
+
+export function DashboardHome({ role, token = '', onVerified = () => undefined }: { role: UserRole | null; token?: string; onVerified?: (patient: CheckinPatient | null) => void }) {
   const [patients, setPatients] = useState<Patient[]>([])
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [dentists, setDentists] = useState<Dentist[]>([])
@@ -108,6 +111,7 @@ export function DashboardHome({ role, token = '' }: { role: UserRole | null; tok
       <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-blue-950 sm:text-3xl">{dashboard.title}</h2>
       <p className="mt-1 max-w-2xl text-sm text-slate-600">{dashboard.description}</p>
     </section>
+    <FaceCheckin onVerified={onVerified} />
     {partialError ? <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">No se pudieron cargar todos los datos del panel. Algunas cifras pueden estar incompletas.</p> : null}
     <section aria-label="Resumen del consultorio" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {metrics.map(({ label, value, icon: Icon, testId }) => <div key={label} data-testid={testId} className="flex min-h-24 items-center gap-3 rounded-xl border border-white/70 bg-white/85 p-4 shadow-md shadow-blue-950/5 backdrop-blur-xl">

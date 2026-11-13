@@ -52,7 +52,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<DashboardLayout />}>
-        <Route index element={<DashboardHome role={role} token={session.token} />} />
+        <Route index element={<DashboardHome role={role} token={session.token} onVerified={() => undefined} />} />
         <Route path="pacientes" element={<PacientesPage />} />
         <Route path="seguimiento" element={<ClinicalRoute role={role}><SeguimientoPage token={session.token} role={role} /></ClinicalRoute>} />
         <Route path="odontograma" element={<ClinicalRoute role={role} allowReception><OdontogramaRoute demoMode={false} /></ClinicalRoute>} />

@@ -5,7 +5,6 @@ import {
   Clock,
   ShieldCheck,
   Calendar,
-  User,
   Filter,
   CheckCircle2,
   XCircle,
@@ -99,7 +98,7 @@ export const TeletriajePage: React.FC<TeletriajePageProps> = ({ initialRole, ini
       return 'RECEPCIONISTA'
     }
   })
-  const [pacienteIdActivo, setPacienteIdActivo] = useState<string>('1')
+  const [pacienteIdActivo] = useState<string>('1')
 
   useEffect(() => {
     if (sessionToken && !initialToken) setToken(sessionToken)
