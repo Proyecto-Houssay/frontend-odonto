@@ -1,77 +1,57 @@
-import React from 'react'
-import { Menu, LogOut, Bell } from 'lucide-react'
-import type { UserProfile } from '../../lib/api'
+import { LogOut, Menu, Moon, Sun } from 'lucide-react'
+import { useAuth } from '../../auth/useAuth'
+import { roleFromToken } from '../../auth/role'
+import { NotificationCenter } from './NotificationCenter'
+import { useTheme } from '../../lib/useTheme'
 
 interface NavbarProps {
   onToggleSidebar: () => void
-  onLogout: () => void
-  user: UserProfile
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onLogout, user }) => {
-  const initials = `${user.nombre?.[0] || ''}${user.apellido?.[0] || ''}`.toUpperCase()
+const labels = {
+  ADMINISTRADOR: 'Administración',
+  ODONTOLOGO: 'Odontología',
+  RECEPCIONISTA: 'Recepción',
+  PACIENTE: 'Paciente',
+}
+
+export function Navbar({ onToggleSidebar }: NavbarProps) {
+  const { session, logout } = useAuth()
+  const { theme, toggleTheme } = useTheme()
+  const role = session?.role || roleFromToken(session?.token || '')
+  const initials = (session?.username || 'U').slice(0, 2).toUpperCase()
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 sticky top-0 z-30 flex items-center justify-between px-4 lg:px-8">
-      {/* Botón menú para móviles y título */}
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={onToggleSidebar}
-          className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 lg:hidden"
-          aria-label="Abrir menú"
-        >
-          <Menu className="w-6 h-6" />
+    <header className="sticky top-0 z-30 flex min-h-16 items-center justify-between gap-4 border-b border-[#94A3B8] bg-[#E2E8F0]/86 px-4 shadow-xs backdrop-blur-xl lg:px-6">
+      <div className="flex min-w-0 items-center gap-3">
+        <button type="button" onClick={onToggleSidebar} className="rounded-xl p-2 text-[#475569] hover:bg-[#DBEAFE] lg:hidden" aria-label="Abrir menú">
+          <Menu className="h-6 w-6" />
         </button>
-        <div>
-          <h1 className="text-base lg:text-lg font-semibold text-slate-800">
-            Panel de Control
-          </h1>
-          <p className="text-xs text-slate-500 hidden sm:block">
-            Gestión integral de la clínica odontológica
-          </p>
+        <div className="min-w-0">
+          <p className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-[#1D4ED8]">NovaDent · {role ? labels[role] : 'Sistema odontológico'}</p>
+          <h1 className="truncate text-lg font-extrabold text-[#1E293B] sm:text-xl">Tu espacio de trabajo</h1>
         </div>
       </div>
-
-      {/* Zona derecha: Notificaciones y Perfil */}
-      <div className="flex items-center gap-2 sm:gap-4">
-        {/* Notificaciones */}
+      <div className="flex items-center gap-2 sm:gap-3">
+        {/* Selector de Modo Oscuro / Modo Claro */}
         <button
           type="button"
-          className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-700 relative"
-          aria-label="Notificaciones"
+          onClick={toggleTheme}
+          aria-label={theme === 'dark' ? 'Activar modo claro' : 'Activar modo oscuro'}
+          title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+          className="flex h-10 items-center gap-1.5 rounded-xl border border-[#94A3B8] bg-[#E2E8F0]/80 px-2.5 py-1.5 text-xs font-semibold text-[#1E293B] transition hover:border-[#1D4ED8] hover:bg-[#DBEAFE] hover:text-[#1D4ED8] focus-visible:outline-2 focus-visible:outline-blue-600"
         >
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full" />
+          {theme === 'dark' ? <Sun size={17} className="text-amber-500" /> : <Moon size={17} className="text-slate-600" />}
+          <span className="hidden md:inline">{theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}</span>
         </button>
 
-        {/* Separador */}
-        <div className="h-8 w-px bg-slate-200" />
-
-        {/* Datos de usuario */}
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 font-semibold flex items-center justify-center text-sm">
-            {initials}
-          </div>
-          <div className="hidden md:block text-left">
-            <span className="block text-sm font-medium text-slate-700 leading-tight">
-              {user.nombre} {user.apellido}
-            </span>
-            <span className="block text-xs text-slate-500">
-              {user.rol.replaceAll('_', ' ').toLowerCase()}
-            </span>
-          </div>
+        <NotificationCenter />
+        <div className="flex items-center gap-2 rounded-xl border border-[#CBD5E1] bg-[#DBEAFE]/80 p-1.5 pr-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#1D4ED8] text-sm font-bold text-white">{initials}</span>
+          <span className="hidden max-w-40 truncate text-sm font-semibold text-[#1E293B] sm:block">{session?.username}</span>
         </div>
-
-        {/* Botón Salir */}
-        <button
-          type="button"
-          onClick={onLogout}
-          className="p-2 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors ml-1"
-          title="Cerrar sesión"
-          aria-label="Cerrar sesión"
-        >
-          <LogOut className="w-5 h-5" />
+        <button type="button" onClick={logout} className="flex min-h-10 items-center gap-2 rounded-xl border border-[#94A3B8] bg-[#E2E8F0]/80 px-3 text-sm font-semibold text-[#1E293B] transition hover:border-red-300 hover:bg-red-50 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600" aria-label="Cerrar sesión">
+          <LogOut aria-hidden="true" className="h-4 w-4" /><span className="hidden sm:inline">Salir</span>
         </button>
       </div>
     </header>

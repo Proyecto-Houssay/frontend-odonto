@@ -1,1 +1,295 @@
 @import "tailwindcss";
+
+.clinic-backdrop {
+  background-color: #dcecf8;
+  background-image:
+    linear-gradient(125deg, rgba(234, 244, 255, 0.34), rgba(224, 239, 253, 0.4)),
+    url('/images/novadent-consultorio.png');
+  background-position: center;
+  background-size: cover;
+  background-attachment: fixed;
+}
+
+.patient-portal-backdrop {
+  background-image:
+    linear-gradient(125deg, rgba(230, 243, 255, 0.28), rgba(218, 237, 252, 0.36)),
+    url('/images/novadent-consultorio.png');
+}
+
+.patient-arch-panel + .patient-arch-panel { margin-top: 1rem; }
+.patient-arch-heading { margin: 0 0 .65rem; color: #1e3a8a; font-size: .75rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.patient-arch-row:not(.patient-arch-3d) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
+.patient-quadrant-panel { min-width: 0; }
+.patient-quadrant-heading { min-height: 1.2rem; margin: 0 0 .4rem; color: #475569; font-size: .65rem; font-weight: 800; line-height: 1.2; }
+.patient-quadrant-teeth { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .3rem; }
+.patient-tooth-button { min-width: 0; min-height: 4.5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .2rem; border: 1px solid #cbd5e1; border-radius: .75rem; background: rgba(255,255,255,.78); color: #1e293b; font-size: .7rem; font-weight: 700; transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease; }
+.patient-tooth-button:hover { border-color: #2563eb; background: rgba(239,246,255,.94); }
+.patient-tooth-button:focus-visible, .patient-chart-control:focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }
+.patient-tooth-button.is-selected { border: 2px solid #2563eb; background: rgba(219,234,254,.88); box-shadow: 0 0 0 2px rgba(59,130,246,.2); }
+.patient-tooth-icon { width: 1.65rem; height: 2.2rem; filter: drop-shadow(2px 3px 2px rgba(30,64,100,.22)); }
+.patient-tooth-label { max-width: 100%; overflow-wrap: anywhere; text-align: center; }
+.patient-tooth-location { max-width: 100%; color: #475569; font-size: .52rem; font-weight: 600; line-height: 1.1; overflow-wrap: anywhere; text-align: center; }
+.patient-chart-control { min-height: 2.6rem; border: 1px solid #93c5fd; border-radius: .7rem; background: rgba(239,246,255,.88); padding: .55rem .9rem; color: #1e3a8a; font-size: .875rem; font-weight: 700; }
+.patient-chart-control[aria-pressed="true"] { border-color: #2563eb; background: #2563eb; color: white; }
+.patient-rotation-control { display: flex; align-items: center; gap: 1rem; margin-top: 1rem; border-radius: .75rem; background: rgba(239,246,255,.85); padding: .7rem .9rem; color: #1e3a8a; font-size: .875rem; font-weight: 700; }
+.patient-rotation-control input { width: min(100%, 20rem); accent-color: #2563eb; }
+.patient-chart-scene { overflow-x: auto; border: 1px solid rgba(147,197,253,.65); border-radius: 1rem; background: rgba(239,246,255,.5); padding: 1rem; }
+.patient-chart-scene.is-3d { perspective: 1100px; }
+.patient-arch-3d { display: flex; width: max-content; min-width: 100%; justify-content: center; gap: .65rem; transform-style: preserve-3d; transition: transform .2s ease; }
+.patient-quadrant-3d { flex: 0 0 max-content; }
+.patient-quadrant-3d .patient-quadrant-teeth { display: flex; gap: .35rem; }
+.patient-tooth-3d { flex: 0 0 3.2rem; min-height: 5.6rem; border-radius: 48% 48% 30% 30%; background: linear-gradient(145deg, rgba(255,255,255,.98), rgba(207,224,243,.9)); box-shadow: inset 3px 1px 3px rgba(255,255,255,.95), inset -5px -2px 7px rgba(86,119,153,.15), 0 7px 9px rgba(30,64,100,.18); }
+.patient-tooth-named { min-height: 7rem; gap: .1rem; padding: .35rem .15rem; font-size: .58rem; }
+.patient-tooth-named .patient-tooth-icon { width: 1.55rem; height: 2.1rem; }
+.patient-arch-3d.is-upper { margin-bottom: 1.15rem; }
+.patient-arch-3d.is-lower { margin-top: .4rem; }
+.patient-tooth-3d .patient-tooth-icon { width: 1.85rem; height: 2.55rem; }
+.patient-3d-note { margin: 0 0 1rem; color: #475569; font-size: .75rem; }
+
+@media (min-width: 760px) {
+  .patient-quadrant-teeth { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+}
+
+/* ==========================================================================
+   MODO CLARO REDISEÑADO (Glassmorphism sutil sobre el fondo de la clínica)
+   Paleta:
+   - Left Sidebar: Soft Ice Blue (#DCE6F1 / rgba(220, 230, 241, 0.90)) + blur(12px) + border-r (#CBD5E1)
+   - Main Cards & Containers: Darkened Off-White / Cool Light Gray (#E2E8F0 / rgba(226, 232, 240, 0.86)) + blur(12px)
+   - Card Borders: Medium Slate Gray (#94A3B8) 1px solid
+   - Data Dividers: Soft Slate Gray (#CBD5E1) 1px solid
+   - Primary Typography: Deep Charcoal Slate (#1E293B)
+   - Secondary Typography: Medium Slate (#475569)
+   - Accent Color: Clinical Royal Blue (#1D4ED8) con soft blue tint (#DBEAFE)
+   ========================================================================== */
+html:not([data-theme="dark"]),
+html[data-theme="light"] {
+  color: #1E293B;
+}
+
+/* 1. Left Sidebar */
+html:not([data-theme="dark"]) aside,
+html[data-theme="light"] aside {
+  background-color: rgba(220, 230, 241, 0.90) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-right: 1px solid #CBD5E1 !important;
+  box-shadow: 4px 0 24px rgba(15, 23, 42, 0.04) !important;
+}
+
+html:not([data-theme="dark"]) aside .border-b,
+html:not([data-theme="dark"]) aside .border-t,
+html[data-theme="light"] aside .border-b,
+html[data-theme="light"] aside .border-t {
+  border-color: #CBD5E1 !important;
+}
+
+html:not([data-theme="dark"]) aside nav a.active,
+html:not([data-theme="dark"]) aside nav a[aria-current="page"],
+html[data-theme="light"] aside nav a.active,
+html[data-theme="light"] aside nav a[aria-current="page"] {
+  background-color: #DBEAFE !important;
+  color: #1D4ED8 !important;
+  border: 1px solid rgba(29, 78, 216, 0.3) !important;
+  font-weight: 700 !important;
+  box-shadow: 0 1px 4px rgba(29, 78, 216, 0.12) !important;
+}
+
+html:not([data-theme="dark"]) aside nav a:not(.active):not([aria-current="page"]):hover,
+html[data-theme="light"] aside nav a:not(.active):not([aria-current="page"]):hover {
+  background-color: rgba(219, 234, 254, 0.6) !important;
+  color: #1D4ED8 !important;
+}
+
+/* 2. Main Cards & Containers */
+html:not([data-theme="dark"]) header,
+html[data-theme="light"] header {
+  background-color: rgba(226, 232, 240, 0.86) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-bottom: 1px solid #94A3B8 !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04) !important;
+}
+
+html:not([data-theme="dark"]) .bg-white,
+html:not([data-theme="dark"]) [class*="bg-white/"],
+html:not([data-theme="dark"]) .odontogram-card,
+html:not([data-theme="dark"]) .patient-chart-card,
+html[data-theme="light"] .bg-white,
+html[data-theme="light"] [class*="bg-white/"],
+html[data-theme="light"] .odontogram-card,
+html[data-theme="light"] .patient-chart-card {
+  background-color: rgba(226, 232, 240, 0.86) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid #94A3B8 !important;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05) !important;
+}
+
+/* 3. Card Borders & Data Dividers */
+html:not([data-theme="dark"]) .border-slate-200,
+html:not([data-theme="dark"]) .border-slate-300,
+html:not([data-theme="dark"]) .border-white\/70,
+html[data-theme="light"] .border-slate-200,
+html[data-theme="light"] .border-slate-300,
+html[data-theme="light"] .border-white\/70 {
+  border-color: #94A3B8 !important;
+}
+
+html:not([data-theme="dark"]) .divide-y > :not([hidden]) ~ :not([hidden]),
+html:not([data-theme="dark"]) .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+html:not([data-theme="dark"]) .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
+html:not([data-theme="dark"]) .divide-blue-100 > :not([hidden]) ~ :not([hidden]),
+html:not([data-theme="dark"]) tbody tr,
+html[data-theme="light"] .divide-y > :not([hidden]) ~ :not([hidden]),
+html[data-theme="light"] .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+html[data-theme="light"] .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
+html[data-theme="light"] .divide-blue-100 > :not([hidden]) ~ :not([hidden]),
+html[data-theme="light"] tbody tr {
+  border-color: #CBD5E1 !important;
+}
+
+html:not([data-theme="dark"]) thead th,
+html[data-theme="light"] thead th {
+  border-bottom: 1px solid #CBD5E1 !important;
+  background-color: rgba(220, 230, 241, 0.5) !important;
+  color: #475569 !important;
+}
+
+/* 4. Primary Typography (Titles & Numbers): Deep Charcoal Slate (#1E293B) */
+html:not([data-theme="dark"]) :is(h1, h2, h3, h4, h5, h6, .text-slate-950, .text-slate-900, .text-slate-800, .text-blue-950, .text-blue-900),
+html[data-theme="light"] :is(h1, h2, h3, h4, h5, h6, .text-slate-950, .text-slate-900, .text-slate-800, .text-blue-950, .text-blue-900) {
+  color: #1E293B !important;
+}
+
+/* 5. Secondary Typography (Subtitles, labels & timestamps): Medium Slate (#475569) */
+html:not([data-theme="dark"]) :is(.text-slate-700, .text-slate-600, .text-slate-500, label:not([class*="text-blue"]), .odontogram-page p),
+html[data-theme="light"] :is(.text-slate-700, .text-slate-600, .text-slate-500, label:not([class*="text-blue"]), .odontogram-page p) {
+  color: #475569 !important;
+}
+
+/* 6. Accent Color: Clinical Royal Blue (#1D4ED8) with soft blue tint (#DBEAFE) */
+html:not([data-theme="dark"]) :is(a:not([class*="text-white"]):not([class*="bg-"]):not([class*="btn"]), .text-blue-600, .text-blue-700, .text-blue-800),
+html[data-theme="light"] :is(a:not([class*="text-white"]):not([class*="bg-"]):not([class*="btn"]), .text-blue-600, .text-blue-700, .text-blue-800) {
+  color: #1D4ED8 !important;
+}
+
+html:not([data-theme="dark"]) :is(.bg-blue-50, [class*="bg-blue-50/"], .bg-blue-100),
+html[data-theme="light"] :is(.bg-blue-50, [class*="bg-blue-50/"], .bg-blue-100) {
+  background-color: #DBEAFE !important;
+  color: #1D4ED8 !important;
+  border-color: #CBD5E1 !important;
+}
+
+html:not([data-theme="dark"]) :is(.border-blue-100, .border-blue-200),
+html[data-theme="light"] :is(.border-blue-100, .border-blue-200) {
+  border-color: #CBD5E1 !important;
+}
+
+html:not([data-theme="dark"]) span[class*="rounded-full"][class*="blue"],
+html[data-theme="light"] span[class*="rounded-full"][class*="blue"] {
+  background-color: #DBEAFE !important;
+  color: #1D4ED8 !important;
+  border: 1px solid rgba(29, 78, 216, 0.25) !important;
+}
+
+/* ==========================================================================
+   MODO OSCURO GLOBAL (Staff Dashboard + Portal del Paciente)
+   ========================================================================== */
+html[data-theme="dark"] .clinic-backdrop,
+html[data-theme="dark"] .patient-portal-backdrop {
+  background-color: #081525;
+  background-image:
+    linear-gradient(125deg, rgba(3, 16, 32, .88), rgba(5, 23, 42, .82)),
+    url('/images/novadent-consultorio.png');
+  color: #e2e8f0;
+}
+
+html[data-theme="dark"] header {
+  border-color: rgba(51, 65, 85, 0.6) !important;
+  background-color: rgba(15, 23, 42, 0.88) !important;
+  color: #f1f5f9;
+}
+
+html[data-theme="dark"] aside {
+  border-color: rgba(51, 65, 85, 0.6) !important;
+  background-color: rgba(15, 23, 42, 0.95) !important;
+  color: #e2e8f0;
+}
+
+html[data-theme="dark"] .bg-white,
+html[data-theme="dark"] [class*="bg-white/"] {
+  border-color: rgba(51, 65, 85, 0.6) !important;
+  background-color: rgba(30, 41, 59, 0.92) !important;
+  color: #f1f5f9;
+}
+
+html[data-theme="dark"] .bg-slate-50,
+html[data-theme="dark"] [class*="bg-slate-50/"],
+html[data-theme="dark"] .bg-slate-100 {
+  border-color: rgba(51, 65, 85, 0.6) !important;
+  background-color: rgba(15, 23, 42, 0.75) !important;
+  color: #e2e8f0;
+}
+
+html[data-theme="dark"] .bg-blue-50,
+html[data-theme="dark"] [class*="bg-blue-50/"] {
+  border-color: rgba(59, 130, 246, 0.3) !important;
+  background-color: rgba(30, 58, 138, 0.3) !important;
+}
+
+html[data-theme="dark"] .bg-amber-50,
+html[data-theme="dark"] [class*="bg-amber-50/"] {
+  border-color: rgba(217, 119, 6, 0.3) !important;
+  background-color: rgba(120, 53, 15, 0.3) !important;
+}
+
+html[data-theme="dark"] .border-slate-200,
+html[data-theme="dark"] .border-slate-100,
+html[data-theme="dark"] .border-slate-300 {
+  border-color: rgba(51, 65, 85, 0.55) !important;
+}
+
+html[data-theme="dark"] :is(h1, h2, h3, h4, .text-slate-950, .text-slate-900, .text-slate-800) {
+  color: #f1f5f9 !important;
+}
+
+html[data-theme="dark"] :is(.text-slate-700, .text-slate-600, .text-slate-500) {
+  color: #94a3b8 !important;
+}
+
+html[data-theme="dark"] :is(.text-blue-950, .text-blue-900) {
+  color: #dbeafe !important;
+}
+
+html[data-theme="dark"] :is(.text-blue-800, .text-blue-700) {
+  color: #93c5fd !important;
+}
+
+html[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] select {
+  border-color: #475569 !important;
+  background: #0f172a !important;
+  color: #f1f5f9 !important;
+}
+
+/* ==========================================================================
+   Modo oscuro específico para componentes odontológicos
+   ========================================================================== */
+html[data-theme="dark"] .patient-arch-heading,
+html[data-theme="dark"] .patient-quadrant-heading { color: #bfdbfe; }
+html[data-theme="dark"] .patient-3d-note { color: #cbd5e1; }
+html[data-theme="dark"] .patient-tooth-button { border-color: #64748b; background: linear-gradient(145deg, #1e3a56, #12263d); color: #f1f5f9; }
+html[data-theme="dark"] .patient-tooth-location { color: #cbd5e1; }
+html[data-theme="dark"] .patient-tooth-button.is-selected { border-color: #60a5fa; background: #1d4ed8; }
+html[data-theme="dark"] .patient-chart-control { border-color: #3b82f6; background: #173451; color: #dbeafe; }
+html[data-theme="dark"] .patient-chart-control[aria-pressed="true"] { background: #2563eb; color: #fff; }
+html[data-theme="dark"] .patient-rotation-control { background: #173451; color: #dbeafe; }
+
+@media (prefers-reduced-motion: reduce) {
+  .patient-tooth-button, .patient-arch-3d { transition: none; }
+}
+
+@media (max-width: 768px) {
+  .clinic-backdrop { background-attachment: scroll; }
+}

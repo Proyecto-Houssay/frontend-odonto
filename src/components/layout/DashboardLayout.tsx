@@ -1,37 +1,42 @@
 import React, { useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Navbar } from './Navbar'
-import { useAuth } from '../../auth/AuthContext'
-import { LoginPage } from '../../pages/LoginPage'
+import { ChatbotFloatingWidget } from '../chatbot/ChatbotFloatingWidget'
+import { useAuth } from '../../auth/useAuth'
+import { roleFromToken } from '../../auth/role'
 
 export const DashboardLayout: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const { user, logout } = useAuth()
-
-  if (!user) return <LoginPage />
+  const location = useLocation()
+  const isChatbotRoute = location.pathname.startsWith('/chatbot')
+  const { session } = useAuth()
+  const role = session?.role || roleFromToken(session?.token || '')
+  const isDentist = role === 'ODONTOLOGO'
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="clinic-backdrop flex min-h-screen relative">
       {/* Barra lateral de navegación */}
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
-        role={user.rol}
       />
 
       {/* Contenedor vertical derecho */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Barra superior de navegación */}
-        <Navbar user={user} onLogout={logout} onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)} />
+        <Navbar onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)} />
 
         {/* Ventana dinámica donde se inyectan las vistas de cada módulo */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-5 lg:p-6">
+          <div className="mx-auto w-full max-w-[1800px]">
             <Outlet />
           </div>
         </main>
       </div>
+
+      {/* Widget flotante del Chatbot IA accesible en todo el sistema excepto para odontólogo o vista completa */}
+      {!isChatbotRoute && !isDentist && <ChatbotFloatingWidget />}
     </div>
   )
 }

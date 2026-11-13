@@ -1,77 +1,166 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Activity, CalendarDays, Clock3, RefreshCw, Stethoscope, Users } from 'lucide-react'
-import { useAuth } from '../auth/AuthContext'
-import { apiRequest, errorMessage } from '../lib/api'
+import { useEffect, useState } from 'react'
+import { ArrowUpRight, CalendarDays, ClipboardCheck, ClipboardList, Stethoscope, Users } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import type { UserRole } from '../auth/role'
+import { apiRequest } from '../lib/api'
 
-type Patient = { id: number; nombre: string; apellido: string }
-type Dentist = { id: number; nombre: string; apellido: string; activo: boolean; especialidad?: { nombre: string } }
-type Appointment = { id: number; fecha: string; hora: string; estado: string; motivo?: string; paciente?: { nombre: string; apellido: string }; odontologo?: { nombre: string; apellido: string } }
+type StaffRole = Exclude<UserRole, 'PACIENTE'>
+type Shortcut = { title: string; action: string; description: string; to: string; icon: typeof Users }
+type Dashboard = { eyebrow: string; title: string; description: string; shortcuts: Shortcut[]; focus: string[]; upcoming: string[] }
+type Patient = { id: number; nombre: string; apellido: string; dni: string }
+type Appointment = { id: number; fecha: string; hora: string; motivo: string; estado: string; paciente?: { nombre: string; apellido: string }; odontologo?: { nombre: string; apellido: string } }
+type Dentist = { id: number; activo: boolean }
+type Treatment = { id: number; descripcion: string; fecha: string; estado: string }
 
-function today() {
-  const date = new Date()
-  const offset = date.getTimezoneOffset() * 60_000
-  return new Date(date.getTime() - offset).toISOString().slice(0, 10)
+function localDate() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 }
 
-export function DashboardHome() {
-  const { token, user } = useAuth()
+const DASHBOARDS: Record<StaffRole, Dashboard> = {
+  ADMINISTRADOR: {
+    eyebrow: 'Administración',
+    title: 'Panel de administración',
+    description: 'Accedé a los módulos disponibles de la clínica desde un solo lugar.',
+    shortcuts: [
+      { title: 'Pacientes', action: 'Ver pacientes', description: 'Consultá y actualizá las fichas registradas.', to: '/pacientes', icon: Users },
+      { title: 'Agenda de turnos', action: 'Ver agenda', description: 'Consultá y asigná turnos reales.', to: '/turnos', icon: CalendarDays },
+      { title: 'Odontograma', action: 'Abrir odontograma', description: 'Revisá el registro dental y los presupuestos.', to: '/odontograma', icon: ClipboardList },
+      { title: 'Seguimiento', action: 'Revisar reportes', description: 'Consultá reportes enviados por pacientes.', to: '/seguimiento', icon: ClipboardCheck },
+    ],
+    focus: ['Gestionar fichas de pacientes', 'Supervisar reportes y odontogramas', 'Coordinar los accesos del consultorio'],
+    upcoming: ['Gestión de usuarios', 'Informes'],
+  },
+  ODONTOLOGO: {
+    eyebrow: 'Odontología',
+    title: 'Espacio clínico',
+    description: 'Tus herramientas clínicas disponibles, organizadas para continuar la atención.',
+    shortcuts: [
+      { title: 'Pacientes', action: 'Ver pacientes', description: 'Buscá las fichas de pacientes del consultorio.', to: '/pacientes', icon: Users },
+      { title: 'Agenda de turnos', action: 'Ver agenda', description: 'Consultá los turnos del consultorio.', to: '/turnos', icon: CalendarDays },
+      { title: 'Odontograma', action: 'Abrir odontograma', description: 'Registrá y consultá hallazgos dentales.', to: '/odontograma', icon: ClipboardList },
+      { title: 'Seguimiento', action: 'Revisar reportes', description: 'Leé las observaciones del paciente y dejá tu revisión.', to: '/seguimiento', icon: ClipboardCheck },
+    ],
+    focus: ['Revisar las observaciones pendientes', 'Actualizar el odontograma clínico', 'Consultar las fichas antes de la atención'],
+    upcoming: ['Historias clínicas integradas'],
+  },
+  RECEPCIONISTA: {
+    eyebrow: 'Recepción',
+    title: 'Gestión de recepción',
+    description: 'Organizá la información administrativa sin modificar registros clínicos profesionales.',
+    shortcuts: [
+      { title: 'Pacientes', action: 'Ver pacientes', description: 'Registrá y actualizá los datos de contacto.', to: '/pacientes', icon: Users },
+      { title: 'Agenda de turnos', action: 'Ver agenda', description: 'Consultá y asigná turnos reales.', to: '/turnos', icon: CalendarDays },
+    ],
+    focus: ['Registrar pacientes nuevos', 'Mantener al día los datos de contacto', 'Preparar la información para el equipo clínico'],
+    upcoming: ['Confirmaciones y asistencia'],
+  },
+}
+
+export function DashboardHome({ role, token = '' }: { role: UserRole | null; token?: string }) {
   const [patients, setPatients] = useState<Patient[]>([])
-  const [dentists, setDentists] = useState<Dentist[]>([])
   const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [dentists, setDentists] = useState<Dentist[]>([])
+  const [treatments, setTreatments] = useState<Treatment[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const refresh = useCallback(async () => {
-    if (!token) return
-    setLoading(true)
-    setError('')
-    try {
-      const [patientData, dentistData, appointmentData] = await Promise.all([
-        apiRequest<Patient[]>('/pacientes', token),
-        apiRequest<Dentist[]>('/odontologos', token),
-        apiRequest<Appointment[]>('/turnos', token),
+  const [partialError, setPartialError] = useState(false)
+
+  useEffect(() => {
+    if (!token || !role || role === 'PACIENTE') return
+    let active = true
+    const controller = new AbortController()
+    async function load() {
+      let failed = false
+      const safe = async <T,>(path: string): Promise<T[]> => {
+        try {
+          const result = await apiRequest<T[]>(path, { token, signal: controller.signal })
+          if (!Array.isArray(result)) throw new Error('La respuesta de la API no tiene formato de lista.')
+          return result
+        }
+        catch (error) { if (!(error instanceof DOMException && error.name === 'AbortError')) failed = true; return [] }
+      }
+      const [patientItems, appointmentItems, dentistItems, treatmentItems] = await Promise.all([
+        safe<Patient>('/pacientes'), safe<Appointment>('/turnos'),
+        role === 'ADMINISTRADOR' ? safe<Dentist>('/odontologos') : Promise.resolve([]),
+        role !== 'RECEPCIONISTA' ? safe<Treatment>('/tratamientos') : Promise.resolve([]),
       ])
-      setPatients(patientData)
-      setDentists(dentistData)
-      setAppointments(appointmentData)
-    } catch (cause) {
-      setError(errorMessage(cause))
-    } finally {
-      setLoading(false)
+      if (active) { setPatients(patientItems); setAppointments(appointmentItems); setDentists(dentistItems); setTreatments(treatmentItems); setPartialError(failed); setLoading(false) }
     }
-  }, [token])
+    void load()
+    return () => { active = false; controller.abort() }
+  }, [role, token])
 
-  useEffect(() => { void refresh() }, [refresh])
+  if (!role || role === 'PACIENTE') return <p role="alert" className="rounded-2xl border border-slate-200 bg-white p-6">Este panel no está disponible para tu cuenta.</p>
+  const dashboard = DASHBOARDS[role]
+  const today = localDate()
+  const todayAppointments = appointments.filter(item => item.fecha === today && item.estado !== 'CANCELADO').sort((a, b) => a.hora.localeCompare(b.hora))
+  const upcomingAppointments = appointments.filter(item => item.fecha >= today && item.estado !== 'CANCELADO').sort((a, b) => `${a.fecha}${a.hora}`.localeCompare(`${b.fecha}${b.hora}`)).slice(0, 5)
+  const activeTreatments = treatments.filter(item => item.estado !== 'COMPLETADO' && item.estado !== 'CANCELADO')
+  const metrics = role === 'ADMINISTRADOR'
+    ? [{ label: 'Pacientes', value: patients.length, icon: Users, testId: 'metric-patients' }, { label: 'Turnos hoy', value: todayAppointments.length, icon: CalendarDays, testId: 'metric-appointments' }, { label: 'Odontólogos activos', value: dentists.filter(item => item.activo).length, icon: Stethoscope, testId: 'metric-dentists' }, { label: 'Tratamientos activos', value: activeTreatments.length, icon: ClipboardList, testId: 'metric-treatments' }]
+    : role === 'ODONTOLOGO'
+      ? [{ label: 'Pacientes de la clínica', value: patients.length, icon: Users, testId: 'metric-patients' }, { label: 'Turnos hoy', value: todayAppointments.length, icon: CalendarDays, testId: 'metric-appointments' }, { label: 'Tratamientos activos', value: activeTreatments.length, icon: ClipboardList, testId: 'metric-treatments' }, { label: 'Próximos turnos', value: upcomingAppointments.length, icon: CalendarDays, testId: 'metric-upcoming' }]
+      : [{ label: 'Pacientes registrados', value: patients.length, icon: Users, testId: 'metric-patients' }, { label: 'Turnos hoy', value: todayAppointments.length, icon: CalendarDays, testId: 'metric-appointments' }]
 
-  const todayAppointments = appointments.filter(item => item.fecha === today()).sort((a, b) => a.hora.localeCompare(b.hora))
-  const stats = [
-    { label: 'Pacientes registrados', value: patients.length, icon: Users, color: 'text-blue-700', bg: 'bg-blue-50' },
-    { label: 'Turnos de hoy', value: todayAppointments.length, icon: CalendarDays, color: 'text-emerald-700', bg: 'bg-emerald-50' },
-    { label: 'Profesionales activos', value: dentists.filter(item => item.activo).length, icon: Stethoscope, color: 'text-violet-700', bg: 'bg-violet-50' },
-  ]
-
-  return (
-    <div className="space-y-7">
-      <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-900 p-7 text-white shadow-lg shadow-blue-950/10 sm:p-10">
-        <div className="flex flex-col gap-7 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="mb-3 flex items-center gap-2 text-sm font-medium text-cyan-200"><Activity size={16} /> NOVADENT · PANEL CLÍNICO</p>
-            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Buen día, {user?.nombre}.</h1>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-blue-100/75">Tu agenda y la actividad de la clínica, actualizadas desde el backend.</p>
-          </div>
-          <button onClick={() => void refresh()} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-medium transition hover:bg-white/15" aria-label="Actualizar datos"><RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Actualizar</button>
-        </div>
+  return <div className="space-y-4 text-slate-900">
+    <section className="overflow-hidden rounded-2xl border border-white/70 bg-white/80 px-5 py-4 shadow-lg shadow-blue-950/5 backdrop-blur-xl sm:px-6">
+      <p className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-blue-700">NovaDent · {dashboard.eyebrow}</p>
+      <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-blue-950 sm:text-3xl">{dashboard.title}</h2>
+      <p className="mt-1 max-w-2xl text-sm text-slate-600">{dashboard.description}</p>
+    </section>
+    {partialError ? <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">No se pudieron cargar todos los datos del panel. Algunas cifras pueden estar incompletas.</p> : null}
+    <section aria-label="Resumen del consultorio" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {metrics.map(({ label, value, icon: Icon, testId }) => <div key={label} data-testid={testId} className="flex min-h-24 items-center gap-3 rounded-xl border border-white/70 bg-white/85 p-4 shadow-md shadow-blue-950/5 backdrop-blur-xl">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700"><Icon aria-hidden="true" className="h-6 w-6" /></span><div><p className="text-xs font-semibold text-slate-600">{label}</p><p className="text-2xl font-extrabold text-blue-950">{loading ? '…' : value}</p></div>
+      </div>)}
+    </section>
+    <div className="grid gap-3 lg:grid-cols-2">
+      <section className="rounded-xl border border-white/70 bg-white/85 p-4 shadow-md shadow-blue-950/5 backdrop-blur-xl">
+        <h3 className="flex items-center gap-2 text-lg font-bold text-blue-950"><CalendarDays aria-hidden="true" className="h-5 w-5 text-blue-600" /> {role === 'RECEPCIONISTA' ? 'Agenda de la clínica' : role === 'ODONTOLOGO' ? 'Próximos turnos de la clínica' : 'Turnos de hoy'}</h3>
+        <p className="mt-1 text-xs text-slate-600">{role === 'ODONTOLOGO' ? 'Sin asignación por cuenta profesional; se muestran los turnos visibles para el rol.' : 'Información registrada en la agenda del backend.'}</p>
+        {loading ? <p className="mt-4 text-sm text-slate-600">Cargando turnos…</p> : (role === 'ADMINISTRADOR' ? todayAppointments : upcomingAppointments).length === 0 ? <p className="mt-4 rounded-lg bg-blue-50 p-3 text-sm text-slate-600">No hay turnos para mostrar.</p> : <ol className="mt-3 divide-y divide-blue-100">{(role === 'ADMINISTRADOR' ? todayAppointments : upcomingAppointments).map(item => <li key={item.id} className="grid grid-cols-[4rem_minmax(0,1fr)_auto] gap-2 py-2.5 text-sm"><time className="font-bold text-blue-950">{item.hora.slice(0, 5)}</time><span className="min-w-0 truncate">{item.paciente ? `${item.paciente.nombre} ${item.paciente.apellido}` : 'Paciente'} · {item.motivo || 'Consulta'}</span><span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-800">{item.estado}</span></li>)}</ol>}
       </section>
-
-      {error && <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-950 sm:flex-row sm:items-center sm:justify-between"><span>{error} Revisá que Spring Boot y MySQL estén iniciados.</span><button onClick={() => void refresh()} className="font-semibold underline underline-offset-4">Reintentar</button></div>}
-
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="Resumen de la clínica">
-        {stats.map(({ label, value, icon: Icon, color, bg }) => <article key={label} className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-200/40"><div className="flex items-center justify-between"><span className="text-sm font-medium text-slate-500">{label}</span><span className={`grid h-10 w-10 place-items-center rounded-xl ${bg} ${color}`}><Icon size={19} /></span></div><p className="mt-5 text-3xl font-semibold tracking-tight text-slate-900">{loading ? '…' : value}</p><p className="mt-1 text-xs text-slate-400">{loading ? 'Consultando API' : 'Dato en tiempo real'}</p></article>)}
-      </section>
-
-      <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-200/40">
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6"><div><h2 className="font-semibold text-slate-900">Agenda de hoy</h2><p className="mt-1 text-xs text-slate-500">{new Intl.DateTimeFormat('es-AR', { dateStyle: 'full' }).format(new Date())}</p></div><span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{todayAppointments.length} turnos</span></div>
-        {loading ? <div className="p-10 text-center text-sm text-slate-500">Cargando agenda…</div> : todayAppointments.length ? <div className="divide-y divide-slate-100">{todayAppointments.map(appointment => <div key={appointment.id} className="grid grid-cols-[70px_1fr_auto] items-center gap-3 px-5 py-4 sm:grid-cols-[90px_1fr_1fr_auto] sm:px-6"><div className="flex items-center gap-2 font-semibold text-slate-800"><Clock3 size={15} className="text-blue-600" />{appointment.hora.slice(0, 5)}</div><div><p className="text-sm font-medium text-slate-800">{appointment.paciente?.nombre} {appointment.paciente?.apellido}</p><p className="text-xs text-slate-500">{appointment.motivo || 'Consulta odontológica'}</p></div><p className="hidden text-sm text-slate-600 sm:block">Dr. {appointment.odontologo?.nombre} {appointment.odontologo?.apellido}</p><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">{appointment.estado}</span></div>)}</div> : <div className="p-10 text-center"><CalendarDays size={24} className="mx-auto text-slate-300" /><p className="mt-3 text-sm font-medium text-slate-700">No hay turnos para hoy</p><p className="mt-1 text-xs text-slate-500">Los próximos turnos aparecerán aquí.</p></div>}
+      <section className="rounded-xl border border-white/70 bg-white/85 p-4 shadow-md shadow-blue-950/5 backdrop-blur-xl">
+        <h3 className="flex items-center gap-2 text-lg font-bold text-blue-950">{role === 'RECEPCIONISTA' ? <Users aria-hidden="true" className="h-5 w-5 text-blue-600" /> : <ClipboardList aria-hidden="true" className="h-5 w-5 text-blue-600" />} {role === 'RECEPCIONISTA' ? 'Pacientes registrados' : role === 'ODONTOLOGO' ? 'Pacientes del consultorio' : 'Tratamientos registrados'}</h3>
+        {loading ? <p className="mt-4 text-sm text-slate-600">Cargando…</p> : role === 'RECEPCIONISTA' || role === 'ODONTOLOGO' ? patients.length === 0 ? <p className="mt-4 rounded-lg bg-blue-50 p-3 text-sm text-slate-600">No hay pacientes registrados.</p> : <ol className="mt-3 divide-y divide-blue-100">{patients.slice(0, 5).map(item => <li key={item.id} className="flex items-center justify-between gap-3 py-2.5 text-sm"><span className="font-semibold text-blue-950">{item.nombre} {item.apellido}</span><span className="text-xs text-slate-600">DNI {item.dni}</span></li>)}</ol> : treatments.length === 0 ? <p className="mt-4 rounded-lg bg-blue-50 p-3 text-sm text-slate-600">No hay tratamientos registrados.</p> : <ol className="mt-3 divide-y divide-blue-100">{treatments.slice(0, 5).map(item => <li key={item.id} className="flex items-center justify-between gap-3 py-2.5 text-sm"><span className="font-semibold text-blue-950">{item.descripcion}</span><span className="text-xs text-slate-600">{item.estado}</span></li>)}</ol>}
+        {role !== 'ADMINISTRADOR' ? <Link to="/pacientes" className="mt-4 inline-flex text-sm font-semibold text-blue-700 hover:underline">Ver pacientes →</Link> : null}
       </section>
     </div>
-  )
+    <section aria-labelledby="available-modules-title">
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h3 id="available-modules-title" className="text-lg font-bold text-blue-950">Accesos disponibles</h3>
+          <p className="text-xs text-slate-600">Herramientas conectadas con el sistema actual.</p>
+        </div>
+        <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-800">{dashboard.eyebrow}</span>
+      </div>
+      <div data-testid="role-shortcut-grid" className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {dashboard.shortcuts.map(({ title, action, description, to, icon: Icon }) =>
+          <Link key={to} to={to} className="group flex min-h-40 flex-col justify-between rounded-xl border border-white/70 bg-white/85 p-4 shadow-md shadow-blue-950/5 backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+            <div className="flex items-start justify-between gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-700"><Icon aria-hidden="true" className="h-5 w-5" /></span>
+              <ArrowUpRight aria-hidden="true" className="h-5 w-5 text-slate-400 transition group-hover:text-blue-700" />
+            </div>
+            <div><h4 className="mt-3 text-base font-bold text-blue-950">{title}</h4><p className="mt-1 text-xs leading-relaxed text-slate-600">{description}</p><span className="mt-2 inline-block text-sm font-semibold text-blue-700">{action} →</span></div>
+          </Link>,
+        )}
+        {dashboard.upcoming.length > 0 ? <div className="flex min-h-40 flex-col justify-between rounded-xl border border-white/70 bg-white/70 p-4 shadow-md shadow-blue-950/5 backdrop-blur-xl">
+          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-600"><CalendarDays aria-hidden="true" className="h-5 w-5" /></span>
+          <div><h4 className="mt-3 text-base font-bold text-blue-950">{dashboard.upcoming[0]}</h4><p className="mt-1 text-xs text-slate-600">Este módulo todavía no muestra datos operativos.</p><span className="mt-2 inline-block rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-800">Próximamente</span></div>
+        </div> : null}
+      </div>
+    </section>
+    <div className="grid items-start gap-3 lg:grid-cols-[1.2fr_0.8fr]">
+      <section className="rounded-xl border border-white/70 bg-white/85 p-5 shadow-md shadow-blue-950/5 backdrop-blur-xl">
+        <h3 className="flex items-center gap-2 text-lg font-bold text-slate-950"><ClipboardCheck aria-hidden="true" className="h-5 w-5 text-blue-700" /> Tu espacio de trabajo</h3>
+        <p className="mt-1 text-sm text-slate-600">Estas son las tareas que corresponden a tu rol.</p>
+        <ul className="mt-3 grid gap-2 sm:grid-cols-2">{dashboard.focus.map(item => <li key={item} className="rounded-lg border border-blue-100 bg-blue-50/65 px-3 py-2.5 text-sm font-medium text-slate-800">{item}</li>)}</ul>
+      </section>
+      <section className="rounded-xl border border-white/70 bg-white/85 p-5 shadow-md shadow-blue-950/5 backdrop-blur-xl">
+        <h3 className="flex items-center gap-2 text-lg font-bold text-slate-950"><CalendarDays aria-hidden="true" className="h-5 w-5 text-blue-700" /> Próximos módulos</h3>
+        <p className="mt-1 text-sm text-slate-600">En preparación; aún no muestran datos operativos.</p>
+        <ul className="mt-3 space-y-2">{dashboard.upcoming.map(item => <li key={item} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2.5 text-sm text-slate-700"><span>{item}</span><span className="text-xs font-semibold text-slate-500">Próximamente</span></li>)}</ul>
+      </section>
+    </div>
+  </div>
 }
