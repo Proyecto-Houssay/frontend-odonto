@@ -184,7 +184,7 @@ export const FaceCheckin = ({ onVerified }: { onVerified: (patient: Patient | ty
       let match: Patient | undefined
       if (session?.role === 'PACIENTE') {
         try {
-          const ownProfile = await apiRequest<Patient>('/pacientes/mi-ficha', { token: session.token })
+          const ownProfile = await apiRequest<Patient>('/portal-paciente/perfil', { token: session.token })
           if (ownProfile.dni.replace(/\D/g, '') === normalizedDni) match = ownProfile
         } catch (failure) {
           if (!(failure instanceof ApiError && failure.status === 404)) throw failure
