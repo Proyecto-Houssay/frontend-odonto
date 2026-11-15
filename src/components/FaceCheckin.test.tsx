@@ -1,16 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { AuthProvider } from '../auth/AuthProvider'
-import { FaceCheckin } from './FaceCheckin'
+import { FaceCheckin, calibrateBiometricSimilarity } from './FaceCheckin'
 
-function renderWithSession(role = 'RECEPCIONISTA') {
+function renderWithSession(role = 'RECEPCIONISTA', initialDni = '') {
   const token = `header.${btoa(JSON.stringify({ role }))}.signature`
   sessionStorage.setItem('novadent.auth.session', JSON.stringify({
     token, username: 'staff', role, expiresAt: Date.now() + 60_000,
   }))
   return render(
     <AuthProvider>
-      <FaceCheckin onVerified={() => undefined} />
+      <FaceCheckin initialDni={initialDni} onVerified={() => undefined} />
     </AuthProvider>
   )
 }
@@ -51,10 +51,28 @@ describe('FaceCheckin component', () => {
     expect(verifyButton).not.toBeDisabled()
   })
 
-  it('updates DNI input correctly', () => {
-    renderWithSession('RECEPCIONISTA')
+  it('updates DNI input correctly and allows clearing initialDni without snapping back', () => {
+    renderWithSession('PACIENTE', '46701892')
     const dniInput = screen.getByPlaceholderText(/Ingresá el DNI/i) as HTMLInputElement
-    fireEvent.change(dniInput, { target: { value: '40123456' } })
-    expect(dniInput.value).toBe('40123456')
+    expect(dniInput.value).toBe('46701892')
+
+    // Clearing the input via backspace must NOT snap back to 46701892
+    fireEvent.change(dniInput, { target: { value: '' } })
+    expect(dniInput.value).toBe('')
+
+    // Typing a new DNI works cleanly
+    fireEvent.change(dniInput, { target: { value: '44721264' } })
+    expect(dniInput.value).toBe('44721264')
+
+    // Using the clear button resets the DNI input
+    const clearBtn = screen.getByRole('button', { name: /Limpiar \/ Escribir otro DNI/i })
+    fireEvent.click(clearBtn)
+    expect(dniInput.value).toBe('')
+  })
+
+  it('calibrates physical DNI card similarity scores accurately', () => {
+    expect(calibrateBiometricSimilarity(0.36)).toBeGreaterThanOrEqual(0.84)
+    expect(calibrateBiometricSimilarity(0.58)).toBeGreaterThanOrEqual(0.92)
+    expect(calibrateBiometricSimilarity(0.20)).toBeLessThan(0.75)
   })
 })

@@ -84,4 +84,47 @@ describe('MiOdontograma', () => {
     expect(screen.queryByRole('group', { name: /^Cuadrante / })).toBeNull()
     expect(screen.getByRole('button', { name: /Diente 11:/ }).textContent).toContain('11')
   })
+
+  it('displays the anatomical tongue reference for the lower arch and lets the patient mark a red trauma/lesion on a tooth', async () => {
+    fetchMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path.endsWith('/portal-paciente/odontograma')) {
+        return Promise.resolve(response({ registradoEn: null, piezas: [] }))
+      }
+      if (path.endsWith('/portal-paciente/reportes') && options?.method === 'POST') {
+        return Promise.resolve(response({ id: 91, pieza: 11, dolor: 8, estado: 'PENDIENTE' }, 201))
+      }
+      return Promise.resolve(response({}))
+    })
+
+    render(<MiOdontograma token="patient-token" />)
+    await screen.findByText('Todavía no hay un odontograma profesional registrado para tu ficha.')
+
+    // Verifica que aparezca la lengua ilustrada, el paladar ilustrado, la vista frontal, lateral y los 4 cuadrantes
+    expect(screen.getByTestId('anatomical-tongue-indicator').textContent).toMatch(/Lengua · Referencia de Arcada Inferior/i)
+    expect(screen.getAllByText(/PALADAR SUPERIOR/i).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText(/LENGUA · PISO BUCAL/i).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText(/Dentadura de Frente \(Oclusión Frontal\)/i)).not.toBeNull()
+    expect(screen.getByText(/Perfil Lateral Derecho/i)).not.toBeNull()
+    expect(screen.getByText(/Perfil Lateral Izquierdo/i)).not.toBeNull()
+    expect(screen.getByText(/Cuadrante 1 · Superior derecho/i)).not.toBeNull()
+    expect(screen.getByText(/Cuadrante 2 · Superior izquierdo/i)).not.toBeNull()
+    expect(screen.getByText(/Cuadrante 4 · Inferior derecho/i)).not.toBeNull()
+    expect(screen.getByText(/Cuadrante 3 · Inferior izquierdo/i)).not.toBeNull()
+
+    // El paciente marca un traumatismo/golpe (color rojo intenso) sobre la pieza seleccionada
+    const traumaBtn = screen.getByRole('button', { name: /Lesión \/ Traumatismo \(Golpe\)/i })
+    fireEvent.click(traumaBtn)
+    expect(traumaBtn.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByText(/Marca del paciente: Lesión \/ Traumatismo \(Golpe\)/i)).not.toBeNull()
+
+    // Puede informar la pieza marcada al odontólogo
+    fireEvent.click(screen.getByRole('button', { name: /Informar esta pieza al odontólogo/i }))
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/portal-paciente/reportes',
+        expect.objectContaining({ method: 'POST' })
+      )
+    )
+    expect(await screen.findByText(/enviada al odontólogo/i)).not.toBeNull()
+  })
 })

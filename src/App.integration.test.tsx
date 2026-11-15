@@ -192,8 +192,11 @@ describe('frontend backed by the local API', () => {
     fetchMock.mockResolvedValueOnce(response({ token: 'admin-jwt', tokenType: 'Bearer', expiresIn: 900, role: 'ADMINISTRADOR' }))
     vi.stubGlobal('fetch', fetchMock)
 
-    await login()
-    fireEvent.click(screen.getByRole('link', { name: 'Informes (demo)' }))
+    window.history.replaceState({}, '', '/informes/demo')
+    render(<App />)
+    fireEvent.change(screen.getByLabelText('Usuario o correo electrónico'), { target: { value: 'admin' } })
+    fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'demo-password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Ingresar' }))
 
     expect(await screen.findByRole('heading', { name: 'Informes operativos' })).toBeInTheDocument()
     expect(screen.getByText('Datos de ejemplo')).toBeInTheDocument()

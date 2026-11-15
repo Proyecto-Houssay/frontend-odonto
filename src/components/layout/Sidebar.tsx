@@ -1,6 +1,6 @@
 import type { ElementType } from 'react'
 import { NavLink } from 'react-router-dom'
-import { BarChart3, CalendarDays, ClipboardCheck, ClipboardList, LayoutDashboard, MessageCircle, ScanLine, Sparkles, Stethoscope, Users, UserRoundCog, Video, X } from 'lucide-react'
+import { BarChart3, CalendarDays, Camera, ClipboardCheck, ClipboardList, LayoutDashboard, MessageCircle, ScanLine, Sparkles, Stethoscope, Users, UserRoundCog, Video, X } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { roleFromToken, type UserRole } from '../../auth/role'
 import { NovadentBrand } from '../brand/NovadentBrand'
@@ -27,17 +27,9 @@ const navItems: NavItem[] = [
   { label: 'Seguimiento', to: '/seguimiento', icon: ClipboardCheck, roles: ['ADMINISTRADOR', 'ODONTOLOGO'] },
   { label: 'Gestión de Usuarios', to: '/usuarios', icon: UserRoundCog, roles: ['ADMINISTRADOR'] },
   { label: 'Informes', to: '/informes', icon: BarChart3, roles: ['ADMINISTRADOR'] },
-  { label: 'Informes (demo)', to: '/informes/demo', icon: BarChart3, roles: ['ADMINISTRADOR'] },
-  { label: 'Asistente IA', to: '/chatbot', icon: MessageCircle, roles: ['ADMINISTRADOR'] },
+  { label: 'Check-in facial', to: '/check-in', icon: Camera, roles: ['ADMINISTRADOR', 'ODONTOLOGO'] },
+  { label: 'Asistente IA', to: '/chatbot', icon: MessageCircle, roles: STAFF_ROLES },
 ]
-
-const plannedByRole: Record<StaffRole, { label: string; icon: ElementType }[]> = {
-  ADMINISTRADOR: [],
-  ODONTOLOGO: [],
-  RECEPCIONISTA: [
-    { label: 'Confirmaciones', icon: ClipboardCheck },
-  ],
-}
 
 const roleLabel: Record<StaffRole, string> = {
   ADMINISTRADOR: 'Administración',
@@ -61,23 +53,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         <p className="px-3 text-[0.7rem] font-bold uppercase tracking-[0.16em] text-[#475569]">Espacio de {staffRole ? roleLabel[staffRole] : 'trabajo'}</p>
         <div className="mt-3 space-y-1">
           {navItems.filter(item => staffRole && item.roles.includes(staffRole)).map(({ label, to, icon: Icon }) =>
-            <NavLink key={to} to={to} end={to === '/' || to === '/informes' || to === '/informes/demo'} onClick={() => { if (window.innerWidth < 1024) onClose() }}
+            <NavLink key={to} to={to} end={to === '/' || to === '/informes'} onClick={() => { if (window.innerWidth < 1024) onClose() }}
               className={({ isActive }) => `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${isActive ? 'bg-[#DBEAFE] text-[#1D4ED8] font-bold border border-blue-300/70 shadow-xs' : 'text-[#475569] hover:bg-[#DBEAFE]/60 hover:text-[#1D4ED8]'}`}>
               <Icon aria-hidden="true" className="h-5 w-5 shrink-0" />
               <span>{label}</span>
             </NavLink>,
           )}
         </div>
-        {staffRole && plannedByRole[staffRole].length ? <div className="mt-8 border-t border-[#CBD5E1] pt-5">
-          <p className="px-3 text-[0.7rem] font-bold uppercase tracking-[0.16em] text-[#475569]">En preparación</p>
-          <ul className="mt-3 space-y-1">{plannedByRole[staffRole].map(({ label, icon: Icon }) =>
-            <li key={label} className="flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-sm text-[#475569]">
-              <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
-              <span>{label}</span>
-              <span className="ml-auto text-[0.6rem] font-semibold uppercase tracking-wide">Pronto</span>
-            </li>,
-          )}</ul>
-        </div> : null}
       </nav>
       <div className="border-t border-[#CBD5E1] p-4">
         <div className="rounded-xl border border-[#CBD5E1] bg-[#DBEAFE]/80 px-3 py-3 text-xs text-[#475569]">

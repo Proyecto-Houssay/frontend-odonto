@@ -1,46 +1,110 @@
-import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
-import { CalendarDays, Camera, ClipboardList, FileUp, Home, LogOut, MessageCircle, Moon, ShieldCheck, Sun, UserRound } from 'lucide-react'
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
+import {
+  Activity,
+  AlertCircle,
+  CalendarDays,
+  Camera,
+  CheckCircle2,
+  ClipboardList,
+  Clock3,
+  FileUp,
+  Home,
+  Image as ImageIcon,
+  LogOut,
+  MessageCircle,
+  Moon,
+  ScanLine,
+  ShieldCheck,
+  Stethoscope,
+  Sun,
+  UserRound,
+  XCircle,
+} from 'lucide-react'
 import { Link, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { ApiError, apiRequest } from '../lib/api'
 import { NovadentBrand } from '../components/brand/NovadentBrand'
 import { ChatbotFloatingWidget } from '../components/chatbot/ChatbotFloatingWidget'
+import { FaceCheckin } from '../components/FaceCheckin'
 import { ChatbotPage } from './ChatbotPage'
+import { DrAnniePage } from './DrAnniePage'
 import { MiOdontograma } from './MiOdontograma'
 import { useTheme } from '../lib/useTheme'
 
-type Perfil = { id: number; nombre: string; apellido: string; dni: string; email: string; telefono?: string; fechaNacimiento: string }
-type Reporte = {
-  id: number; pacienteId: number; pieza: number; dolor: number; sintomas: string; fotoDisponible?: boolean
-  fotoBase64?: string | null; creadoEn?: string; estado: 'PENDIENTE' | 'REVISADO'
-  revisionProfesional?: string | null; revisadoEn?: string | null
+type Perfil = {
+  id: number
+  nombre: string
+  apellido: string
+  dni: string
+  email: string
+  telefono?: string
+  fechaNacimiento: string
 }
-type TurnoPropio = { id: number; fecha: string; hora: string; motivo: string; estado: string; odontologoNombre: string }
-type TratamientoPropio = { id: number; fecha: string; descripcion: string; estado: string }
+
+type Reporte = {
+  id: number
+  pacienteId: number
+  pieza: number
+  dolor: number
+  sintomas: string
+  fotoDisponible?: boolean
+  fotoBase64?: string | null
+  creadoEn?: string
+  estado: 'PENDIENTE' | 'REVISADO'
+  revisionProfesional?: string | null
+  revisadoEn?: string | null
+}
+
+type TurnoPropio = {
+  id: number
+  fecha: string
+  hora: string
+  motivo: string
+  estado: string
+  odontologoNombre: string
+}
+
+type TratamientoPropio = {
+  id: number
+  fecha: string
+  descripcion: string
+  estado: string
+}
+
+type TurnoFilter = 'ALL' | 'CONFIRMED' | 'PENDING' | 'REJECTED'
+type ReportFilter = 'ALL' | 'REVISADO' | 'PENDIENTE' | 'WITH_PHOTO'
 
 const PATIENT_LINKS = [
   { label: 'Inicio', to: '/', icon: Home },
+  { label: 'Check-in facial', to: '/check-in', icon: Camera },
   { label: 'Mi odontograma', to: '/mi-odontograma', icon: ShieldCheck },
-  { label: 'Mi seguimiento', to: '/mi-seguimiento', icon: ShieldCheck },
+  { label: 'Mi seguimiento', to: '/mi-seguimiento', icon: Activity },
   { label: 'Mis turnos', to: '/mis-turnos', icon: CalendarDays },
-  { label: 'Mis tratamientos', to: '/mis-tratamientos', icon: ShieldCheck },
+  { label: 'Mis tratamientos', to: '/mis-tratamientos', icon: Stethoscope },
   { label: 'Mis reportes', to: '/mis-reportes', icon: ClipboardList },
   { label: 'Mis datos', to: '/mis-datos', icon: UserRound },
+  { label: 'Dr. Annie (IA)', to: '/dr-annie', icon: ScanLine },
   { label: 'Asistente IA', to: '/chatbot', icon: MessageCircle },
 ] as const
 
 const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
   '/': { title: 'Inicio', subtitle: 'Consultá tu resumen y registrá lo que observás.' },
+  '/check-in': { title: 'Check-in facial', subtitle: 'Validá tu identidad biométrica para confirmar tu ingreso.' },
   '/mi-odontograma': { title: 'Mi odontograma', subtitle: 'Consultá los registros del equipo profesional por pieza dental.' },
-  '/mi-seguimiento': { title: 'Mi seguimiento dental', subtitle: 'Consultá la evolución de tus observaciones.' },
-  '/mis-turnos': { title: 'Tus turnos', subtitle: 'Consultá tus citas registradas en el consultorio.' },
+  '/mi-seguimiento': { title: 'Mi seguimiento dental', subtitle: 'Tablero de evolución clínica, mapa de piezas vigiladas y respuesta odontológica.' },
+  '/mis-turnos': { title: 'Tus turnos', subtitle: 'Agenda de citas confirmadas, turnos en espera y estado de atención.' },
   '/mis-tratamientos': { title: 'Tus tratamientos', subtitle: 'Consultá los tratamientos indicados para tu ficha.' },
-  '/mis-reportes': { title: 'Tus reportes', subtitle: 'Consultá tus observaciones y las revisiones profesionales.' },
+  '/mis-reportes': { title: 'Tus reportes', subtitle: 'Bandeja de autoevaluaciones enviadas, evidencia fotográfica y dictamen profesional.' },
   '/mis-datos': { title: 'Tus datos', subtitle: 'Revisá tus datos de contacto.' },
+  '/dr-annie': { title: 'Dr. Annie (IA)', subtitle: 'Análisis orientativo de imágenes dentales asistido por inteligencia artificial.' },
   '/chatbot': { title: 'Asistente IA', subtitle: 'Consultá información general de NovaDent.' },
 }
 
 function dateLabel(date: string) {
-  return new Date(`${date}T12:00:00`).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
+  return new Date(`${date}T12:00:00`).toLocaleDateString('es-AR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
 }
 
 const DIENTES = [
@@ -49,17 +113,66 @@ const DIENTES = [
 ]
 
 const TOOTH_TYPES: Record<number, string> = {
-  1: 'Incisivo central', 2: 'Incisivo lateral', 3: 'Canino', 4: 'Primer premolar',
-  5: 'Segundo premolar', 6: 'Primer molar', 7: 'Segundo molar', 8: 'Tercer molar',
+  1: 'Incisivo central',
+  2: 'Incisivo lateral',
+  3: 'Canino',
+  4: 'Primer premolar',
+  5: 'Segundo premolar',
+  6: 'Primer molar',
+  7: 'Segundo molar',
+  8: 'Tercer molar',
 }
 const TOOTH_QUADRANTS: Record<number, string> = {
-  1: 'superior derecho', 2: 'superior izquierdo', 3: 'inferior izquierdo', 4: 'inferior derecho',
+  1: 'superior derecho',
+  2: 'superior izquierdo',
+  3: 'inferior izquierdo',
+  4: 'inferior derecho',
 }
 
 function nombrePieza(numero: number) {
   const cuadrante = Math.floor(numero / 10)
   const tipo = numero % 10
   return `${TOOTH_TYPES[tipo] || 'Pieza dental'} ${TOOTH_QUADRANTS[cuadrante] || ''}`.trim()
+}
+
+export function classifyTurnoStatus(estado?: string): 'CONFIRMED' | 'REJECTED' | 'PENDING' {
+  const raw = (estado || 'PENDIENTE').toUpperCase().trim()
+  if (raw.includes('CANCEL') || raw.includes('RECHAZ') || raw.includes('AUSENT')) {
+    return 'REJECTED'
+  }
+  if (raw.includes('CONFIRM') || raw.includes('COMPLET') || raw.includes('ATENDID')) {
+    return 'CONFIRMED'
+  }
+  return 'PENDING'
+}
+
+export function getTurnoStatusUi(estado?: string) {
+  const category = classifyTurnoStatus(estado)
+  if (category === 'CONFIRMED') {
+    return {
+      category,
+      badgeClass: 'bg-emerald-600 text-white border border-emerald-700 font-bold shadow-xs',
+      cardAccentClass: 'border-l-4 border-l-emerald-500 bg-emerald-50/40 border-emerald-200',
+      badgeStyle: { backgroundColor: '#059669', color: '#ffffff', borderColor: '#047857' },
+      statusHelper: 'Cita confirmada · Presentarse 10 min antes con DNI o usar Check-in Facial.',
+    }
+  }
+  if (category === 'REJECTED') {
+    return {
+      category,
+      badgeClass: 'bg-red-600 text-white border border-red-700 font-bold shadow-xs',
+      cardAccentClass: 'border-l-4 border-l-red-500 bg-red-50/40 border-red-200',
+      badgeStyle: { backgroundColor: '#dc2626', color: '#ffffff', borderColor: '#b91c1c' },
+      statusHelper: 'Turno cancelado o rechazado · Podés reprogramar desde recepción o Asistente IA.',
+    }
+  }
+  return {
+    category,
+    badgeClass: 'bg-orange-500 text-white border border-orange-600 font-bold shadow-xs',
+    cardAccentClass: 'border-l-4 border-l-orange-500 bg-orange-50/40 border-orange-200',
+    badgeStyle: { backgroundColor: '#f97316', color: '#ffffff', borderColor: '#ea580c' },
+    statusHelper: 'En espera de confirmación o atención · Recepción validará tu horario.',
+  }
 }
 
 export function PortalPaciente({ token, onLogout }: { token: string; onLogout: () => void }) {
@@ -83,11 +196,20 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
   const [fotoNombre, setFotoNombre] = useState('')
   const [fotoConsentida, setFotoConsentida] = useState(false)
   const [selectedReport, setSelectedReport] = useState<Reporte | null>(null)
+  const [turnoFilter, setTurnoFilter] = useState<TurnoFilter>('ALL')
+  const [reportFilter, setReportFilter] = useState<ReportFilter>('ALL')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [openedAt] = useState(() => Date.now())
+  const [reloadKey, setReloadKey] = useState(0)
   const { theme, toggleTheme } = useTheme()
+
+  useEffect(() => {
+    const onTurnoBooked = () => setReloadKey(value => value + 1)
+    window.addEventListener('novadent:turno-booked', onTurnoBooked)
+    return () => window.removeEventListener('novadent:turno-booked', onTurnoBooked)
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -117,7 +239,11 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
             return []
           }),
         ])
-        if (active) { setReports(reportList); setTurnos(ownTurnos); setTratamientos(ownTreatments) }
+        if (active) {
+          setReports(reportList)
+          setTurnos(ownTurnos)
+          setTratamientos(ownTreatments)
+        }
       } catch (failure) {
         if (!active) return
         if (!(failure instanceof ApiError && failure.status === 404)) {
@@ -127,16 +253,23 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
         if (active) setLoading(false)
       }
     }
+    void reloadKey
     void load()
-    return () => { active = false }
-  }, [token])
+    return () => {
+      active = false
+    }
+  }, [token, reloadKey])
 
   async function crearPerfil(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setBusy(true); setError(''); setNotice('')
+    setBusy(true)
+    setError('')
+    setNotice('')
     try {
       const created = await apiRequest<Perfil>('/portal-paciente/perfil', {
-        method: 'POST', token, body: { dni: dni.trim(), telefono: telefono.trim(), fechaNacimiento },
+        method: 'POST',
+        token,
+        body: { dni: dni.trim(), telefono: telefono.trim(), fechaNacimiento },
       })
       setPerfil(created)
       setEditTelefono(created.telefono || '')
@@ -147,24 +280,36 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
       setNotice('Tu ficha quedó vinculada a esta cuenta.')
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'No se pudo crear la ficha.')
-    } finally { setBusy(false) }
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function actualizarTelefono(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setBusy(true); setError(''); setNotice('')
+    setBusy(true)
+    setError('')
+    setNotice('')
     try {
       const updated = await apiRequest<Perfil>('/portal-paciente/perfil', {
-        method: 'PUT', token, body: { telefono: editTelefono.trim() },
+        method: 'PUT',
+        token,
+        body: { telefono: editTelefono.trim() },
       })
       setPerfil(updated)
       setNotice('Teléfono actualizado.')
-    } catch (failure) { setError(failure instanceof Error ? failure.message : 'No se pudo actualizar el teléfono.') }
-    finally { setBusy(false) }
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'No se pudo actualizar el teléfono.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   function cargarFoto(event: ChangeEvent<HTMLInputElement>) {
-    setError(''); setFoto(null); setFotoNombre(''); setFotoConsentida(false)
+    setError('')
+    setFoto(null)
+    setFotoNombre('')
+    setFotoConsentida(false)
     const file = event.target.files?.[0]
     if (!file) return
     if (!['image/png', 'image/jpeg'].includes(file.type) || file.size > 1_000_000) {
@@ -181,190 +326,1140 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
 
   async function enviar(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (foto && !fotoConsentida) { setError('Aceptá el uso de la foto para este reporte.'); return }
-    setBusy(true); setError(''); setNotice('')
+    if (foto && !fotoConsentida) {
+      setError('Aceptá el uso de la foto para este reporte.')
+      return
+    }
+    setBusy(true)
+    setError('')
+    setNotice('')
     try {
       await apiRequest<Reporte>('/portal-paciente/reportes', {
-        method: 'POST', token,
-        body: { pieza: selectedTooth, dolor, sintomas: sintomas.trim(), fotoBase64: foto, consentimientoFoto: foto ? fotoConsentida : false },
+        method: 'POST',
+        token,
+        body: {
+          pieza: selectedTooth,
+          dolor,
+          sintomas: sintomas.trim(),
+          fotoBase64: foto,
+          consentimientoFoto: foto ? fotoConsentida : false,
+        },
       })
       setReports(await apiRequest<Reporte[]>('/portal-paciente/reportes', { token }))
-      setSintomas(''); setFoto(null); setFotoNombre(''); setFotoConsentida(false)
+      setSintomas('')
+      setFoto(null)
+      setFotoNombre('')
+      setFotoConsentida(false)
       setNotice('Reporte enviado. Un odontólogo debe revisarlo; esto no es un diagnóstico.')
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'No se pudo enviar el reporte.')
-    } finally { setBusy(false) }
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function verReporte(id: number) {
     setError('')
-    try { setSelectedReport(await apiRequest<Reporte>(`/portal-paciente/reportes/${id}`, { token })) }
-    catch (failure) { setError(failure instanceof Error ? failure.message : 'No se pudo abrir el reporte.') }
+    try {
+      setSelectedReport(await apiRequest<Reporte>(`/portal-paciente/reportes/${id}`, { token }))
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'No se pudo abrir el reporte.')
+    }
   }
 
-  const nextTurno = turnos.find(turno => turno.estado !== 'CANCELADO' &&
-    new Date(`${turno.fecha}T${turno.hora}`).getTime() >= openedAt)
+  const nextTurno = turnos.find(
+    turno =>
+      classifyTurnoStatus(turno.estado) !== 'REJECTED' &&
+      new Date(`${turno.fecha}T${turno.hora}`).getTime() >= openedAt
+  )
   const page = PAGE_TITLES[location.pathname] || PAGE_TITLES['/']
 
-  return <main className="clinic-backdrop patient-portal-backdrop min-h-screen text-slate-900" style={{ backgroundImage: theme === 'dark'
-    ? 'linear-gradient(125deg, rgba(3,16,32,.76), rgba(5,23,42,.68)), url("/images/novadent-consultorio.png")'
-    : 'linear-gradient(125deg, rgba(230,243,255,.28), rgba(218,237,252,.36)), url("/images/novadent-consultorio.png")' }}>
-    <div className="mx-auto grid w-full max-w-[1800px] gap-4 px-3 py-3 sm:px-5 sm:py-5 lg:grid-cols-[280px_minmax(0,1fr)]">
-      <aside className="flex flex-col rounded-2xl border border-white/70 bg-white/85 p-4 shadow-xl shadow-blue-950/10 backdrop-blur-xl lg:sticky lg:top-5 lg:h-[calc(100vh-2.5rem)] lg:p-5">
-        <NovadentBrand compact />
-        <nav aria-label="Navegación del paciente" className="mt-5 flex flex-wrap gap-1 border-t border-blue-100 pt-4 lg:flex-col">
-          {PATIENT_LINKS.map(({ label, to, icon: Icon }) => <NavLink key={to} to={to} end={to === '/'}
-            className={({ isActive }) => `flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${isActive ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-700 hover:bg-blue-50 hover:text-blue-800'}`}>
-            <Icon aria-hidden="true" size={17} /> {label}
-          </NavLink>)}
-        </nav>
-        <div className="mt-auto hidden border-t border-blue-100 pt-4 lg:block">
-          <div className="flex items-center gap-3 rounded-xl bg-blue-50/90 p-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">{perfil?.nombre?.charAt(0).toUpperCase() || 'P'}</span>
-            <span className="min-w-0"><span className="block truncate text-sm font-bold text-slate-900">{perfil ? `${perfil.nombre} ${perfil.apellido}` : 'Mi cuenta'}</span><span className="block text-xs text-slate-600">Paciente</span></span>
-          </div>
-        </div>
-      </aside>
-      <div className="min-w-0">
-        <header id="inicio" className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/70 bg-white/75 px-5 py-4 shadow-lg shadow-blue-950/5 backdrop-blur-xl sm:px-6">
-          <div><p className="text-[0.7rem] font-bold uppercase tracking-[0.16em] text-blue-700">Portal del paciente</p><h1 className="mt-0.5 text-2xl font-extrabold tracking-tight text-blue-950 sm:text-3xl">{page.title}</h1><p className="mt-0.5 text-sm text-slate-600">{page.subtitle}</p></div>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Activar modo claro' : 'Activar modo oscuro'} className="flex min-h-10 items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/80 px-3 py-2 text-sm font-semibold text-blue-900 hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-blue-600">
-              {theme === 'dark' ? <Sun aria-hidden="true" size={16} /> : <Moon aria-hidden="true" size={16} />}{theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
-            </button>
-            <button type="button" onClick={onLogout} className="flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-red-50 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-blue-600"><LogOut size={16} /> Cerrar sesión</button>
-          </div>
-        </header>
-        <div className="space-y-4 py-4">
-      <p className="rounded-xl border border-blue-200/90 bg-blue-50/90 px-4 py-2.5 text-sm text-blue-950 shadow-sm">
-        Este portal registra lo que vos observás. No determina enfermedades ni reemplaza la consulta. La evaluación corresponde al odontólogo.
-      </p>
-      {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</p>}
-      {notice && <p role="status" className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">{notice}</p>}
-      {location.pathname === '/chatbot' ? <ChatbotPage /> : loading ? <p className="rounded-xl bg-white/85 p-5">Cargando tu información…</p> : !perfil ? <section id="mis-datos" className="rounded-2xl border border-white/70 bg-white/85 p-5 shadow-lg shadow-blue-950/5 backdrop-blur-xl">
-        <h2 className="mb-2 text-lg font-bold text-blue-950">Completá tu ficha para ver {page.title.toLocaleLowerCase('es-AR')}</h2>
-        <p className="mb-5 text-sm text-slate-600">Tu cuenta todavía no tiene una ficha de paciente vinculada. Completá tus datos abajo para consultar tus turnos, tratamientos, reportes y odontograma, o pedí al administrador que vincule tu ficha si ya te atendiste en el consultorio.</p>
-        <form onSubmit={crearPerfil} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <label className="block text-sm font-medium">DNI<input className={inputClass} required minLength={5} maxLength={30} value={dni} onChange={event => setDni(event.target.value)} /></label>
-          <label className="block text-sm font-medium">Fecha de nacimiento<input className={inputClass} required type="date" max={new Date().toISOString().slice(0, 10)} value={fechaNacimiento} onChange={event => setFechaNacimiento(event.target.value)} /></label>
-          <label className="block text-sm font-medium">Teléfono (opcional)<input className={inputClass} maxLength={30} value={telefono} onChange={event => setTelefono(event.target.value)} /></label>
-          <div className="flex items-end"><button type="submit" disabled={busy} className={primaryClass}>Crear mi ficha</button></div>
-        </form>
-      </section> : <>
-        <Routes>
-          <Route path="/mi-odontograma" element={<MiOdontograma token={token} />} />
-          <Route path="/" element={
-            <div className="space-y-4">
-              <section data-testid="patient-summary-grid" className={cardClass + ' grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center'}>
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Resumen personal</p>
-                  <h2 className="mt-1 text-2xl font-extrabold text-blue-950">Resumen de hoy</h2>
-                  <p className="mt-1 text-sm text-slate-600">Hola, {perfil.nombre}. Acá tenés tus próximas acciones y actividad reciente.</p>
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    <Link to="/mis-datos" className="rounded-lg border border-blue-200 bg-blue-50/80 px-4 py-2 text-sm font-semibold text-blue-900 hover:bg-blue-100">Revisar mis datos</Link>
-                    <Link to="/mi-odontograma" className="rounded-lg border border-blue-200 bg-white/75 px-4 py-2 text-sm font-semibold text-blue-900 hover:bg-blue-50">Ver odontograma</Link>
-                    <Link to="/mis-reportes" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Ver mis reportes</Link>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 lg:min-w-72">
-                  <div className="rounded-xl border border-blue-100 bg-blue-50/80 p-3"><span className="block text-xs text-slate-600">Reportes pendientes</span><span className="mt-1 block text-2xl font-extrabold text-blue-900">{reports.filter(report => report.estado === 'PENDIENTE').length}</span></div>
-                  <div className="rounded-xl border border-green-200 bg-green-50/80 p-3"><span className="block text-xs text-slate-600">Tratamientos activos</span><span className="mt-1 block text-2xl font-extrabold text-green-800">{tratamientos.filter(item => item.estado.toLocaleLowerCase('es-AR').includes('curso') || item.estado.toLocaleLowerCase('es-AR').includes('activo')).length}</span></div>
-                </div>
-              </section>
+  // Contadores de turnos por estado
+  const turnoCounts = useMemo(() => {
+    const confirmed = turnos.filter(t => classifyTurnoStatus(t.estado) === 'CONFIRMED').length
+    const pending = turnos.filter(t => classifyTurnoStatus(t.estado) === 'PENDING').length
+    const rejected = turnos.filter(t => classifyTurnoStatus(t.estado) === 'REJECTED').length
+    return { confirmed, pending, rejected }
+  }, [turnos])
 
-              <div className="grid gap-4 lg:grid-cols-2">
-                <section className={cardClass}>
-                  <h2 className="flex items-center gap-2 text-base font-bold text-blue-950"><CalendarDays aria-hidden="true" className="h-5 w-5 text-blue-600" /> Próximo turno</h2>
-                  {turnosError ? <p role="alert" className="mt-3 text-sm text-red-700">No se pudieron cargar tus turnos.</p> : nextTurno ? <div className="mt-3">
-                    <p className="font-semibold text-slate-900">{dateLabel(nextTurno.fecha)} · {nextTurno.hora.slice(0, 5)} hs</p>
-                    <p className="text-sm text-slate-700">{nextTurno.motivo}</p><p className="text-sm text-slate-600">{nextTurno.odontologoNombre}</p>
-                    <Link to="/mis-turnos" className="mt-3 inline-flex rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Ver mis turnos</Link>
-                  </div> : <p className="mt-3 text-sm text-slate-700">Todavía no tenés próximos turnos.</p>}
-                </section>
-                <section className={cardClass}>
-                  <h2 className="flex items-center gap-2 text-base font-bold text-blue-950"><ClipboardList aria-hidden="true" className="h-5 w-5 text-green-700" /> Actividad reciente</h2>
-                  {reportsError ? <p role="alert" className="mt-3 text-sm text-red-700">No se pudieron cargar tus reportes.</p> : reports.length === 0 ? <p className="mt-3 text-sm text-slate-600">Todavía no hay reportes. Si querés registrar una observación, usá el formulario de abajo.</p> : <p className="mt-3 text-sm text-slate-700">Tenés {reports.length} {reports.length === 1 ? 'reporte' : 'reportes'} registrados. El más reciente es de la pieza {reports[0].pieza}.</p>}
-                  <Link to="/mi-seguimiento" className="mt-3 inline-flex rounded-lg border border-green-300 bg-green-50/80 px-4 py-2 text-sm font-semibold text-green-900 hover:bg-green-100">Ver evolución de mis reportes</Link>
-                </section>
-              </div>
+  const filteredTurnos = useMemo(() => {
+    if (turnoFilter === 'ALL') return turnos
+    return turnos.filter(t => classifyTurnoStatus(t.estado) === turnoFilter)
+  }, [turnos, turnoFilter])
 
-              <section id="registrar-reporte" className={cardClass}>
-                <h2 className="mb-1 text-lg font-bold text-blue-950">Registrar una observación</h2>
-                <p className="mb-3 text-sm text-slate-600">Contale al equipo qué sentís. Esto registra una observación y no es un diagnóstico.</p>
-                <form className="grid gap-4 lg:grid-cols-2" onSubmit={enviar}>
-                  <div className="space-y-3">
-                    <label className="block text-sm font-medium">Pieza dental<select className={inputClass} value={selectedTooth} onChange={event => setSelectedTooth(Number(event.target.value))}>{DIENTES.flat().map(number => <option key={number} value={number}>{number} · {nombrePieza(number)}</option>)}</select></label>
-                    <label className="block text-sm font-medium">Dolor informado: {dolor}/10<input className="mt-2 w-full accent-blue-600" type="range" min="0" max="10" value={dolor} onChange={event => setDolor(Number(event.target.value))} /></label>
-                  </div>
-                  <div className="space-y-3">
-                    <label className="block text-sm font-medium">Síntomas<textarea className={inputClass} required minLength={3} maxLength={500} rows={2} value={sintomas} onChange={event => setSintomas(event.target.value)} placeholder="Qué notás y desde cuándo" /></label>
-                    <div>
-                      <label htmlFor="patient-photo-upload" className="flex items-center gap-2 text-sm font-medium"><Camera size={18} /> Foto opcional (PNG/JPEG, hasta 1 MB)</label>
-                      <div className="relative mt-2 rounded-lg border border-dashed border-blue-300 bg-blue-50/70 p-2.5 transition hover:border-blue-600 hover:bg-blue-100/80 focus-within:border-blue-700 focus-within:ring-2 focus-within:ring-blue-300">
-                        <input id="patient-photo-upload" aria-label="Foto opcional (PNG/JPEG, hasta 1 MB)" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" type="file" accept="image/png,image/jpeg" onChange={cargarFoto} />
-                        <div className="pointer-events-none flex flex-wrap items-center gap-3"><span className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm"><FileUp aria-hidden="true" size={17} /> Seleccionar foto</span><span className="min-w-0 break-all text-sm text-blue-950">{fotoNombre || 'Ningún archivo seleccionado'}</span></div>
-                      </div>
-                    </div>
-                    {foto && <><img src={foto} alt="Vista previa de la foto cargada" className="max-h-44 rounded-xl border object-contain" /><label className="flex gap-2 text-sm"><input type="checkbox" checked={fotoConsentida} onChange={event => setFotoConsentida(event.target.checked)} />Acepto guardar esta foto en mi reporte clínico.</label></>}
-                    <button type="submit" disabled={busy} className={primaryClass + ' w-full'}>Enviar reporte</button>
+  // Agrupación de piezas bajo seguimiento clínico para /mi-seguimiento
+  const trackedTeethSummary = useMemo(() => {
+    const map = new Map<
+      number,
+      {
+        pieza: number
+        latest: Reporte
+        totalReports: number
+        maxPain: number
+        hasProfessionalReview: boolean
+      }
+    >()
+    const sorted = [...reports].sort(
+      (a, b) => new Date(b.creadoEn || 0).getTime() - new Date(a.creadoEn || 0).getTime()
+    )
+    for (const rep of sorted) {
+      const existing = map.get(rep.pieza)
+      if (!existing) {
+        map.set(rep.pieza, {
+          pieza: rep.pieza,
+          latest: rep,
+          totalReports: 1,
+          maxPain: rep.dolor,
+          hasProfessionalReview: rep.estado === 'REVISADO' || Boolean(rep.revisionProfesional),
+        })
+      } else {
+        existing.totalReports += 1
+        existing.maxPain = Math.max(existing.maxPain, rep.dolor)
+        if (rep.estado === 'REVISADO' || rep.revisionProfesional) {
+          existing.hasProfessionalReview = true
+        }
+      }
+    }
+    return Array.from(map.values())
+  }, [reports])
+
+  const filteredReports = useMemo(() => {
+    return reports.filter(item => {
+      if (reportFilter === 'REVISADO') return item.estado === 'REVISADO'
+      if (reportFilter === 'PENDIENTE') return item.estado === 'PENDIENTE'
+      if (reportFilter === 'WITH_PHOTO') return Boolean(item.fotoDisponible || item.fotoBase64)
+      return true
+    })
+  }, [reports, reportFilter])
+
+  return (
+    <main
+      className="clinic-backdrop patient-portal-backdrop min-h-screen text-slate-900"
+      style={{
+        backgroundImage:
+          theme === 'dark'
+            ? 'linear-gradient(125deg, rgba(3,16,32,.84), rgba(5,23,42,.78)), url("/images/novadent-consultorio.png")'
+            : 'linear-gradient(125deg, rgba(226,236,248,.48), rgba(214,230,246,.54)), url("/images/novadent-consultorio.png")',
+      }}
+    >
+      <div className="mx-auto grid w-full max-w-[1800px] gap-4 px-3 py-3 sm:px-5 sm:py-5 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <aside className="flex flex-col rounded-2xl border border-slate-300 bg-white/90 p-4 shadow-xl shadow-blue-950/10 backdrop-blur-xl lg:sticky lg:top-5 lg:h-[calc(100vh-2.5rem)] lg:p-5">
+          <NovadentBrand compact />
+          <nav
+            aria-label="Navegación del paciente"
+            className="mt-5 flex flex-wrap gap-1 border-t border-blue-100 pt-4 lg:flex-col"
+          >
+            {PATIENT_LINKS.map(({ label, to, icon: Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === '/'}
+                className={({ isActive }) =>
+                  `flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
+                    isActive
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-800 hover:bg-blue-50 hover:text-blue-800'
+                  }`
+                }
+              >
+                <Icon aria-hidden="true" size={17} /> {label}
+              </NavLink>
+            ))}
+          </nav>
+          <div className="mt-auto hidden border-t border-blue-100 pt-4 lg:block">
+            <div className="flex items-center gap-3 rounded-xl bg-blue-50/90 p-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+                {perfil?.nombre?.charAt(0).toUpperCase() || 'P'}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-bold text-slate-900">
+                  {perfil ? `${perfil.nombre} ${perfil.apellido}` : 'Mi cuenta'}
+                </span>
+                <span className="block text-xs font-semibold text-slate-700">Paciente</span>
+              </span>
+            </div>
+          </div>
+        </aside>
+
+        <div className="min-w-0">
+          <header
+            id="inicio"
+            className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-300 bg-white/88 px-5 py-4 shadow-lg shadow-blue-950/5 backdrop-blur-xl sm:px-6"
+          >
+            <div>
+              <p className="text-[0.72rem] font-bold uppercase tracking-[0.16em] text-blue-700">
+                Portal del paciente
+              </p>
+              <h1 className="mt-0.5 text-2xl font-extrabold tracking-tight text-slate-950 sm:text-3xl">
+                {page.title}
+              </h1>
+              <p className="mt-0.5 text-sm font-medium text-slate-700">{page.subtitle}</p>
+            </div>
+            <div className="flex items-center gap-2.5">
+              {/* Botón de Tema: Modo oscuro (Naranja con Luna negra) / Modo claro (Celeste con Sol amarillo) */}
+              <button
+                type="button"
+                onClick={toggleTheme}
+                aria-label={theme === 'dark' ? 'Activar modo claro' : 'Activar modo oscuro'}
+                style={
+                  theme === 'dark'
+                    ? { backgroundColor: '#38bdf8', color: '#082f49', borderColor: '#0284c7' }
+                    : { backgroundColor: '#f97316', color: '#09090b', borderColor: '#c2410c' }
+                }
+                className={`flex min-h-10 items-center gap-2 rounded-xl border-2 px-3.5 py-2 text-sm font-extrabold shadow-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 ${
+                  theme === 'dark'
+                    ? 'border-sky-500 bg-sky-300 text-slate-950 hover:bg-sky-200 focus-visible:outline-sky-400'
+                    : 'border-orange-700 bg-orange-500 text-slate-950 hover:bg-orange-600 focus-visible:outline-orange-600'
+                }`}
+              >
+                {theme === 'dark' ? (
+                  <Sun
+                    aria-hidden="true"
+                    size={18}
+                    className="text-yellow-300 fill-yellow-400 drop-shadow-[0_1px_1px_rgba(0,0,0,0.45)]"
+                    style={{ color: '#fde047', fill: '#facc15' }}
+                  />
+                ) : (
+                  <Moon
+                    aria-hidden="true"
+                    size={18}
+                    className="text-black fill-black"
+                    style={{ color: '#000000', fill: '#000000' }}
+                  />
+                )}
+                {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+              </button>
+
+              {/* Botón Cerrar sesión siempre en Rojo intenso */}
+              <button
+                type="button"
+                onClick={onLogout}
+                style={{ backgroundColor: '#dc2626', color: '#ffffff', borderColor: '#b91c1c' }}
+                className="flex min-h-10 items-center gap-2 rounded-xl border border-red-700 bg-red-600 px-3.5 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+              >
+                <LogOut size={16} className="text-white" /> Cerrar sesión
+              </button>
+            </div>
+          </header>
+
+          <div className="space-y-4 py-4">
+            <p className="rounded-xl border border-blue-200/90 bg-blue-50/95 px-4 py-2.5 text-sm font-medium text-blue-950 shadow-sm">
+              Este portal registra lo que vos observás. No determina enfermedades ni reemplaza la consulta. La evaluación corresponde al odontólogo.
+            </p>
+            {error && (
+              <p role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-900">
+                {error}
+              </p>
+            )}
+            {notice && (
+              <p role="status" className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900">
+                {notice}
+              </p>
+            )}
+
+            {location.pathname === '/chatbot' ? (
+              <ChatbotPage />
+            ) : location.pathname === '/dr-annie' ? (
+              <DrAnniePage />
+            ) : location.pathname === '/check-in' ? (
+              <FaceCheckin
+                token={token}
+                role="PACIENTE"
+                initialDni={perfil?.dni}
+                initialPatient={perfil ? { ...perfil, telefono: perfil.telefono ?? null } : null}
+              />
+            ) : loading ? (
+              <p className="rounded-xl bg-white/90 p-5 font-medium">Cargando tu información…</p>
+            ) : !perfil ? (
+              <section
+                id="mis-datos"
+                className="rounded-2xl border border-slate-300 bg-white/90 p-5 shadow-lg shadow-blue-950/5 backdrop-blur-xl"
+              >
+                <h2 className="mb-2 text-lg font-bold text-slate-950">
+                  Completá tu ficha para ver {page.title.toLocaleLowerCase('es-AR')}
+                </h2>
+                <p className="mb-5 text-sm text-slate-700">
+                  Tu cuenta todavía no tiene una ficha de paciente vinculada. Completá tus datos abajo para consultar tus turnos, tratamientos, reportes y odontograma, o pedí al administrador que vincule tu ficha si ya te atendiste en el consultorio.
+                </p>
+                <form onSubmit={crearPerfil} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  <label className="block text-sm font-semibold">
+                    DNI
+                    <input
+                      className={inputClass}
+                      required
+                      minLength={5}
+                      maxLength={30}
+                      value={dni}
+                      onChange={event => setDni(event.target.value)}
+                    />
+                  </label>
+                  <label className="block text-sm font-semibold">
+                    Fecha de nacimiento
+                    <input
+                      className={inputClass}
+                      required
+                      type="date"
+                      max={new Date().toISOString().slice(0, 10)}
+                      value={fechaNacimiento}
+                      onChange={event => setFechaNacimiento(event.target.value)}
+                    />
+                  </label>
+                  <label className="block text-sm font-semibold">
+                    Teléfono (opcional)
+                    <input
+                      className={inputClass}
+                      maxLength={30}
+                      value={telefono}
+                      onChange={event => setTelefono(event.target.value)}
+                    />
+                  </label>
+                  <div className="flex items-end">
+                    <button type="submit" disabled={busy} className={primaryClass}>
+                      Crear mi ficha
+                    </button>
                   </div>
                 </form>
               </section>
-            </div>
-          } />
-          <Route path="/mi-seguimiento" element={<section className={cardClass}>
-            <header className="border-b border-blue-100 pb-4">
-              <p className="text-xs font-bold uppercase tracking-wide text-green-700">Línea de tiempo</p>
-              <h2 className="mt-1 text-xl font-bold text-blue-950">Evolución de mis observaciones</h2>
-              <p className="mt-1 text-sm text-slate-600">Revisá en orden cronológico lo que informaste y si el equipo profesional dejó una respuesta.</p>
-            </header>
-            {reportsError ? <p role="alert" className="mt-5 text-sm text-red-700">{reportsError}</p> : reports.length === 0 ? <p className="mt-5 rounded-xl bg-blue-50/80 p-4 text-sm text-slate-700">Todavía no registraste observaciones. Podés iniciar una desde <Link to="/" className="font-semibold text-blue-700 underline">Inicio</Link>.</p> : <ol className="mt-5 space-y-4">
-              {[...reports].sort((a, b) => new Date(b.creadoEn || 0).getTime() - new Date(a.creadoEn || 0).getTime()).map(item => <li key={item.id} className="relative rounded-xl border border-blue-100 bg-white/70 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-bold text-blue-950">Pieza {item.pieza} · {nombrePieza(item.pieza)}</h3><time className="text-xs text-slate-500">{item.creadoEn ? new Date(item.creadoEn).toLocaleString('es-AR') : 'Reporte #' + item.id}</time></div>
-                <p className="mt-2 text-sm text-slate-700">{item.sintomas}</p>
-                <p className="mt-2 text-xs text-slate-600">Dolor informado: {item.dolor}/10</p>
-                <p className="mt-2 text-xs font-semibold text-blue-700">{item.estado === 'REVISADO' ? 'Revisado por un profesional' : 'Pendiente de revisión profesional'}</p>
-                {item.revisionProfesional && <p className="mt-3 rounded-lg border-l-4 border-green-500 bg-green-50/70 p-3 text-sm text-green-950"><span className="font-semibold">Nota del equipo: </span>{item.revisionProfesional}</p>}
-              </li>)}
-            </ol>}
-            <Link to="/mis-reportes" className="mt-5 inline-flex rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Abrir mis reportes</Link>
-          </section>} />
-          <Route path="/mis-turnos" element={<section className={cardClass}>
-            <h2 className="text-xl font-bold text-blue-950">Mis turnos</h2>
-            <p className="mt-1 text-sm text-slate-600">Consultá las citas vinculadas a tu ficha. Para cambiar un turno, comunicate con recepción.</p>
-            {turnosError ? <p role="alert" className="mt-5 text-sm text-red-700">{turnosError}</p> : turnos.length === 0 ? <p className="mt-5 rounded-xl bg-blue-50 p-4 text-sm text-slate-700">Todavía no tenés turnos registrados.</p> : <ol className="mt-5 grid gap-3 md:grid-cols-2">
-              {turnos.map(item => <li key={item.id} className="rounded-xl border border-blue-100 bg-white/85 p-4"><p className="font-bold text-blue-950">{dateLabel(item.fecha)} · {item.hora.slice(0, 5)} hs</p><p className="mt-1 text-sm">{item.motivo}</p><p className="text-sm text-slate-600">{item.odontologoNombre}</p><span className="mt-3 inline-flex rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-800">{item.estado}</span></li>)}
-            </ol>}
-          </section>} />
-          <Route path="/mis-tratamientos" element={<section className={cardClass}>
-            <h2 className="text-xl font-bold text-blue-950">Mis tratamientos</h2>
-            <p className="mt-1 text-sm text-slate-600">Estos tratamientos fueron registrados por el equipo profesional para tu ficha.</p>
-            {tratamientosError ? <p role="alert" className="mt-5 text-sm text-red-700">{tratamientosError}</p> : tratamientos.length === 0 ? <p className="mt-5 rounded-xl bg-blue-50 p-4 text-sm text-slate-700">Todavía no tenés tratamientos registrados.</p> : <ol className="mt-5 grid gap-3 md:grid-cols-2">
-              {tratamientos.map(item => <li key={item.id} className="rounded-xl border border-blue-100 bg-white/85 p-4"><p className="font-bold text-blue-950">{item.descripcion}</p><p className="mt-1 text-sm text-slate-600">{dateLabel(item.fecha)}</p><span className="mt-3 inline-flex rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-800">{item.estado}</span></li>)}
-            </ol>}
-          </section>} />
-          <Route path="/mis-reportes" element={<section className={cardClass}>
-            <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold text-blue-950">Mis reportes</h2><p className="mt-1 text-sm text-slate-600">Observaciones que enviaste y revisión del odontólogo.</p></div><Link to="/" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Nuevo reporte</Link></div>
-            {reportsError ? <p role="alert" className="mt-5 text-sm text-red-700">{reportsError}</p> : reports.length === 0 ? <p className="mt-5 rounded-xl bg-blue-50 p-4 text-sm text-slate-700">Todavía no enviaste reportes.</p> : <ol className="mt-5 grid gap-3 md:grid-cols-2">
-              {reports.map(item => <li key={item.id}><button type="button" onClick={() => void verReporte(item.id)} className="w-full rounded-xl border border-blue-100 bg-white/85 p-4 text-left transition hover:border-blue-400 focus-visible:outline-2 focus-visible:outline-blue-600"><span className="font-bold text-blue-950">Pieza {item.pieza} · Reporte #{item.id}</span><span className="ml-2 text-xs text-slate-600">Dolor {item.dolor}/10</span><p className="mt-2 text-sm">{item.sintomas}</p><p className="mt-2 text-xs font-semibold text-blue-700">{item.estado === 'REVISADO' ? 'Revisado por un profesional' : 'Pendiente de revisión profesional'}</p></button></li>)}
-            </ol>}
-            {selectedReport && <div className="mt-5 rounded-xl border border-blue-200 bg-blue-50 p-4"><p className="font-semibold">Reporte #{selectedReport.id}</p>{selectedReport.fotoBase64 && <img src={selectedReport.fotoBase64} alt="Foto del reporte seleccionado" className="my-3 max-h-64 rounded-lg object-contain" />}<p className="mt-2 text-sm">{selectedReport.revisionProfesional || 'Aún no hay una nota profesional.'}</p></div>}
-          </section>} />
-          <Route path="/mis-datos" element={<section className={cardClass}>
-            <h2 className="text-xl font-bold text-blue-950">Mis datos</h2>
-            <dl className="mt-5 grid gap-4 sm:grid-cols-2"><div><dt className="text-xs font-semibold uppercase text-slate-500">Nombre completo</dt><dd className="mt-1 font-semibold">{perfil.nombre} {perfil.apellido}</dd></div><div><dt className="text-xs font-semibold uppercase text-slate-500">DNI</dt><dd className="mt-1">{perfil.dni}</dd></div><div><dt className="text-xs font-semibold uppercase text-slate-500">Correo electrónico</dt><dd className="mt-1 break-all">{perfil.email}</dd></div><div><dt className="text-xs font-semibold uppercase text-slate-500">Fecha de nacimiento</dt><dd className="mt-1">{perfil.fechaNacimiento ? dateLabel(perfil.fechaNacimiento) : 'No registrada'}</dd></div></dl>
-            <form onSubmit={actualizarTelefono} className="mt-6 flex flex-wrap items-end gap-3 border-t border-blue-100 pt-5"><label className="text-sm font-medium">Teléfono de contacto<input className={inputClass} maxLength={30} value={editTelefono} onChange={event => setEditTelefono(event.target.value)} /></label><button type="submit" disabled={busy} className={primaryClass}>Actualizar teléfono</button></form>
-          </section>} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </>}
+            ) : (
+              <Routes>
+                <Route path="/mi-odontograma" element={<MiOdontograma token={token} />} />
+
+                {/* RUTA 1: INICIO */}
+                <Route
+                  path="/"
+                  element={
+                    <div className="space-y-4">
+                      <section
+                        data-testid="patient-summary-grid"
+                        className={cardClass + ' grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center'}
+                      >
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wide text-blue-700">
+                            Resumen personal
+                          </p>
+                          <h2 className="mt-1 text-2xl font-extrabold text-slate-950">Resumen de hoy</h2>
+                          <p className="mt-1 text-sm font-medium text-slate-700">
+                            Hola, {perfil.nombre}. Acá tenés tus próximas acciones y actividad reciente.
+                          </p>
+                          <div className="mt-4 flex flex-wrap gap-3">
+                            <Link
+                              to="/mis-datos"
+                              className="rounded-lg border border-blue-300 bg-blue-50/90 px-4 py-2 text-sm font-bold text-blue-900 hover:bg-blue-100"
+                            >
+                              Revisar mis datos
+                            </Link>
+                            <Link
+                              to="/mi-odontograma"
+                              className="rounded-lg border border-blue-300 bg-white/90 px-4 py-2 text-sm font-bold text-blue-900 hover:bg-blue-50"
+                            >
+                              Ver odontograma
+                            </Link>
+                            <Link
+                              to="/mis-reportes"
+                              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700"
+                            >
+                              Ver mis reportes
+                            </Link>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 lg:min-w-72">
+                          <div className="rounded-xl border border-orange-300 bg-orange-50/90 p-3">
+                            <span className="block text-xs font-bold text-slate-700">Reportes pendientes</span>
+                            <span className="mt-1 block text-2xl font-extrabold text-orange-700">
+                              {reports.filter(report => report.estado === 'PENDIENTE').length}
+                            </span>
+                          </div>
+                          <div className="rounded-xl border border-emerald-300 bg-emerald-50/90 p-3">
+                            <span className="block text-xs font-bold text-slate-700">Tratamientos activos</span>
+                            <span className="mt-1 block text-2xl font-extrabold text-emerald-800">
+                              {
+                                tratamientos.filter(
+                                  item =>
+                                    item.estado.toLocaleLowerCase('es-AR').includes('curso') ||
+                                    item.estado.toLocaleLowerCase('es-AR').includes('activo')
+                                ).length
+                              }
+                            </span>
+                          </div>
+                        </div>
+                      </section>
+
+                      <div className="grid gap-4 lg:grid-cols-2">
+                        <section className={cardClass}>
+                          <h2 className="flex items-center gap-2 text-base font-bold text-slate-950">
+                            <CalendarDays aria-hidden="true" className="h-5 w-5 text-blue-600" /> Próximo turno
+                          </h2>
+                          {turnosError ? (
+                            <p role="alert" className="mt-3 text-sm font-semibold text-red-700">
+                              No se pudieron cargar tus turnos.
+                            </p>
+                          ) : nextTurno ? (
+                            (() => {
+                              const statusUi = getTurnoStatusUi(nextTurno.estado)
+                              return (
+                                <div className={`mt-3 rounded-xl border p-3.5 ${statusUi.cardAccentClass}`}>
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <p className="font-bold text-slate-950">
+                                      {dateLabel(nextTurno.fecha)} · {nextTurno.hora.slice(0, 5)} hs
+                                    </p>
+                                    <span
+                                      style={statusUi.badgeStyle}
+                                      className={`inline-flex items-center rounded-full px-3 py-1 text-xs ${statusUi.badgeClass}`}
+                                    >
+                                      {nextTurno.estado}
+                                    </span>
+                                  </div>
+                                  <p className="mt-1 text-sm font-semibold text-slate-800">{nextTurno.motivo}</p>
+                                  <p className="text-sm font-medium text-slate-700">{nextTurno.odontologoNombre}</p>
+                                  <Link
+                                    to="/mis-turnos"
+                                    className="mt-3 inline-flex rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700"
+                                  >
+                                    Ver mis turnos
+                                  </Link>
+                                </div>
+                              )
+                            })()
+                          ) : (
+                            <p className="mt-3 text-sm font-medium text-slate-700">Todavía no tenés próximos turnos.</p>
+                          )}
+                        </section>
+
+                        <section className={cardClass}>
+                          <h2 className="flex items-center gap-2 text-base font-bold text-slate-950">
+                            <ClipboardList aria-hidden="true" className="h-5 w-5 text-emerald-700" /> Actividad reciente
+                          </h2>
+                          {reportsError ? (
+                            <p role="alert" className="mt-3 text-sm font-semibold text-red-700">
+                              No se pudieron cargar tus reportes.
+                            </p>
+                          ) : reports.length === 0 ? (
+                            <p className="mt-3 text-sm font-medium text-slate-700">
+                              Todavía no hay reportes. Si querés registrar una observación, usá el formulario de abajo.
+                            </p>
+                          ) : (
+                            <p className="mt-3 text-sm font-medium text-slate-800">
+                              Tenés {reports.length} {reports.length === 1 ? 'reporte' : 'reportes'} registrados. El más reciente es de la pieza {reports[0].pieza}.
+                            </p>
+                          )}
+                          <Link
+                            to="/mi-seguimiento"
+                            className="mt-3 inline-flex rounded-lg border border-emerald-400 bg-emerald-50/90 px-4 py-2 text-sm font-bold text-emerald-900 hover:bg-emerald-100"
+                          >
+                            Ver evolución de mis reportes
+                          </Link>
+                        </section>
+                      </div>
+
+                      <section id="registrar-reporte" className={cardClass}>
+                        <h2 className="mb-1 text-lg font-bold text-slate-950">Registrar una observación</h2>
+                        <p className="mb-3 text-sm font-medium text-slate-700">
+                          Contale al equipo qué sentís. Esto registra una observación y no es un diagnóstico.
+                        </p>
+                        <form className="grid gap-4 lg:grid-cols-2" onSubmit={enviar}>
+                          <div className="space-y-3">
+                            <label className="block text-sm font-semibold">
+                              Pieza dental
+                              <select
+                                className={inputClass}
+                                value={selectedTooth}
+                                onChange={event => setSelectedTooth(Number(event.target.value))}
+                              >
+                                {DIENTES.flat().map(number => (
+                                  <option key={number} value={number}>
+                                    {number} · {nombrePieza(number)}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="block text-sm font-semibold">
+                              Dolor informado: {dolor}/10
+                              <input
+                                className="mt-2 w-full accent-blue-600"
+                                type="range"
+                                min="0"
+                                max="10"
+                                value={dolor}
+                                onChange={event => setDolor(Number(event.target.value))}
+                              />
+                            </label>
+                          </div>
+                          <div className="space-y-3">
+                            <label className="block text-sm font-semibold">
+                              Síntomas
+                              <textarea
+                                className={inputClass}
+                                required
+                                minLength={3}
+                                maxLength={500}
+                                rows={2}
+                                value={sintomas}
+                                onChange={event => setSintomas(event.target.value)}
+                                placeholder="Qué notás y desde cuándo"
+                              />
+                            </label>
+                            <div>
+                              <label htmlFor="patient-photo-upload" className="flex items-center gap-2 text-sm font-semibold">
+                                <Camera size={18} /> Foto opcional (PNG/JPEG, hasta 1 MB)
+                              </label>
+                              <div className="relative mt-2 rounded-lg border border-dashed border-blue-400 bg-blue-50/80 p-2.5 transition hover:border-blue-600 hover:bg-blue-100/80 focus-within:border-blue-700 focus-within:ring-2 focus-within:ring-blue-300">
+                                <input
+                                  id="patient-photo-upload"
+                                  aria-label="Foto opcional (PNG/JPEG, hasta 1 MB)"
+                                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                                  type="file"
+                                  accept="image/png,image/jpeg"
+                                  onChange={cargarFoto}
+                                />
+                                <div className="pointer-events-none flex flex-wrap items-center gap-3">
+                                  <span className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm">
+                                    <FileUp aria-hidden="true" size={17} /> Seleccionar foto
+                                  </span>
+                                  <span className="min-w-0 break-all text-sm font-medium text-slate-900">
+                                    {fotoNombre || 'Ningún archivo seleccionado'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            {foto && (
+                              <>
+                                <img
+                                  src={foto}
+                                  alt="Vista previa de la foto cargada"
+                                  className="max-h-44 rounded-xl border object-contain"
+                                />
+                                <label className="flex gap-2 text-sm font-medium">
+                                  <input
+                                    type="checkbox"
+                                    checked={fotoConsentida}
+                                    onChange={event => setFotoConsentida(event.target.checked)}
+                                  />
+                                  Acepto guardar esta foto en mi reporte clínico.
+                                </label>
+                              </>
+                            )}
+                            <button type="submit" disabled={busy} className={primaryClass + ' w-full'}>
+                              Enviar reporte
+                            </button>
+                          </div>
+                        </form>
+                      </section>
+                    </div>
+                  }
+                />
+
+                {/* RUTA 2: MI SEGUIMIENTO (Tablero de Evolución Clínica, Mapa de Piezas y Plan de Tratamientos) */}
+                <Route
+                  path="/mi-seguimiento"
+                  element={
+                    <div className="space-y-4">
+                      <section className={cardClass}>
+                        <header className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-300 pb-4">
+                          <div>
+                            <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">
+                              Tablero de seguimiento clínico
+                            </p>
+                            <h2 className="mt-1 text-xl font-extrabold text-slate-950">
+                              Evolución de mis observaciones
+                            </h2>
+                            <p className="mt-1 text-sm font-medium text-slate-700">
+                              Monitoreá las piezas dentales bajo vigilancia, la curva de alivio o dolor y las indicaciones del equipo odontológico.
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Link
+                              to="/mi-odontograma"
+                              className="inline-flex items-center gap-1.5 rounded-xl border border-blue-300 bg-blue-50 px-3.5 py-2 text-xs font-bold text-blue-900 hover:bg-blue-100"
+                            >
+                              <ShieldCheck size={15} /> Ver mapa en odontograma
+                            </Link>
+                            <Link
+                              to="/mis-reportes"
+                              className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
+                            >
+                              Abrir mis reportes
+                            </Link>
+                          </div>
+                        </header>
+
+                        {/* KPIs de evolución clínica */}
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                          <div className="rounded-xl border border-blue-200 bg-blue-50/80 p-3.5">
+                            <span className="text-xs font-bold uppercase text-blue-800">Piezas en vigilancia</span>
+                            <strong className="mt-1 block text-2xl font-extrabold text-slate-950">
+                              {trackedTeethSummary.length}
+                            </strong>
+                            <span className="text-xs font-medium text-slate-700">
+                              Piezas con seguimiento registrado
+                            </span>
+                          </div>
+                          <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-3.5">
+                            <span className="text-xs font-bold uppercase text-emerald-800">Controles respondidos</span>
+                            <strong className="mt-1 block text-2xl font-extrabold text-emerald-900">
+                              {reports.filter(r => r.estado === 'REVISADO').length} / {reports.length}
+                            </strong>
+                            <span className="text-xs font-medium text-slate-700">
+                              Evaluaciones con devolución clínica
+                            </span>
+                          </div>
+                          <div className="rounded-xl border border-orange-200 bg-orange-50/80 p-3.5">
+                            <span className="text-xs font-bold uppercase text-orange-800">Último dolor reportado</span>
+                            <strong className="mt-1 block text-2xl font-extrabold text-orange-800">
+                              {reports[0] ? `${reports[0].dolor}/10` : '0/10'}
+                            </strong>
+                            <span className="text-xs font-medium text-slate-700">
+                              Escala subjetiva de sensibilidad
+                            </span>
+                          </div>
+                          <div className="rounded-xl border border-violet-200 bg-violet-50/80 p-3.5">
+                            <span className="text-xs font-bold uppercase text-violet-800">Planes terapéuticos</span>
+                            <strong className="mt-1 block text-2xl font-extrabold text-violet-950">
+                              {tratamientos.length}
+                            </strong>
+                            <span className="text-xs font-medium text-slate-700">
+                              Tratamientos vinculados a tu ficha
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Mapa de piezas dentales bajo seguimiento */}
+                        {trackedTeethSummary.length > 0 && (
+                          <div className="mt-5">
+                            <h3 className="text-sm font-extrabold uppercase tracking-wide text-slate-800">
+                              Estado actual por pieza dental vigilada
+                            </h3>
+                            <div className="mt-2.5 grid gap-3 md:grid-cols-2">
+                              {trackedTeethSummary.map(item => {
+                                const painPercent = Math.min(100, Math.max(8, item.latest.dolor * 10))
+                                const isReviewed = item.hasProfessionalReview
+                                return (
+                                  <div
+                                    key={item.pieza}
+                                    className={`rounded-xl border p-4 ${
+                                      isReviewed
+                                        ? 'border-l-4 border-l-emerald-500 border-emerald-200 bg-emerald-50/35'
+                                        : 'border-l-4 border-l-orange-500 border-orange-200 bg-orange-50/35'
+                                    }`}
+                                  >
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                      <span className="font-extrabold text-slate-950">
+                                        Pieza #{item.pieza} · {nombrePieza(item.pieza)}
+                                      </span>
+                                      <span
+                                        style={
+                                          isReviewed
+                                            ? { backgroundColor: '#059669', color: '#ffffff' }
+                                            : { backgroundColor: '#f97316', color: '#ffffff' }
+                                        }
+                                        className="rounded-full px-2.5 py-0.5 text-xs font-bold text-white"
+                                      >
+                                        {isReviewed ? 'En control profesional' : 'En observación activa'}
+                                      </span>
+                                    </div>
+                                    <div className="mt-2.5">
+                                      <div className="flex justify-between text-xs font-semibold text-slate-700">
+                                        <span>Intensidad de molestia actual: {item.latest.dolor}/10</span>
+                                        <span>{item.totalReports} {item.totalReports === 1 ? 'registro' : 'registros'}</span>
+                                      </div>
+                                      <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                                        <div
+                                          className="h-full rounded-full"
+                                          style={{
+                                            width: `${painPercent}%`,
+                                            backgroundColor:
+                                              item.latest.dolor >= 7
+                                                ? '#dc2626'
+                                                : item.latest.dolor >= 4
+                                                  ? '#f97316'
+                                                  : '#10b981',
+                                          }}
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Línea de tiempo cronológica */}
+                        {reportsError ? (
+                          <p role="alert" className="mt-5 text-sm font-semibold text-red-700">
+                            {reportsError}
+                          </p>
+                        ) : reports.length === 0 ? (
+                          <p className="mt-5 rounded-xl bg-blue-50/90 p-4 text-sm font-medium text-slate-800">
+                            Todavía no registraste observaciones. Podés iniciar una desde{' '}
+                            <Link to="/" className="font-bold text-blue-700 underline">
+                              Inicio
+                            </Link>
+                            .
+                          </p>
+                        ) : (
+                          <div className="mt-6">
+                            <h3 className="text-sm font-extrabold uppercase tracking-wide text-slate-800">
+                              Historial cronológico de evolución
+                            </h3>
+                            <ol className="mt-3 space-y-4">
+                              {[...reports]
+                                .sort((a, b) => new Date(b.creadoEn || 0).getTime() - new Date(a.creadoEn || 0).getTime())
+                                .map(item => (
+                                  <li
+                                    key={item.id}
+                                    className={`relative rounded-xl border p-4 ${
+                                      item.estado === 'REVISADO'
+                                        ? 'border-l-4 border-l-emerald-500 border-slate-300 bg-white/90'
+                                        : 'border-l-4 border-l-orange-500 border-slate-300 bg-white/90'
+                                    }`}
+                                  >
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                      <h3 className="font-extrabold text-slate-950">
+                                        Pieza {item.pieza} · {nombrePieza(item.pieza)}
+                                      </h3>
+                                      <time className="text-xs font-semibold text-slate-600">
+                                        {item.creadoEn
+                                          ? new Date(item.creadoEn).toLocaleString('es-AR')
+                                          : 'Reporte #' + item.id}
+                                      </time>
+                                    </div>
+                                    <p className="mt-2 text-sm font-medium text-slate-800">{item.sintomas}</p>
+                                    <div className="mt-2 flex flex-wrap items-center gap-3">
+                                      <span className="text-xs font-bold text-slate-700">
+                                        Dolor informado: {item.dolor}/10
+                                      </span>
+                                      <span
+                                        style={
+                                          item.estado === 'REVISADO'
+                                            ? { backgroundColor: '#059669', color: '#ffffff' }
+                                            : { backgroundColor: '#f97316', color: '#ffffff' }
+                                        }
+                                        className="rounded-full px-2.5 py-0.5 text-xs font-bold text-white"
+                                      >
+                                        {item.estado === 'REVISADO'
+                                          ? 'Revisado por un profesional'
+                                          : 'Pendiente de revisión profesional'}
+                                      </span>
+                                    </div>
+                                    {item.revisionProfesional && (
+                                      <p className="mt-3 rounded-lg border-l-4 border-emerald-600 bg-emerald-50/90 p-3 text-sm font-medium text-emerald-950">
+                                        <span className="font-bold">Nota del equipo: </span>
+                                        {item.revisionProfesional}
+                                      </p>
+                                    )}
+                                  </li>
+                                ))}
+                            </ol>
+                          </div>
+                        )}
+                      </section>
+                    </div>
+                  }
+                />
+
+                {/* RUTA 3: MIS TURNOS (Agenda de Citas y Semáforo de Confirmación: Verde Confirmado, Naranja En Espera, Rojo Rechazado/Cancelado) */}
+                <Route
+                  path="/mis-turnos"
+                  element={
+                    <section className={cardClass}>
+                      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-300 pb-4">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wide text-blue-700">
+                            Gestión de citas y asistencia
+                          </p>
+                          <h2 className="mt-1 text-xl font-extrabold text-slate-950">Mis turnos</h2>
+                          <p className="mt-1 text-sm font-medium text-slate-700">
+                            Consultá las citas vinculadas a tu ficha identificadas por color según su estado de confirmación.
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Link
+                            to="/check-in"
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-blue-300 bg-blue-50 px-3.5 py-2 text-xs font-bold text-blue-900 hover:bg-blue-100"
+                          >
+                            <Camera size={15} /> Ir a Check-in facial
+                          </Link>
+                          <Link
+                            to="/chatbot"
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-blue-700"
+                          >
+                            <MessageCircle size={15} /> Consultar horarios por IA
+                          </Link>
+                        </div>
+                      </div>
+
+                      {/* Semáforo de Estados de Turno */}
+                      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                        <div className="flex items-center justify-between rounded-xl border-l-4 border-l-emerald-600 border border-emerald-200 bg-emerald-50/70 p-3.5">
+                          <div>
+                            <span className="flex items-center gap-1.5 text-xs font-extrabold uppercase text-emerald-800">
+                              <CheckCircle2 size={15} /> Confirmados
+                            </span>
+                            <p className="mt-0.5 text-xs font-medium text-slate-700">Horario asignado y validado</p>
+                          </div>
+                          <span
+                            style={{ backgroundColor: '#059669', color: '#ffffff' }}
+                            className="flex h-9 min-w-9 items-center justify-center rounded-full px-2.5 text-base font-extrabold text-white"
+                          >
+                            {turnoCounts.confirmed}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between rounded-xl border-l-4 border-l-orange-500 border border-orange-200 bg-orange-50/70 p-3.5">
+                          <div>
+                            <span className="flex items-center gap-1.5 text-xs font-extrabold uppercase text-orange-800">
+                              <Clock3 size={15} /> En espera / Programados
+                            </span>
+                            <p className="mt-0.5 text-xs font-medium text-slate-700">Pendientes de confirmación o atención</p>
+                          </div>
+                          <span
+                            style={{ backgroundColor: '#f97316', color: '#ffffff' }}
+                            className="flex h-9 min-w-9 items-center justify-center rounded-full px-2.5 text-base font-extrabold text-white"
+                          >
+                            {turnoCounts.pending}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between rounded-xl border-l-4 border-l-red-600 border border-red-200 bg-red-50/70 p-3.5">
+                          <div>
+                            <span className="flex items-center gap-1.5 text-xs font-extrabold uppercase text-red-800">
+                              <XCircle size={15} /> Rechazados / Cancelados
+                            </span>
+                            <p className="mt-0.5 text-xs font-medium text-slate-700">Citas sin efecto o reprogramadas</p>
+                          </div>
+                          <span
+                            style={{ backgroundColor: '#dc2626', color: '#ffffff' }}
+                            className="flex h-9 min-w-9 items-center justify-center rounded-full px-2.5 text-base font-extrabold text-white"
+                          >
+                            {turnoCounts.rejected}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Filtros rápidos de estado de turno */}
+                      {turnos.length > 0 && (
+                        <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Filtrar turnos por estado">
+                          {[
+                            { id: 'ALL' as const, label: `Todos (${turnos.length})` },
+                            { id: 'CONFIRMED' as const, label: `Confirmados (${turnoCounts.confirmed})` },
+                            { id: 'PENDING' as const, label: `En espera (${turnoCounts.pending})` },
+                            { id: 'REJECTED' as const, label: `Rechazados / Cancelados (${turnoCounts.rejected})` },
+                          ].map(tab => (
+                            <button
+                              key={tab.id}
+                              type="button"
+                              aria-pressed={turnoFilter === tab.id}
+                              onClick={() => setTurnoFilter(tab.id)}
+                              className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition ${
+                                turnoFilter === tab.id
+                                  ? 'border-blue-700 bg-blue-600 text-white'
+                                  : 'border-slate-300 bg-white text-slate-800 hover:bg-blue-50'
+                              }`}
+                            >
+                              {tab.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {turnosError ? (
+                        <p role="alert" className="mt-5 text-sm font-semibold text-red-700">
+                          {turnosError}
+                        </p>
+                      ) : turnos.length === 0 ? (
+                        <p className="mt-5 rounded-xl bg-blue-50 p-4 text-sm font-medium text-slate-800">
+                          Todavía no tenés turnos registrados.
+                        </p>
+                      ) : (
+                        <ol className="mt-5 grid gap-3.5 md:grid-cols-2">
+                          {filteredTurnos.map(item => {
+                            const statusUi = getTurnoStatusUi(item.estado)
+                            return (
+                              <li
+                                key={item.id}
+                                className={`rounded-xl border p-4 shadow-xs ${statusUi.cardAccentClass}`}
+                              >
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <p className="font-extrabold text-slate-950">
+                                    {dateLabel(item.fecha)} · {item.hora.slice(0, 5)} hs
+                                  </p>
+                                  <span
+                                    style={statusUi.badgeStyle}
+                                    className={`inline-flex items-center rounded-full px-3 py-1 text-xs ${statusUi.badgeClass}`}
+                                  >
+                                    {item.estado}
+                                  </span>
+                                </div>
+                                <p className="mt-2 text-sm font-bold text-slate-900">{item.motivo}</p>
+                                <p className="mt-0.5 text-sm font-semibold text-slate-700">
+                                  Profesional: {item.odontologoNombre}
+                                </p>
+                                <p className="mt-2.5 rounded-lg bg-white/80 px-3 py-1.5 text-xs font-medium text-slate-700">
+                                  {statusUi.statusHelper}
+                                </p>
+                              </li>
+                            )
+                          })}
+                        </ol>
+                      )}
+                    </section>
+                  }
+                />
+
+                {/* RUTA 4: MIS TRATAMIENTOS */}
+                <Route
+                  path="/mis-tratamientos"
+                  element={
+                    <section className={cardClass}>
+                      <h2 className="text-xl font-extrabold text-slate-950">Mis tratamientos</h2>
+                      <p className="mt-1 text-sm font-medium text-slate-700">
+                        Estos tratamientos fueron registrados por el equipo profesional para tu ficha.
+                      </p>
+                      {tratamientosError ? (
+                        <p role="alert" className="mt-5 text-sm font-semibold text-red-700">
+                          {tratamientosError}
+                        </p>
+                      ) : tratamientos.length === 0 ? (
+                        <p className="mt-5 rounded-xl bg-blue-50 p-4 text-sm font-medium text-slate-800">
+                          Todavía no tenés tratamientos registrados.
+                        </p>
+                      ) : (
+                        <ol className="mt-5 grid gap-3 md:grid-cols-2">
+                          {tratamientos.map(item => {
+                            const statusUi = getTurnoStatusUi(item.estado)
+                            return (
+                              <li
+                                key={item.id}
+                                className={`rounded-xl border p-4 ${statusUi.cardAccentClass}`}
+                              >
+                                <p className="font-extrabold text-slate-950">{item.descripcion}</p>
+                                <p className="mt-1 text-sm font-medium text-slate-700">{dateLabel(item.fecha)}</p>
+                                <span
+                                  style={statusUi.badgeStyle}
+                                  className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs ${statusUi.badgeClass}`}
+                                >
+                                  {item.estado}
+                                </span>
+                              </li>
+                            )
+                          })}
+                        </ol>
+                      )}
+                    </section>
+                  }
+                />
+
+                {/* RUTA 5: MIS REPORTES (Bandeja de Documentación de Síntomas, Evidencia Fotográfica y Dictamen) */}
+                <Route
+                  path="/mis-reportes"
+                  element={
+                    <section className={cardClass}>
+                      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-300 pb-4">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wide text-blue-700">
+                            Archivo de autoevaluaciones y fotos intraorales
+                          </p>
+                          <h2 className="mt-1 text-xl font-extrabold text-slate-950">Mis reportes</h2>
+                          <p className="mt-1 text-sm font-medium text-slate-700">
+                            Seleccioná cualquier reporte enviado para inspeccionar tu evidencia fotográfica y el dictamen del odontólogo.
+                          </p>
+                        </div>
+                        <Link
+                          to="/"
+                          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700"
+                        >
+                          Nuevo reporte
+                        </Link>
+                      </div>
+
+                      {reports.length > 0 && (
+                        <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Filtrar bandeja de reportes">
+                          {[
+                            { id: 'ALL' as const, label: `Todos (${reports.length})` },
+                            {
+                              id: 'REVISADO' as const,
+                              label: `Con dictamen profesional (${reports.filter(r => r.estado === 'REVISADO').length})`,
+                            },
+                            {
+                              id: 'PENDIENTE' as const,
+                              label: `Pendientes (${reports.filter(r => r.estado === 'PENDIENTE').length})`,
+                            },
+                            {
+                              id: 'WITH_PHOTO' as const,
+                              label: `Con foto (${reports.filter(r => r.fotoDisponible || r.fotoBase64).length})`,
+                            },
+                          ].map(tab => (
+                            <button
+                              key={tab.id}
+                              type="button"
+                              aria-pressed={reportFilter === tab.id}
+                              onClick={() => setReportFilter(tab.id)}
+                              className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition ${
+                                reportFilter === tab.id
+                                  ? 'border-blue-700 bg-blue-600 text-white'
+                                  : 'border-slate-300 bg-white text-slate-800 hover:bg-blue-50'
+                              }`}
+                            >
+                              {tab.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {reportsError ? (
+                        <p role="alert" className="mt-5 text-sm font-semibold text-red-700">
+                          {reportsError}
+                        </p>
+                      ) : reports.length === 0 ? (
+                        <p className="mt-5 rounded-xl bg-blue-50 p-4 text-sm font-medium text-slate-800">
+                          Todavía no enviaste reportes.
+                        </p>
+                      ) : (
+                        <ol className="mt-5 grid gap-3.5 md:grid-cols-2">
+                          {filteredReports.map(item => {
+                            const isReviewed = item.estado === 'REVISADO'
+                            return (
+                              <li key={item.id}>
+                                <button
+                                  type="button"
+                                  onClick={() => void verReporte(item.id)}
+                                  className={`w-full rounded-xl border p-4 text-left transition hover:border-blue-500 focus-visible:outline-2 focus-visible:outline-blue-600 ${
+                                    isReviewed
+                                      ? 'border-l-4 border-l-emerald-500 border-slate-300 bg-white/95'
+                                      : 'border-l-4 border-l-orange-500 border-slate-300 bg-white/95'
+                                  }`}
+                                >
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <span className="font-extrabold text-slate-950">
+                                      Pieza {item.pieza} · Reporte #{item.id}
+                                    </span>
+                                    <span
+                                      style={
+                                        item.dolor >= 7
+                                          ? { backgroundColor: '#dc2626', color: '#ffffff' }
+                                          : item.dolor >= 4
+                                            ? { backgroundColor: '#f97316', color: '#ffffff' }
+                                            : { backgroundColor: '#059669', color: '#ffffff' }
+                                      }
+                                      className="rounded-full px-2.5 py-0.5 text-xs font-bold text-white"
+                                    >
+                                      Dolor {item.dolor}/10
+                                    </span>
+                                  </div>
+                                  <p className="mt-2 text-sm font-medium text-slate-800">{item.sintomas}</p>
+                                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-2.5">
+                                    <span className="inline-flex items-center gap-1 text-xs font-bold text-blue-800">
+                                      {isReviewed ? (
+                                        <>
+                                          <CheckCircle2 size={14} className="text-emerald-600" /> Revisado por un profesional
+                                        </>
+                                      ) : (
+                                        <>
+                                          <AlertCircle size={14} className="text-orange-500" /> Pendiente de revisión profesional
+                                        </>
+                                      )}
+                                    </span>
+                                    {(item.fotoDisponible || item.fotoBase64) && (
+                                      <span className="inline-flex items-center gap-1 rounded-md bg-blue-100 px-2 py-0.5 text-[11px] font-bold text-blue-900">
+                                        <ImageIcon size={12} /> Foto adjunta
+                                      </span>
+                                    )}
+                                  </div>
+                                </button>
+                              </li>
+                            )
+                          })}
+                        </ol>
+                      )}
+
+                      {selectedReport && (
+                        <div className="mt-5 rounded-xl border-2 border-blue-300 bg-blue-50/95 p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="font-extrabold text-slate-950">
+                              Reporte #{selectedReport.id} · Pieza {selectedReport.pieza} ({nombrePieza(selectedReport.pieza)})
+                            </p>
+                            <span className="text-xs font-bold text-blue-900">
+                              Dolor {selectedReport.dolor}/10
+                            </span>
+                          </div>
+                          {selectedReport.fotoBase64 && (
+                            <img
+                              src={selectedReport.fotoBase64}
+                              alt="Foto del reporte seleccionado"
+                              className="my-3 max-h-64 rounded-lg border border-slate-300 object-contain"
+                            />
+                          )}
+                          <p className="mt-2 text-sm font-semibold text-slate-900">
+                            {selectedReport.revisionProfesional || 'Aún no hay una nota profesional.'}
+                          </p>
+                        </div>
+                      )}
+                    </section>
+                  }
+                />
+
+                {/* RUTA 6: MIS DATOS */}
+                <Route
+                  path="/mis-datos"
+                  element={
+                    <section className={cardClass}>
+                      <h2 className="text-xl font-extrabold text-slate-950">Mis datos</h2>
+                      <dl className="mt-5 grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <dt className="text-xs font-bold uppercase text-slate-600">Nombre completo</dt>
+                          <dd className="mt-1 font-bold text-slate-950">
+                            {perfil.nombre} {perfil.apellido}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-bold uppercase text-slate-600">DNI</dt>
+                          <dd className="mt-1 font-semibold text-slate-900">{perfil.dni}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-bold uppercase text-slate-600">Correo electrónico</dt>
+                          <dd className="mt-1 break-all font-semibold text-slate-900">{perfil.email}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-bold uppercase text-slate-600">Fecha de nacimiento</dt>
+                          <dd className="mt-1 font-semibold text-slate-900">
+                            {perfil.fechaNacimiento ? dateLabel(perfil.fechaNacimiento) : 'No registrada'}
+                          </dd>
+                        </div>
+                      </dl>
+                      <form
+                        onSubmit={actualizarTelefono}
+                        className="mt-6 flex flex-wrap items-end gap-3 border-t border-slate-300 pt-5"
+                      >
+                        <label className="text-sm font-semibold">
+                          Teléfono de contacto
+                          <input
+                            className={inputClass}
+                            maxLength={30}
+                            value={editTelefono}
+                            onChange={event => setEditTelefono(event.target.value)}
+                          />
+                        </label>
+                        <button type="submit" disabled={busy} className={primaryClass}>
+                          Actualizar teléfono
+                        </button>
+                      </form>
+                    </section>
+                  }
+                />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            )}
+          </div>
         </div>
       </div>
-    </div>
-    {location.pathname !== '/chatbot' && <ChatbotFloatingWidget />}
-  </main>
+      {location.pathname !== '/chatbot' && <ChatbotFloatingWidget />}
+    </main>
+  )
 }
 
-const inputClass = 'mt-1.5 block min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-600'
-const primaryClass = 'min-h-11 rounded-lg bg-blue-600 px-5 py-2 font-semibold text-white hover:bg-blue-700 disabled:opacity-60'
-const cardClass = 'rounded-2xl border border-white/70 bg-white/85 p-5 shadow-lg shadow-blue-950/5 backdrop-blur-xl'
+const inputClass =
+  'mt-1.5 block min-h-11 w-full rounded-lg border border-slate-400 bg-white px-3 py-2 text-slate-900 outline-none focus:border-blue-600'
+const primaryClass =
+  'min-h-11 rounded-lg bg-blue-600 px-5 py-2 font-bold text-white hover:bg-blue-700 disabled:opacity-60'
+const cardClass =
+  'rounded-2xl border border-slate-300 bg-white/92 p-5 shadow-lg shadow-blue-950/5 backdrop-blur-xl'

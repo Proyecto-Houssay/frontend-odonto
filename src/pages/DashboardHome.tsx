@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
-import { ArrowUpRight, CalendarDays, ClipboardCheck, ClipboardList, Stethoscope, Users } from 'lucide-react'
+import { ArrowUpRight, BarChart3, CalendarDays, Camera, ClipboardCheck, ClipboardList, MessageCircle, ScanLine, Stethoscope, UserRoundCog, Users, Video } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { UserRole } from '../auth/role'
 import { apiRequest } from '../lib/api'
-import { FaceCheckin } from '../components/FaceCheckin'
 
 type StaffRole = Exclude<UserRole, 'PACIENTE'>
 type Shortcut = { title: string; action: string; description: string; to: string; icon: typeof Users }
-type Dashboard = { eyebrow: string; title: string; description: string; shortcuts: Shortcut[]; focus: string[]; upcoming: string[] }
+type ModuleItem = { label: string; to: string; icon: typeof Users }
+type Dashboard = { eyebrow: string; title: string; description: string; shortcuts: Shortcut[]; focus: string[]; modulesByRole: ModuleItem[] }
 type Patient = { id: number; nombre: string; apellido: string; dni: string }
 type Appointment = { id: number; fecha: string; hora: string; motivo: string; estado: string; paciente?: { nombre: string; apellido: string }; odontologo?: { nombre: string; apellido: string } }
 type Dentist = { id: number; activo: boolean }
@@ -30,7 +30,14 @@ const DASHBOARDS: Record<StaffRole, Dashboard> = {
       { title: 'Seguimiento', action: 'Revisar reportes', description: 'Consultá reportes enviados por pacientes.', to: '/seguimiento', icon: ClipboardCheck },
     ],
     focus: ['Gestionar fichas de pacientes', 'Supervisar reportes y odontogramas', 'Coordinar los accesos del consultorio'],
-    upcoming: ['Gestión de usuarios', 'Informes'],
+    modulesByRole: [
+      { label: 'Gestión de usuarios', to: '/usuarios', icon: UserRoundCog },
+      { label: 'Equipo de Odontólogos', to: '/odontologos', icon: Stethoscope },
+      { label: 'Historias clínicas', to: '/historias-clinicas', icon: ClipboardList },
+      { label: 'Informes operativos', to: '/informes', icon: BarChart3 },
+      { label: 'Check-in facial', to: '/check-in', icon: Camera },
+      { label: 'Asistente de Gestión IA', to: '/chatbot', icon: MessageCircle },
+    ],
   },
   ODONTOLOGO: {
     eyebrow: 'Odontología',
@@ -43,7 +50,15 @@ const DASHBOARDS: Record<StaffRole, Dashboard> = {
       { title: 'Seguimiento', action: 'Revisar reportes', description: 'Leé las observaciones del paciente y dejá tu revisión.', to: '/seguimiento', icon: ClipboardCheck },
     ],
     focus: ['Revisar las observaciones pendientes', 'Actualizar el odontograma clínico', 'Consultar las fichas antes de la atención'],
-    upcoming: ['Historias clínicas integradas'],
+    modulesByRole: [
+      { label: 'Agenda de turnos', to: '/turnos', icon: CalendarDays },
+      { label: 'Historias clínicas', to: '/historias-clinicas', icon: ClipboardList },
+      { label: 'Odontograma clínico', to: '/odontograma', icon: ClipboardList },
+      { label: 'Seguimiento de pacientes', to: '/seguimiento', icon: ClipboardCheck },
+      { label: 'Dr. Annie (IA)', to: '/dr-annie', icon: ScanLine },
+      { label: 'Check-in facial', to: '/check-in', icon: Camera },
+      { label: 'Copiloto Clínico IA', to: '/chatbot', icon: MessageCircle },
+    ],
   },
   RECEPCIONISTA: {
     eyebrow: 'Recepción',
@@ -52,15 +67,23 @@ const DASHBOARDS: Record<StaffRole, Dashboard> = {
     shortcuts: [
       { title: 'Pacientes', action: 'Ver pacientes', description: 'Registrá y actualizá los datos de contacto.', to: '/pacientes', icon: Users },
       { title: 'Agenda de turnos', action: 'Ver agenda', description: 'Consultá y asigná turnos reales.', to: '/turnos', icon: CalendarDays },
+      { title: 'Equipo de Odontólogos', action: 'Ver profesionales', description: 'Consultá matrículas y especialidades activas.', to: '/odontologos', icon: Stethoscope },
+      { title: 'Teletriaje', action: 'Ver solicitudes', description: 'Gestioná reservas y prioridades en cola.', to: '/teletriaje', icon: Video },
     ],
     focus: ['Registrar pacientes nuevos', 'Mantener al día los datos de contacto', 'Preparar la información para el equipo clínico'],
-    upcoming: ['Confirmaciones y asistencia'],
+    modulesByRole: [
+      { label: 'Pacientes', to: '/pacientes', icon: Users },
+      { label: 'Agenda de turnos', to: '/turnos', icon: CalendarDays },
+      { label: 'Equipo de Odontólogos', to: '/odontologos', icon: Stethoscope },
+      { label: 'Teletriaje', to: '/teletriaje', icon: Video },
+      { label: 'Odontograma (lectura)', to: '/odontograma', icon: ClipboardList },
+    ],
   },
 }
 
 type CheckinPatient = { id: number; nombre?: string; apellido?: string; dni?: string; telefono?: string | null; email?: string; fechaNacimiento?: string; demo?: boolean }
 
-export function DashboardHome({ role, token = '', onVerified = () => undefined }: { role: UserRole | null; token?: string; onVerified?: (patient: CheckinPatient | null) => void }) {
+export function DashboardHome({ role, token = '' }: { role: UserRole | null; token?: string; onVerified?: (patient: CheckinPatient | null) => void }) {
   const [patients, setPatients] = useState<Patient[]>([])
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [dentists, setDentists] = useState<Dentist[]>([])
@@ -111,7 +134,6 @@ export function DashboardHome({ role, token = '', onVerified = () => undefined }
       <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-blue-950 sm:text-3xl">{dashboard.title}</h2>
       <p className="mt-1 max-w-2xl text-sm text-slate-600">{dashboard.description}</p>
     </section>
-    <FaceCheckin onVerified={onVerified} />
     {partialError ? <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">No se pudieron cargar todos los datos del panel. Algunas cifras pueden estar incompletas.</p> : null}
     <section aria-label="Resumen del consultorio" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {metrics.map(({ label, value, icon: Icon, testId }) => <div key={label} data-testid={testId} className="flex min-h-24 items-center gap-3 rounded-xl border border-white/70 bg-white/85 p-4 shadow-md shadow-blue-950/5 backdrop-blur-xl">
@@ -148,10 +170,6 @@ export function DashboardHome({ role, token = '', onVerified = () => undefined }
             <div><h4 className="mt-3 text-base font-bold text-blue-950">{title}</h4><p className="mt-1 text-xs leading-relaxed text-slate-600">{description}</p><span className="mt-2 inline-block text-sm font-semibold text-blue-700">{action} →</span></div>
           </Link>,
         )}
-        {dashboard.upcoming.length > 0 ? <div className="flex min-h-40 flex-col justify-between rounded-xl border border-white/70 bg-white/70 p-4 shadow-md shadow-blue-950/5 backdrop-blur-xl">
-          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-600"><CalendarDays aria-hidden="true" className="h-5 w-5" /></span>
-          <div><h4 className="mt-3 text-base font-bold text-blue-950">{dashboard.upcoming[0]}</h4><p className="mt-1 text-xs text-slate-600">Este módulo todavía no muestra datos operativos.</p><span className="mt-2 inline-block rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-800">Próximamente</span></div>
-        </div> : null}
       </div>
     </section>
     <div className="grid items-start gap-3 lg:grid-cols-[1.2fr_0.8fr]">
@@ -161,9 +179,9 @@ export function DashboardHome({ role, token = '', onVerified = () => undefined }
         <ul className="mt-3 grid gap-2 sm:grid-cols-2">{dashboard.focus.map(item => <li key={item} className="rounded-lg border border-blue-100 bg-blue-50/65 px-3 py-2.5 text-sm font-medium text-slate-800">{item}</li>)}</ul>
       </section>
       <section className="rounded-xl border border-white/70 bg-white/85 p-5 shadow-md shadow-blue-950/5 backdrop-blur-xl">
-        <h3 className="flex items-center gap-2 text-lg font-bold text-slate-950"><CalendarDays aria-hidden="true" className="h-5 w-5 text-blue-700" /> Próximos módulos</h3>
-        <p className="mt-1 text-sm text-slate-600">En preparación; aún no muestran datos operativos.</p>
-        <ul className="mt-3 space-y-2">{dashboard.upcoming.map(item => <li key={item} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2.5 text-sm text-slate-700"><span>{item}</span><span className="text-xs font-semibold text-slate-500">Próximamente</span></li>)}</ul>
+        <h3 className="flex items-center gap-2 text-lg font-bold text-slate-950"><CalendarDays aria-hidden="true" className="h-5 w-5 text-blue-700" /> Módulos del rol</h3>
+        <p className="mt-1 text-sm text-slate-600">Secciones operativas habilitadas para tu perfil.</p>
+        <ul className="mt-3 space-y-2">{dashboard.modulesByRole.map(({ label, to, icon: Icon }) => <li key={to}><Link to={to} className="flex items-center justify-between gap-3 rounded-lg border border-blue-100 bg-blue-50/50 px-3 py-2.5 text-sm font-semibold text-blue-950 hover:border-blue-300 hover:bg-blue-100/60 transition"><span className="flex items-center gap-2"><Icon aria-hidden="true" className="h-4 w-4 text-blue-700" />{label}</span><span className="text-xs font-bold text-blue-700">Activo →</span></Link></li>)}</ul>
       </section>
     </div>
   </div>
