@@ -280,4 +280,83 @@ describe('ChatbotPage', () => {
     expect(bookedListener).toHaveBeenCalledTimes(1)
     window.removeEventListener('novadent:turno-booked', bookedListener)
   })
+
+  it('allows going back to initial options via "Volver atrás / Ver opciones" button', async () => {
+    fetchMock.mockResolvedValue(response({ respuesta: 'Información sobre obras sociales.', intencion: 'obras_sociales' }))
+    render(<MemoryRouter><ChatbotPage /></MemoryRouter>)
+
+    expect(screen.getByRole('button', { name: '¿Qué obras sociales atienden?' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '¿Qué obras sociales atienden?' }))
+
+    expect(await screen.findByText('Información sobre obras sociales.')).toBeInTheDocument()
+    const backButton = screen.getByRole('button', { name: /Volver atrás \/ Ver opciones/i })
+    expect(backButton).toBeInTheDocument()
+
+    fireEvent.click(backButton)
+
+    expect(screen.getByRole('button', { name: '¿Qué obras sociales atienden?' })).toBeInTheDocument()
+  })
+
+  it('answers "que turnos tengo" with registered appointments even if scheduled date is prior to today', async () => {
+    fetchMock.mockResolvedValue(response([{
+      id: 55,
+      fecha: '2026-11-11',
+      hora: '11:00:00',
+      motivo: 'Teletriaje: Consulta de control y valoración de gingivitis',
+      estado: 'CONFIRMADO',
+      odontologoNombre: 'Martino Costigliolo',
+    }]))
+    render(<MemoryRouter><ChatbotPage /></MemoryRouter>)
+
+    fireEvent.change(screen.getByLabelText('Tu pregunta'), { target: { value: 'que turnos tengo' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar' }))
+
+    expect(await screen.findByText(/En tu ficha clínica registrás:/i)).toBeInTheDocument()
+    expect(screen.getByText(/11 de noviembre de 2026.*11:00/i)).toBeInTheDocument()
+    expect(screen.getByText(/Martino Costigliolo/i)).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith('/api/portal-paciente/turnos', expect.anything())
+  })
+
+  it('answers receptionist questions about obras sociales and horarios using backend RAG', async () => {
+    mockSession.current = { token: 'reception-token', role: 'RECEPCIONISTA' }
+    fetchMock.mockResolvedValue(response({
+      respuesta: 'En NovaDent atendemos con OSDE, Swiss Medical, Galeno, Medicus, IOMA, PAMI, Accord Salud y Sancor Salud. El horario de atención es de lunes a viernes de 8:00 a 20:00 hs y sábados de 9:00 a 14:00 hs.',
+      intencion: 'obras_sociales',
+      citas: [
+        { id: '1', documento: 'obras-sociales-convenios.md', version: '1.0', fragmento: 'OSDE: Todos los planes' },
+        { id: '2', documento: 'faq-clinica.md', version: '1.0', fragmento: 'Horarios: Lunes a viernes de 8:00 a 20:00 hs' },
+      ],
+      accionesSugeridas: ['/turnos', '/pacientes'],
+    }))
+
+    render(<MemoryRouter><ChatbotPage /></MemoryRouter>)
+
+    expect(screen.getByRole('button', { name: '¿Qué obras sociales y horarios están vigentes?' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '¿Qué obras sociales y horarios están vigentes?' }))
+
+    expect(await screen.findByText(/En NovaDent atendemos con OSDE, Swiss Medical/i)).toBeInTheDocument()
+    expect(screen.getByText(/obras-sociales-convenios.md · versión 1.0/i)).toBeInTheDocument()
+    expect(screen.getByText(/faq-clinica.md · versión 1.0/i)).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith('/api/chatbot/ask', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ mensaje: '¿Qué obras sociales y horarios están vigentes?' }),
+      headers: expect.objectContaining({ Authorization: 'Bearer reception-token' }),
+    }))
+  })
+
+  it('uses rich reception knowledge fallback when backend RAG is unavailable', async () => {
+    mockSession.current = { token: 'reception-token', role: 'RECEPCIONISTA' }
+    fetchMock.mockRejectedValue(new Error('Network error'))
+
+    render(<MemoryRouter><ChatbotPage /></MemoryRouter>)
+
+    fireEvent.change(screen.getByLabelText('Tu pregunta'), { target: { value: '¿Qué obras sociales y horarios están vigentes?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar' }))
+
+    expect(await screen.findByText(/Información oficial de recepción — Clínica Dental NovaDent/i)).toBeInTheDocument()
+    expect(screen.getByText(/OSDE/i)).toBeInTheDocument()
+    expect(screen.getByText(/Swiss Medical/i)).toBeInTheDocument()
+    expect(screen.getByText(/Lunes a viernes de 8:00 a 20:00 hs/i)).toBeInTheDocument()
+  })
 })

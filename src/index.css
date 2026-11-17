@@ -391,64 +391,281 @@ html {
 }
 
 /* ==========================================================================
-   MODO CLARO DE ALTO CONTRASTE Y TONO BLANCO HUESO (#FAF5E8 / #F2E9D8)
-   - Superficies cálidas en blanco hueso para evitar fatiga visual en todos los roles
-   - Bordes y divisiones bien marcados (#B8AE99 / #94A3B8)
-   - Tipografía primaria profunda (#0F172A) y secundaria nítida (#1E293B)
+   PALETA DE TEMAS CSS - NOVADENT (MODO CLARO Y MODO OSCURO)
+   ========================================================================== */
+
+/* ==========================================================================
+   MODO CLARO: Crema Hueso con Subtono Verdoso Sutil y Divisiones Marcadas
+   ========================================================================== */
+:root,
+[data-theme="light"],
+.light {
+  /* Fondos principales (con transparencia para mantener visible tu imagen de fondo) */
+  --bg-base: #E7E8E1;
+  --bg-overlay: rgba(231, 232, 225, 0.78);
+
+  /* Barra lateral (Sidebar) */
+  --sidebar-bg: #E2E3DC;
+  --sidebar-border: #C4C7BC;
+  --sidebar-item-active: #1D4ED8;
+  --sidebar-text: #474A43;
+  --sidebar-text-active: #FFFFFF;
+
+  /* Tarjetas y Contenedores */
+  --card-bg: rgba(242, 242, 235, 0.94);
+  --card-header-bg: rgba(235, 236, 228, 0.85);
+  --card-border: #BFC2B7;
+
+  /* Líneas divisoras notorias y estados Hover */
+  --divider-line: #C8CBC0;
+  --row-hover: rgba(226, 228, 219, 0.75);
+
+  /* Textos */
+  --text-primary: #1A1C18;
+  --text-secondary: #4E5249;
+  --text-muted: #6E7368;
+
+  /* Botones y Acentos (Colores originales) */
+  --btn-primary: #1D4ED8;
+  --btn-primary-hover: #1E40AF;
+  --btn-dark-mode: #D97706;
+  --btn-danger: #DC2626;
+
+  /* Etiquetas DADO y enlaces */
+  --badge-bg: rgba(37, 99, 235, 0.12);
+  --badge-border: rgba(37, 99, 235, 0.35);
+  --badge-text: #1D4ED8;
+  --link-accent: #1D4ED8;
+
+  /* Botón Copiloto Clínico (Azul original) */
+  --bot-primary: #2563EB;
+  --bot-hover: #1D4ED8;
+}
+
+/* ==========================================================================
+   MODO OSCURO: Gris Pizarra Cálido / Carbón Mate
+   ========================================================================== */
+[data-theme="dark"],
+.dark {
+  /* Fondos principales (con transparencia para la marca de agua) */
+  --bg-base: #121211;
+  --bg-overlay: rgba(18, 18, 17, 0.88);
+
+  /* Barra lateral (Sidebar) */
+  --sidebar-bg: #151413;
+  --sidebar-border: #262422;
+  --sidebar-item-active: #23211F;
+  --sidebar-text: #9E9A94;
+  --sidebar-text-active: #F5F4F0;
+
+  /* Tarjetas y Contenedores */
+  --card-bg: rgba(28, 27, 25, 0.85);
+  --card-header-bg: rgba(34, 32, 30, 0.6);
+  --card-border: #2D2B28;
+
+  /* Líneas divisoras y estados Hover */
+  --divider-line: #292724;
+  --row-hover: rgba(45, 43, 40, 0.45);
+
+  /* Textos */
+  --text-primary: #F2F0EC;
+  --text-secondary: #A39F98;
+  --text-muted: #75716B;
+
+  /* Botones y Acentos */
+  --btn-primary: #2563EB;
+  --btn-primary-hover: #1D4ED8;
+  --btn-dark-mode: #D97706;
+  --btn-danger: #DC2626;
+
+  /* Etiquetas DADO y enlaces */
+  --badge-bg: rgba(56, 114, 138, 0.22);
+  --badge-border: rgba(74, 144, 173, 0.4);
+  --badge-text: #7BC2DE;
+  --link-accent: #5FA8C4;
+
+  /* Botón Copiloto Clínico (Azul original) */
+  --bot-primary: #2563EB;
+  --bot-hover: #1D4ED8;
+}
+
+/* ==========================================================================
+   ESTILOS BASE DE COMPONENTES
+   ========================================================================== */
+/* Contenedor principal sobre la imagen de fondo */
+.app-container {
+  background-color: var(--bg-overlay);
+  color: var(--text-primary);
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* Barra lateral izquierda (Sidebar) */
+.sidebar {
+  background-color: var(--sidebar-bg);
+  border-right: 1.5px solid var(--sidebar-border);
+}
+
+.sidebar-item {
+  color: var(--sidebar-text);
+  border-radius: 8px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.sidebar-item.active {
+  background-color: var(--sidebar-item-active);
+  color: var(--sidebar-text-active);
+}
+
+/* Tarjetas de métricas y contenedores de listas */
+.card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+/* Filas de "Próximos turnos" y "Pacientes" con líneas divisoras */
+.list-row {
+  border-bottom: 1px solid var(--divider-line);
+  padding: 12px 16px;
+  transition: background-color 0.15s ease;
+}
+
+.list-row:last-child {
+  border-bottom: none;
+}
+
+.list-row:hover {
+  background-color: var(--row-hover);
+}
+
+/* Etiqueta "DADO" */
+.badge-dado {
+  background-color: var(--badge-bg);
+  border: 1px solid var(--badge-border);
+  color: var(--badge-text);
+  padding: 2px 10px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   APLICACIÓN DEL MODO CLARO (CREMA HUESO) A TODA LA INTERFAZ
    ========================================================================== */
 html:not([data-theme="dark"]),
-html[data-theme="light"] {
-  color: #0F172A;
+html[data-theme="light"],
+html.light {
+  color: var(--text-primary);
+}
+
+html:not([data-theme="dark"]) .clinic-backdrop,
+html:not([data-theme="dark"]) .patient-portal-backdrop,
+html[data-theme="light"] .clinic-backdrop,
+html[data-theme="light"] .patient-portal-backdrop,
+html.light .clinic-backdrop,
+html.light .patient-portal-backdrop {
+  background-color: var(--bg-base);
+  background-image:
+    linear-gradient(125deg, rgba(231, 232, 225, 0.88), rgba(231, 232, 225, 0.78)),
+    url('/images/novadent-consultorio.png');
+  color: var(--text-primary);
+}
+
+html:not([data-theme="dark"]) header:not(.dark-hero):not([class*="from-slate-"]),
+html[data-theme="light"] header:not(.dark-hero):not([class*="from-slate-"]),
+html.light header:not(.dark-hero):not([class*="from-slate-"]) {
+  background-color: var(--sidebar-bg) !important;
+  border-bottom: 1.5px solid var(--sidebar-border) !important;
+  color: var(--text-primary) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04) !important;
+}
+
+html:not([data-theme="dark"]) header .text-\[\#1D4ED8\],
+html[data-theme="light"] header .text-\[\#1D4ED8\],
+html.light header .text-\[\#1D4ED8\] {
+  color: var(--link-accent) !important;
+}
+
+html:not([data-theme="dark"]) header .bg-\[\#DBEAFE\]\/85,
+html[data-theme="light"] header .bg-\[\#DBEAFE\]\/85,
+html.light header .bg-\[\#DBEAFE\]\/85 {
+  background-color: var(--card-bg) !important;
+  border-color: var(--sidebar-border) !important;
 }
 
 html:not([data-theme="dark"]) aside,
-html[data-theme="light"] aside {
-  background-color: rgba(244, 237, 222, 0.96) !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  border-right: 2px solid #B8AE99 !important;
-  box-shadow: 4px 0 24px rgba(15, 23, 42, 0.08) !important;
+html[data-theme="light"] aside,
+html.light aside {
+  background-color: var(--sidebar-bg) !important;
+  border-right: 1.5px solid var(--sidebar-border) !important;
+  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.04) !important;
 }
 
-html:not([data-theme="dark"]) aside nav a.active,
-html:not([data-theme="dark"]) aside nav a[aria-current="page"],
-html[data-theme="light"] aside nav a.active,
-html[data-theme="light"] aside nav a[aria-current="page"] {
-  background-color: #1D4ED8 !important;
-  color: #FFFFFF !important;
-  border: 1.5px solid #1E40AF !important;
-  font-weight: 800 !important;
-  box-shadow: 0 2px 6px rgba(29, 78, 216, 0.25) !important;
+html:not([data-theme="dark"]) aside > div,
+html[data-theme="light"] aside > div,
+html.light aside > div {
+  border-color: var(--sidebar-border) !important;
 }
 
-html:not([data-theme="dark"]) aside nav a:not(.active):not([aria-current="page"]):hover,
-html[data-theme="light"] aside nav a:not(.active):not([aria-current="page"]):hover {
-  background-color: #DBEAFE !important;
-  color: #1E3A8A !important;
+html:not([data-theme="dark"]) aside nav p,
+html[data-theme="light"] aside nav p,
+html.light aside nav p {
+  color: var(--text-muted) !important;
 }
 
-html:not([data-theme="dark"]) header,
-html[data-theme="light"] header {
-  background-color: rgba(250, 245, 232, 0.96) !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  border-bottom: 2px solid #B8AE99 !important;
-  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08) !important;
+html:not([data-theme="dark"]) aside a,
+html[data-theme="light"] aside a,
+html.light aside a {
+  color: var(--sidebar-text) !important;
+}
+
+html:not([data-theme="dark"]) aside a:hover,
+html[data-theme="light"] aside a:hover,
+html.light aside a:hover {
+  background-color: var(--row-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+html:not([data-theme="dark"]) aside a.active,
+html:not([data-theme="dark"]) aside a[aria-current="page"],
+html[data-theme="light"] aside a.active,
+html[data-theme="light"] aside a[aria-current="page"],
+html.light aside a.active,
+html.light aside a[aria-current="page"] {
+  background-color: var(--sidebar-item-active) !important;
+  color: var(--sidebar-text-active) !important;
+  border-color: var(--btn-primary-hover) !important;
+  font-weight: 700 !important;
+}
+
+html:not([data-theme="dark"]) aside .bg-\[\#DBEAFE\]\/80,
+html[data-theme="light"] aside .bg-\[\#DBEAFE\]\/80,
+html.light aside .bg-\[\#DBEAFE\]\/80 {
+  background-color: var(--card-bg) !important;
+  border-color: var(--sidebar-border) !important;
 }
 
 html:not([data-theme="dark"]) .bg-white,
-html:not([data-theme="dark"]) [class*="bg-white/"],
+html:not([data-theme="dark"]) [class*="bg-white/"]:not(.dark-hero *):not([class*="from-slate-"] *):not(.dark-kpi),
+html:not([data-theme="dark"]) [class*="bg-[#FAF5E8]"],
 html:not([data-theme="dark"]) .odontogram-card,
 html:not([data-theme="dark"]) .patient-chart-card,
 html[data-theme="light"] .bg-white,
-html[data-theme="light"] [class*="bg-white/"],
+html[data-theme="light"] [class*="bg-white/"]:not(.dark-hero *):not([class*="from-slate-"] *):not(.dark-kpi),
+html[data-theme="light"] [class*="bg-[#FAF5E8]"],
 html[data-theme="light"] .odontogram-card,
-html[data-theme="light"] .patient-chart-card {
-  background-color: #FAF5E8 !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  border-color: #B8AE99 !important;
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08) !important;
+html[data-theme="light"] .patient-chart-card,
+html.light .bg-white,
+html.light [class*="bg-white/"]:not(.dark-hero *):not([class*="from-slate-"] *):not(.dark-kpi),
+html.light [class*="bg-[#FAF5E8]"],
+html.light .odontogram-card,
+html.light .patient-chart-card {
+  background-color: var(--card-bg) !important;
+  border-color: var(--card-border) !important;
+  backdrop-filter: blur(8px) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 
 html:not([data-theme="dark"]) .bg-slate-50,
@@ -456,157 +673,310 @@ html:not([data-theme="dark"]) [class*="bg-slate-50/"],
 html:not([data-theme="dark"]) .bg-slate-100,
 html[data-theme="light"] .bg-slate-50,
 html[data-theme="light"] [class*="bg-slate-50/"],
-html[data-theme="light"] .bg-slate-100 {
-  background-color: #F2E9D8 !important;
-  border-color: #B8AE99 !important;
+html[data-theme="light"] .bg-slate-100,
+html.light .bg-slate-50,
+html.light [class*="bg-slate-50/"],
+html.light .bg-slate-100 {
+  background-color: var(--card-header-bg) !important;
+  border-color: var(--card-border) !important;
+}
+
+html:not([data-theme="dark"]) .bg-blue-50,
+html:not([data-theme="dark"]) [class*="bg-blue-50/"],
+html:not([data-theme="dark"]) .bg-blue-100,
+html[data-theme="light"] .bg-blue-50,
+html[data-theme="light"] [class*="bg-blue-50/"],
+html[data-theme="light"] .bg-blue-100,
+html.light .bg-blue-50,
+html.light [class*="bg-blue-50/"],
+html.light .bg-blue-100 {
+  background-color: rgba(226, 234, 245, 0.7) !important;
+  border-color: var(--card-border) !important;
 }
 
 html:not([data-theme="dark"]) .border-slate-200,
 html:not([data-theme="dark"]) .border-slate-100,
 html:not([data-theme="dark"]) .border-slate-300,
+html:not([data-theme="dark"]) [class*="border-[#CBD5E1]"],
+html:not([data-theme="dark"]) [class*="border-[#B8AE99]"],
 html[data-theme="light"] .border-slate-200,
 html[data-theme="light"] .border-slate-100,
-html[data-theme="light"] .border-slate-300 {
-  border-color: #B8AE99 !important;
+html[data-theme="light"] .border-slate-300,
+html[data-theme="light"] [class*="border-[#CBD5E1]"],
+html[data-theme="light"] [class*="border-[#B8AE99]"],
+html.light .border-slate-200,
+html.light .border-slate-100,
+html.light .border-slate-300,
+html.light [class*="border-[#CBD5E1]"],
+html.light [class*="border-[#B8AE99]"] {
+  border-color: var(--divider-line) !important;
 }
 
-html:not([data-theme="dark"]) .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
-html:not([data-theme="dark"]) .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
-html[data-theme="light"] .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
-html[data-theme="light"] .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
-  border-color: #B8AE99 !important;
+html:not([data-theme="dark"]) [class*="divide-"] > :not([hidden]) ~ :not([hidden]),
+html[data-theme="light"] [class*="divide-"] > :not([hidden]) ~ :not([hidden]),
+html.light [class*="divide-"] > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--divider-line) !important;
 }
 
-/* Contraste reforzado para títulos y textos en Modo Claro (excluyendo contenedores 3D oscuros) */
-html:not([data-theme="dark"]) :is(h1, h2, h3, h4, h5, h6, .text-slate-950, .text-slate-900, .text-slate-800, .text-blue-950, .text-blue-900):not(.patient-chart-scene.is-3d *),
-html[data-theme="light"] :is(h1, h2, h3, h4, h5, h6, .text-slate-950, .text-slate-900, .text-slate-800, .text-blue-950, .text-blue-900):not(.patient-chart-scene.is-3d *) {
-  color: #0F172A !important;
+html:not([data-theme="dark"]) :is(h1, h2, h3, h4, h5, h6, .text-slate-950, .text-slate-900, .text-slate-800, .text-blue-950, .text-blue-900):not(.patient-chart-scene.is-3d *):not(.dark-hero *):not([class*="from-slate-"] *),
+html[data-theme="light"] :is(h1, h2, h3, h4, h5, h6, .text-slate-950, .text-slate-900, .text-slate-800, .text-blue-950, .text-blue-900):not(.patient-chart-scene.is-3d *):not(.dark-hero *):not([class*="from-slate-"] *),
+html.light :is(h1, h2, h3, h4, h5, h6, .text-slate-950, .text-slate-900, .text-slate-800, .text-blue-950, .text-blue-900):not(.patient-chart-scene.is-3d *):not(.dark-hero *):not([class*="from-slate-"] *) {
+  color: var(--text-primary) !important;
 }
 
-html:not([data-theme="dark"]) :is(.text-slate-700, .text-slate-600, .text-slate-500, .text-slate-400, .odontogram-page p):not(.patient-chart-scene.is-3d *),
-html[data-theme="light"] :is(.text-slate-700, .text-slate-600, .text-slate-500, .text-slate-400, .odontogram-page p):not(.patient-chart-scene.is-3d *) {
-  color: #1E293B !important;
+html:not([data-theme="dark"]) :is(.text-slate-700, .text-slate-600, .text-slate-500, .odontogram-page p):not(.patient-chart-scene.is-3d *):not(.dark-hero *):not([class*="from-slate-"] *),
+html[data-theme="light"] :is(.text-slate-700, .text-slate-600, .text-slate-500, .odontogram-page p):not(.patient-chart-scene.is-3d *):not(.dark-hero *):not([class*="from-slate-"] *),
+html.light :is(.text-slate-700, .text-slate-600, .text-slate-500, .odontogram-page p):not(.patient-chart-scene.is-3d *):not(.dark-hero *):not([class*="from-slate-"] *) {
+  color: var(--text-secondary) !important;
+}
+
+html:not([data-theme="dark"]) .text-slate-400:not(.patient-chart-scene.is-3d *):not(.dark-hero *):not([class*="from-slate-"] *),
+html[data-theme="light"] .text-slate-400:not(.patient-chart-scene.is-3d *):not(.dark-hero *):not([class*="from-slate-"] *),
+html.light .text-slate-400:not(.patient-chart-scene.is-3d *):not(.dark-hero *):not([class*="from-slate-"] *) {
+  color: var(--text-muted) !important;
+}
+
+html:not([data-theme="dark"]) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html:not([data-theme="dark"]) textarea,
+html:not([data-theme="dark"]) select,
+html[data-theme="light"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html[data-theme="light"] textarea,
+html[data-theme="light"] select,
+html.light input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html.light textarea,
+html.light select {
+  border-color: var(--card-border) !important;
+  background: #FFFFFF !important;
+  color: var(--text-primary) !important;
 }
 
 /* ==========================================================================
-   MODO OSCURO DE ALTO CONTRASTE Y LECTURA CÓMODA
-   - Superficies en azul marino profundo (#0F1D32 / #162640)
-   - Textos primarios en blanco nítido (#F8FAFC) y secundarios en plata brillante (#E2E8F0)
+   APLICACIÓN DEL MODO OSCURO CÁLIDO / CHARCOAL A TODA LA INTERFAZ
    ========================================================================== */
 html[data-theme="dark"] .clinic-backdrop,
-html[data-theme="dark"] .patient-portal-backdrop {
-  background-color: #071220;
+html[data-theme="dark"] .patient-portal-backdrop,
+html.dark .clinic-backdrop,
+html.dark .patient-portal-backdrop {
+  background-color: var(--bg-base);
   background-image:
-    linear-gradient(125deg, rgba(4, 15, 30, 0.9), rgba(7, 22, 42, 0.86)),
+    linear-gradient(125deg, rgba(18, 18, 17, 0.94), rgba(18, 18, 17, 0.90)),
     url('/images/novadent-consultorio.png');
-  color: #F8FAFC;
+  color: var(--text-primary);
 }
 
-html[data-theme="dark"] header {
-  border-color: #334155 !important;
-  background-color: rgba(15, 29, 50, 0.94) !important;
-  color: #F8FAFC;
+html[data-theme="dark"] header,
+html.dark header {
+  border-color: var(--sidebar-border) !important;
+  background-color: var(--sidebar-bg) !important;
+  color: var(--text-primary) !important;
 }
 
-html[data-theme="dark"] aside {
-  border-color: #334155 !important;
-  background-color: rgba(15, 29, 50, 0.96) !important;
-  color: #F8FAFC;
+html[data-theme="dark"] header :is(h1, h2, p, span),
+html.dark header :is(h1, h2, p, span) {
+  color: var(--text-primary);
+}
+
+html[data-theme="dark"] header .text-\[\#1D4ED8\],
+html.dark header .text-\[\#1D4ED8\] {
+  color: var(--link-accent) !important;
+}
+
+html[data-theme="dark"] header .bg-\[\#DBEAFE\]\/85,
+html.dark header .bg-\[\#DBEAFE\]\/85 {
+  background-color: var(--sidebar-item-active) !important;
+  border-color: var(--sidebar-border) !important;
+}
+
+html[data-theme="dark"] aside,
+html.dark aside {
+  border-color: var(--sidebar-border) !important;
+  background-color: var(--sidebar-bg) !important;
+  color: var(--text-primary) !important;
+}
+
+html[data-theme="dark"] aside > div,
+html.dark aside > div {
+  border-color: var(--sidebar-border) !important;
+}
+
+html[data-theme="dark"] aside nav p,
+html.dark aside nav p {
+  color: var(--text-muted) !important;
+}
+
+html[data-theme="dark"] aside a,
+html.dark aside a {
+  color: var(--sidebar-text) !important;
+}
+
+html[data-theme="dark"] aside a:hover,
+html.dark aside a:hover {
+  background-color: var(--row-hover) !important;
+  color: var(--sidebar-text-active) !important;
+}
+
+html[data-theme="dark"] aside a[aria-current="page"],
+html[data-theme="dark"] aside a.active,
+html.dark aside a[aria-current="page"],
+html.dark aside a.active {
+  background-color: var(--sidebar-item-active) !important;
+  color: var(--sidebar-text-active) !important;
+  border-color: var(--card-border) !important;
+}
+
+html[data-theme="dark"] aside .border-t,
+html.dark aside .border-t {
+  border-color: var(--sidebar-border) !important;
+}
+
+html[data-theme="dark"] aside .bg-\[\#DBEAFE\]\/80,
+html.dark aside .bg-\[\#DBEAFE\]\/80 {
+  background-color: var(--sidebar-item-active) !important;
+  border-color: var(--sidebar-border) !important;
+}
+
+html[data-theme="dark"] aside .text-\[\#1D4ED8\],
+html.dark aside .text-\[\#1D4ED8\] {
+  color: var(--link-accent) !important;
 }
 
 html[data-theme="dark"] .bg-white,
-html[data-theme="dark"] [class*="bg-white/"],
+html[data-theme="dark"] [class*="bg-white/"]:not(.dark-hero *):not([class*="from-slate-"] *):not(.dark-kpi),
 html[data-theme="dark"] [class*="bg-[#FAF5E8]"],
 html[data-theme="dark"] [class*="border-[#B8AE99]"],
-html[data-theme="dark"] .patient-chart-card {
-  border-color: #475569 !important;
-  background-color: rgba(21, 37, 62, 0.95) !important;
-  color: #F8FAFC !important;
+html[data-theme="dark"] .patient-chart-card,
+html.dark .bg-white,
+html.dark [class*="bg-white/"]:not(.dark-hero *):not([class*="from-slate-"] *):not(.dark-kpi),
+html.dark [class*="bg-[#FAF5E8]"],
+html.dark [class*="border-[#B8AE99]"],
+html.dark .patient-chart-card {
+  border-color: var(--card-border) !important;
+  background-color: var(--card-bg) !important;
+  color: var(--text-primary) !important;
+  backdrop-filter: blur(8px);
 }
 
 html[data-theme="dark"] .bg-slate-50,
 html[data-theme="dark"] [class*="bg-slate-50/"],
-html[data-theme="dark"] .bg-slate-100 {
-  border-color: #475569 !important;
-  background-color: rgba(15, 23, 42, 0.85) !important;
-  color: #F1F5F9;
+html[data-theme="dark"] .bg-slate-100,
+html.dark .bg-slate-50,
+html.dark [class*="bg-slate-50/"],
+html.dark .bg-slate-100 {
+  border-color: var(--card-border) !important;
+  background-color: var(--card-header-bg) !important;
+  color: var(--text-primary);
 }
 
 html[data-theme="dark"] .bg-blue-50,
 html[data-theme="dark"] [class*="bg-blue-50/"],
-html[data-theme="dark"] .bg-blue-100 {
-  border-color: rgba(96, 165, 250, 0.45) !important;
-  background-color: rgba(30, 58, 138, 0.42) !important;
-  color: #EFF6FF !important;
+html[data-theme="dark"] .bg-blue-100,
+html.dark .bg-blue-50,
+html.dark [class*="bg-blue-50/"],
+html.dark .bg-blue-100 {
+  border-color: var(--card-border) !important;
+  background-color: rgba(34, 32, 30, 0.75) !important;
+  color: var(--text-primary) !important;
 }
 
 html[data-theme="dark"] .bg-amber-50,
 html[data-theme="dark"] [class*="bg-amber-50/"],
 html[data-theme="dark"] .bg-orange-50,
-html[data-theme="dark"] [class*="bg-orange-50/"] {
-  border-color: rgba(251, 146, 60, 0.5) !important;
-  background-color: rgba(124, 45, 18, 0.42) !important;
+html[data-theme="dark"] [class*="bg-orange-50/"],
+html.dark .bg-amber-50,
+html.dark [class*="bg-amber-50/"],
+html.dark .bg-orange-50,
+html.dark [class*="bg-orange-50/"] {
+  border-color: rgba(251, 146, 60, 0.4) !important;
+  background-color: rgba(60, 35, 20, 0.5) !important;
   color: #FFEDD5 !important;
 }
 
-html[data-theme="dark"] :is(.text-amber-950, .text-amber-900, .text-amber-800, .text-orange-800, .text-orange-700) {
+html[data-theme="dark"] :is(.text-amber-950, .text-amber-900, .text-amber-800, .text-orange-800, .text-orange-700),
+html.dark :is(.text-amber-950, .text-amber-900, .text-amber-800, .text-orange-800, .text-orange-700) {
   color: #FED7AA !important;
 }
 
 html[data-theme="dark"] .bg-emerald-50,
 html[data-theme="dark"] [class*="bg-emerald-50/"],
 html[data-theme="dark"] .bg-green-50,
-html[data-theme="dark"] [class*="bg-green-50/"] {
-  border-color: rgba(52, 211, 153, 0.5) !important;
-  background-color: rgba(6, 78, 59, 0.42) !important;
+html[data-theme="dark"] [class*="bg-green-50/"],
+html.dark .bg-emerald-50,
+html.dark [class*="bg-emerald-50/"],
+html.dark .bg-green-50,
+html.dark [class*="bg-green-50/"] {
+  border-color: rgba(52, 211, 153, 0.4) !important;
+  background-color: rgba(20, 50, 35, 0.5) !important;
   color: #ECFDF5 !important;
 }
 
-html[data-theme="dark"] :is(.text-emerald-950, .text-emerald-900, .text-emerald-800, .text-emerald-700, .text-green-900, .text-green-800) {
+html[data-theme="dark"] :is(.text-emerald-950, .text-emerald-900, .text-emerald-800, .text-emerald-700, .text-green-900, .text-green-800),
+html.dark :is(.text-emerald-950, .text-emerald-900, .text-emerald-800, .text-emerald-700, .text-green-900, .text-green-800) {
   color: #A7F3D0 !important;
 }
 
 html[data-theme="dark"] .bg-red-50,
 html[data-theme="dark"] [class*="bg-red-50/"],
-html[data-theme="dark"] .bg-rose-50 {
-  border-color: rgba(248, 113, 113, 0.5) !important;
-  background-color: rgba(127, 29, 29, 0.42) !important;
+html[data-theme="dark"] .bg-rose-50,
+html.dark .bg-red-50,
+html.dark [class*="bg-red-50/"],
+html.dark .bg-rose-50 {
+  border-color: rgba(248, 113, 113, 0.4) !important;
+  background-color: rgba(60, 20, 20, 0.5) !important;
   color: #FEE2E2 !important;
 }
 
-html[data-theme="dark"] :is(.text-red-900, .text-red-800, .text-red-700, .text-rose-700) {
+html[data-theme="dark"] :is(.text-red-900, .text-red-800, .text-red-700, .text-rose-700),
+html.dark :is(.text-red-900, .text-red-800, .text-red-700, .text-rose-700) {
   color: #FECACA !important;
 }
 
 html[data-theme="dark"] .border-slate-200,
 html[data-theme="dark"] .border-slate-100,
 html[data-theme="dark"] .border-slate-300,
-html[data-theme="dark"] .border-slate-400 {
-  border-color: #475569 !important;
+html[data-theme="dark"] .border-slate-400,
+html[data-theme="dark"] [class*="border-[#CBD5E1]"],
+html.dark .border-slate-200,
+html.dark .border-slate-100,
+html.dark .border-slate-300,
+html.dark .border-slate-400,
+html.dark [class*="border-[#CBD5E1]"] {
+  border-color: var(--divider-line) !important;
 }
 
-html[data-theme="dark"] :is(h1, h2, h3, h4, h5, h6, .text-slate-950, .text-slate-900, .text-slate-800) {
-  color: #F8FAFC !important;
+html[data-theme="dark"] [class*="divide-"] > :not([hidden]) ~ :not([hidden]),
+html.dark [class*="divide-"] > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--divider-line) !important;
 }
 
-html[data-theme="dark"] :is(.text-slate-700, .text-slate-600, .text-slate-500, .text-slate-400) {
-  color: #E2E8F0 !important;
+html[data-theme="dark"] :is(h1, h2, h3, h4, h5, h6, .text-slate-950, .text-slate-900, .text-slate-800, .text-blue-950, .text-blue-900),
+html.dark :is(h1, h2, h3, h4, h5, h6, .text-slate-950, .text-slate-900, .text-slate-800, .text-blue-950, .text-blue-900) {
+  color: var(--text-primary) !important;
 }
 
-html[data-theme="dark"] :is(.text-blue-950, .text-blue-900) {
-  color: #EFF6FF !important;
+html[data-theme="dark"] :is(.text-slate-700, .text-slate-600, .text-slate-500),
+html.dark :is(.text-slate-700, .text-slate-600, .text-slate-500) {
+  color: var(--text-secondary) !important;
 }
 
-html[data-theme="dark"] :is(.text-blue-800, .text-blue-700, .text-blue-600) {
-  color: #93C5FD !important;
+html[data-theme="dark"] .text-slate-400,
+html.dark .text-slate-400 {
+  color: var(--text-muted) !important;
+}
+
+html[data-theme="dark"] :is(.text-blue-700, .text-blue-600, .text-blue-800),
+html.dark :is(.text-blue-700, .text-blue-600, .text-blue-800) {
+  color: var(--link-accent) !important;
 }
 
 html[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
 html[data-theme="dark"] textarea,
-html[data-theme="dark"] select {
-  border-color: #64748B !important;
-  background: #0F172A !important;
-  color: #F8FAFC !important;
+html[data-theme="dark"] select,
+html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html.dark textarea,
+html.dark select {
+  border-color: var(--card-border) !important;
+  background: #1C1B19 !important;
+  color: var(--text-primary) !important;
 }
 
 /* Protección explícita de botones y etiquetas de estado con texto blanco en ambos temas */
@@ -622,37 +992,120 @@ html[data-theme="dark"] select {
   color: #FFFFFF !important;
 }
 
-/* Modo oscuro para escena 2D del odontograma */
-html[data-theme="dark"] .patient-chart-scene.is-2d {
-  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
-  border-color: #475569;
+/* ==========================================================================
+   CABECERAS HERO / COCKPIT OSCURAS (CENTRO INTELIGENTE, DR. ANNIE)
+   Preserva alto contraste, textos blancos y efecto vidrio translúcido
+   tanto en modo claro como en modo oscuro
+   ========================================================================== */
+.dark-hero,
+[class*="from-slate-950"],
+[class*="from-slate-900"] {
+  color: #FFFFFF !important;
 }
 
-html[data-theme="dark"] .patient-chart-scene.is-2d .patient-quadrant-panel {
-  background: rgba(30, 41, 59, 0.9);
-  border-color: #475569;
+.dark-hero :is(h1, h2, h3, h4, h5, h6),
+[class*="from-slate-950"] :is(h1, h2, h3, h4, h5, h6),
+[class*="from-slate-900"] :is(h1, h2, h3, h4, h5, h6) {
+  color: #FFFFFF !important;
+}
+
+.dark-hero p,
+[class*="from-slate-950"] p,
+[class*="from-slate-900"] p {
+  color: #E2E8F0;
+}
+
+.dark-hero .text-blue-100,
+[class*="from-slate-950"] .text-blue-100,
+[class*="from-slate-900"] .text-blue-100 {
+  color: #DBEAFE !important;
+}
+
+.dark-hero .text-blue-100\/80,
+.dark-hero .text-blue-100\/90,
+[class*="from-slate-950"] .text-blue-100\/80,
+[class*="from-slate-950"] .text-blue-100\/90 {
+  color: rgba(219, 234, 254, 0.85) !important;
+}
+
+.dark-hero .dark-kpi,
+.dark-hero [class*="bg-white/"],
+[class*="from-slate-950"] .dark-kpi,
+[class*="from-slate-950"] [class*="bg-white/"],
+[class*="from-slate-900"] .dark-kpi,
+[class*="from-slate-900"] [class*="bg-white/"] {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.20) !important;
+  backdrop-filter: blur(12px) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+  color: #FFFFFF !important;
+}
+
+.dark-hero .dark-kpi span,
+.dark-hero .dark-kpi .text-xs,
+[class*="from-slate-950"] .dark-kpi span,
+[class*="from-slate-950"] .dark-kpi .text-xs {
+  color: #DBEAFE !important;
+}
+
+.dark-hero .dark-kpi p.text-3xl,
+[class*="from-slate-950"] .dark-kpi p.text-3xl {
+  color: #FFFFFF !important;
+  font-weight: 800 !important;
+}
+
+.dark-hero button,
+[class*="from-slate-950"] button,
+[class*="from-slate-900"] button {
+  background-color: rgba(255, 255, 255, 0.14) !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+  color: #FFFFFF !important;
+}
+
+.dark-hero button:hover,
+[class*="from-slate-950"] button:hover,
+[class*="from-slate-900"] button:hover {
+  background-color: rgba(255, 255, 255, 0.24) !important;
+}
+
+/* Modo oscuro para escena 2D del odontograma */
+html[data-theme="dark"] .patient-chart-scene.is-2d,
+html.dark .patient-chart-scene.is-2d {
+  background: linear-gradient(180deg, #151413 0%, #1c1b19 100%);
+  border-color: var(--card-border);
+}
+
+html[data-theme="dark"] .patient-chart-scene.is-2d .patient-quadrant-panel,
+html.dark .patient-chart-scene.is-2d .patient-quadrant-panel {
+  background: var(--card-bg);
+  border-color: var(--card-border);
 }
 
 html[data-theme="dark"] .patient-arch-heading,
-html[data-theme="dark"] .patient-quadrant-heading {
-  color: #F8FAFC !important;
+html[data-theme="dark"] .patient-quadrant-heading,
+html.dark .patient-arch-heading,
+html.dark .patient-quadrant-heading {
+  color: var(--text-primary) !important;
 }
 
-html[data-theme="dark"] .patient-chart-control {
-  border-color: #60A5FA;
-  background: #1E3A8A;
-  color: #EFF6FF;
+html[data-theme="dark"] .patient-chart-control,
+html.dark .patient-chart-control {
+  border-color: var(--card-border);
+  background: #23211F;
+  color: var(--text-primary);
 }
 
-html[data-theme="dark"] .patient-chart-control[aria-pressed="true"] {
+html[data-theme="dark"] .patient-chart-control[aria-pressed="true"],
+html.dark .patient-chart-control[aria-pressed="true"] {
   background: #2563EB;
   color: #FFFFFF !important;
 }
 
-html[data-theme="dark"] .patient-rotation-control {
-  background: #1E293B;
-  border-color: #475569;
-  color: #F8FAFC;
+html[data-theme="dark"] .patient-rotation-control,
+html.dark .patient-rotation-control {
+  background: #23211F;
+  border-color: var(--card-border);
+  color: var(--text-primary);
 }
 
 @media (prefers-reduced-motion: reduce) {

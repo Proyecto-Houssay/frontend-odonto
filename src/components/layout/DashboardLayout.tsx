@@ -10,7 +10,7 @@ export const DashboardLayout: React.FC = () => {
   const isChatbotRoute = location.pathname.startsWith('/chatbot')
 
   return (
-    <div className="clinic-backdrop flex min-h-screen relative">
+    <div className="clinic-backdrop app-container flex min-h-screen relative">
       {/* Barra lateral de navegación */}
       <Sidebar
         isOpen={isSidebarOpen}

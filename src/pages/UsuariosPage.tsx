@@ -45,6 +45,7 @@ type UsuarioFormState = {
   apellido: string
   email: string
   password: string
+  confirmPassword: string
   rol: SystemRole
   activo: boolean
   telefono: string
@@ -56,6 +57,7 @@ const EMPTY_FORM: UsuarioFormState = {
   apellido: '',
   email: '',
   password: '',
+  confirmPassword: '',
   rol: 'ODONTOLOGO',
   activo: true,
   telefono: '',
@@ -231,6 +233,7 @@ export const UsuariosPage: React.FC = () => {
       apellido: user.apellido,
       email: user.email,
       password: '',
+      confirmPassword: '',
       rol: ['ADMINISTRADOR', 'ODONTOLOGO', 'RECEPCIONISTA', 'PACIENTE'].includes(normalizedRole)
         ? normalizedRole
         : 'ODONTOLOGO',
@@ -255,6 +258,9 @@ export const UsuariosPage: React.FC = () => {
 
     try {
       if (editingId === null) {
+        if (form.password !== form.confirmPassword) {
+          throw new Error('Las contraseñas no coinciden.')
+        }
         const body = {
           username: form.username.trim(),
           nombre: form.nombre.trim(),
@@ -611,21 +617,38 @@ export const UsuariosPage: React.FC = () => {
             </div>
 
             {editingId === null && (
-              <div>
-                <label htmlFor="user-password" className="block text-xs font-bold text-slate-700 mb-1">
-                  Contraseña inicial
-                </label>
-                <input
-                  id="user-password"
-                  type="password"
-                  required
-                  minLength={6}
-                  value={form.password}
-                  onChange={e => setForm({ ...form, password: e.target.value })}
-                  placeholder="Mínimo 6 caracteres"
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-purple-600 focus:outline-none"
-                />
-              </div>
+              <>
+                <div>
+                  <label htmlFor="user-password" className="block text-xs font-bold text-slate-700 mb-1">
+                    Contraseña inicial
+                  </label>
+                  <input
+                    id="user-password"
+                    type="password"
+                    required
+                    minLength={6}
+                    value={form.password}
+                    onChange={e => setForm({ ...form, password: e.target.value })}
+                    placeholder="Mínimo 6 caracteres"
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-purple-600 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="user-confirm-password" className="block text-xs font-bold text-slate-700 mb-1">
+                    Confirmar contraseña
+                  </label>
+                  <input
+                    id="user-confirm-password"
+                    type="password"
+                    required
+                    minLength={6}
+                    value={form.confirmPassword}
+                    onChange={e => setForm({ ...form, confirmPassword: e.target.value })}
+                    placeholder="Repetir contraseña inicial"
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-purple-600 focus:outline-none"
+                  />
+                </div>
+              </>
             )}
 
             <div className="flex items-center gap-2 pt-5">

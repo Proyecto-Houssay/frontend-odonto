@@ -91,6 +91,7 @@ describe('UsuariosPage', () => {
     fireEvent.change(screen.getByLabelText('Correo electrónico'), { target: { value: 'lmendez@novadent.com' } })
     fireEvent.change(screen.getByLabelText('Rol del sistema'), { target: { value: 'ODONTOLOGO' } })
     fireEvent.change(screen.getByLabelText('Contraseña inicial'), { target: { value: 'clave123' } })
+    fireEvent.change(screen.getByLabelText('Confirmar contraseña'), { target: { value: 'clave123' } })
     fireEvent.click(screen.getByRole('button', { name: 'Crear usuario' }))
 
     await waitFor(() =>
@@ -115,5 +116,26 @@ describe('UsuariosPage', () => {
       )
     )
     expect(await screen.findByText(/Ficha clínica vinculada correctamente/i)).not.toBeNull()
+  })
+
+  it('validates that initial password and confirmation match when creating a user', async () => {
+    fetchMock.mockResolvedValue(jsonResponse([]))
+    render(
+      <MemoryRouter>
+        <UsuariosPage />
+      </MemoryRouter>
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: /\+ Nuevo Usuario/i }))
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Lucas' } })
+    fireEvent.change(screen.getByLabelText('Apellido'), { target: { value: 'Méndez' } })
+    fireEvent.change(screen.getByLabelText('Nombre de usuario'), { target: { value: 'lmendez' } })
+    fireEvent.change(screen.getByLabelText('Correo electrónico'), { target: { value: 'lmendez@novadent.com' } })
+    fireEvent.change(screen.getByLabelText('Contraseña inicial'), { target: { value: 'clave123' } })
+    fireEvent.change(screen.getByLabelText('Confirmar contraseña'), { target: { value: 'otraClave' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Crear usuario' }))
+
+    expect(await screen.findByText('Las contraseñas no coinciden.')).not.toBeNull()
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/usuarios', expect.objectContaining({ method: 'POST' }))
   })
 })

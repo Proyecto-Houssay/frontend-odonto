@@ -169,14 +169,14 @@ export function CentroInteligentePage({ token: propToken }: { token?: string } =
   ]
 
   return <main className={`mx-auto max-w-7xl space-y-6 p-4 md:p-8 ${largeText ? 'text-lg' : ''} ${highContrast ? 'contrast-125' : ''}`}>
-    <header className="overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-blue-950 to-cyan-900 p-6 text-white shadow-xl md:p-8">
+    <section className="dark-hero overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-blue-950 to-cyan-900 p-6 text-white shadow-xl md:p-8">
       <div className="flex flex-wrap items-start justify-between gap-5">
         <div className="max-w-3xl">
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold"><Sparkles size={14}/> NOVADENT · CUIDADO CONECTADO</div>
-          <h1 className="text-3xl font-bold tracking-tight md:text-4xl">Centro de atención inteligente</h1>
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white"><Sparkles size={14}/> NOVADENT · CUIDADO CONECTADO</div>
+          <h1 className="text-3xl font-bold tracking-tight text-white md:text-4xl">Centro de atención inteligente</h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-blue-100 md:text-base">Un recorrido coordinado desde la primera señal hasta el seguimiento, con el equipo clínico tomando las decisiones.</p>
         </div>
-        <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold hover:bg-white/20 disabled:opacity-60"><RefreshCw size={16} className={loading ? 'animate-spin' : ''}/> Actualizar</button>
+        <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/20 disabled:opacity-60"><RefreshCw size={16} className={loading ? 'animate-spin' : ''}/> Actualizar</button>
       </div>
       <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi label="Próximas atenciones" value={String(upcoming.length)} hint="Turnos y teleconsultas" icon={<CalendarClock/>}/>
@@ -184,7 +184,7 @@ export function CentroInteligentePage({ token: propToken }: { token?: string } =
         <Kpi label="Señales para revisión humana" value={String(alertCount)} hint="Prioridad sugerida; validar" icon={<AlertTriangle/>}/>
         <Kpi label="Profesionales activos" value={String(dentists.filter((item) => item.activo !== false).length)} hint="Disponibilidad consultable" icon={<Stethoscope/>}/>
       </div>
-    </header>
+    </section>
 
     <nav aria-label="Herramientas de atención" className="flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
       {tabs.map(({ id, label, icon: Icon }) => <button key={id} type="button" onClick={() => setTab(id)} aria-current={tab === id ? 'page' : undefined} className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${tab === id ? 'bg-blue-700 text-white shadow' : 'text-slate-600 hover:bg-slate-100'}`}><Icon size={16}/>{label}</button>)}
@@ -221,7 +221,16 @@ export function CentroInteligentePage({ token: propToken }: { token?: string } =
 }
 
 function Kpi({ label, value, hint, icon }: { label: string; value: string; hint: string; icon: React.ReactNode }) {
-  return <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm"><div className="flex items-center justify-between text-blue-100"><span className="text-xs font-semibold">{label}</span><span>{icon}</span></div><p className="mt-2 text-3xl font-bold">{value}</p><p className="mt-1 text-xs text-blue-100/80">{hint}</p></div>
+  return (
+    <div className="dark-kpi rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-sm text-white shadow-xs">
+      <div className="flex items-center justify-between text-blue-100">
+        <span className="text-xs font-semibold text-blue-100">{label}</span>
+        <span className="text-blue-100">{icon}</span>
+      </div>
+      <p className="mt-2 text-3xl font-bold text-white">{value}</p>
+      <p className="mt-1 text-xs text-blue-100/90">{hint}</p>
+    </div>
+  )
 }
 function Empty({ children }: { children: React.ReactNode }) {
   return <div className="rounded-xl border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">{children}</div>

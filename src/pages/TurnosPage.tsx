@@ -196,6 +196,7 @@ export function TurnosPage({ token }: { token?: string } = {}) {
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week')
   const [selectedDay, setSelectedDay] = useState(dateKey(new Date()))
   const [dentistFilter, setDentistFilter] = useState('all')
+  const [scheduleFilter, setScheduleFilter] = useState<'all' | 'assigned' | 'free'>('all')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [chatOpen, setChatOpen] = useState(!isDentist)
@@ -272,6 +273,38 @@ export function TurnosPage({ token }: { token?: string } = {}) {
   const visibleAppointments = useMemo(() => appointments.filter((appointment) =>
     appointment.fecha === selectedDay,
   ).sort((a, b) => a.hora.localeCompare(b.hora)), [appointments, selectedDay, dentistFilter])
+
+  useEffect(() => {
+    if (isDentist && dentists.length > 0 && dentistFilter === 'all') {
+      const me = dentists.find(d =>
+        auth?.session?.username && (
+          (d.apellido && auth.session.username.toLowerCase().includes(d.apellido.toLowerCase())) ||
+          (d.nombre && auth.session.username.toLowerCase().includes(d.nombre.toLowerCase()))
+        )
+      )
+      if (me) setDentistFilter(String(me.id))
+    }
+  }, [isDentist, dentists, auth?.session?.username, dentistFilter])
+
+  const dayOfWeek = new Date(`${selectedDay}T12:00:00`).getDay()
+  const dayClinicHours = useMemo(() => {
+    if (dayOfWeek === 0) return []
+    const start = dayOfWeek === 6 ? 9 : 8
+    const end = dayOfWeek === 6 ? 14 : 20
+    const list: string[] = []
+    for (let h = start; h < end; h++) {
+      list.push(`${String(h).padStart(2, '0')}:00`)
+      list.push(`${String(h).padStart(2, '0')}:30`)
+    }
+    return list
+  }, [selectedDay, dayOfWeek])
+
+  const slotsWithStatus = useMemo(() => {
+    return dayClinicHours.map(slot => {
+      const app = visibleAppointments.find(a => a.hora.startsWith(slot))
+      return { slot, appointment: app, isDado: Boolean(app) }
+    })
+  }, [dayClinicHours, visibleAppointments])
   const upcomingCount = appointments.filter((appointment) => appointment.fecha >= dateKey(new Date()) && !(appointment.estado || '').toLowerCase().includes('cancel')).length
   const telemedicineCount = appointments.filter((appointment) => appointment.telemedicina).length
   const dayLabel = formatDate(new Date(`${selectedDay}T12:00:00`), { weekday: 'long', day: 'numeric', month: 'long' })
@@ -823,133 +856,384 @@ export function TurnosPage({ token }: { token?: string } = {}) {
               </div>
             ) : (
               <div className="space-y-3">
-                {visibleAppointments.length ? (
-                  visibleAppointments.map((appointment) => (
-                    <article
-                      key={appointment.id}
-                      className={`group flex flex-col gap-3 rounded-xl border-2 p-4 shadow-xs transition sm:flex-row sm:items-center sm:justify-between ${appointmentCardAccent(
-                        appointment.estado
-                      )}`}
-                    >
-                      <div className="flex gap-3 sm:gap-4">
-                        <div className="w-16 shrink-0 border-r-2 border-[#B8AE99] pr-3 pt-0.5 text-right">
-                          <span className="text-base font-extrabold text-slate-950">{appointment.hora.slice(0, 5)}</span>
-                          <span className="mt-0.5 block text-xs font-bold text-slate-700">30 min</span>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="truncate text-base font-extrabold text-slate-950">
-                              {appointment.paciente
-                                ? `${appointment.paciente.nombre} ${appointment.paciente.apellido}`.trim()
-                                : 'Paciente'}
-                            </p>
-                            <span className={`rounded-full border px-3 py-0.5 text-xs ${stateColor(appointment.estado)}`}>
-                              {appointment.estado || 'CONFIRMADO'}
-                            </span>
-                            {appointment.telemedicina && (
-                              <span className="inline-flex items-center gap-1 rounded-full border border-violet-400 bg-violet-100 px-2.5 py-0.5 text-xs font-extrabold text-violet-900">
-                                <Video size={12} /> Teleconsulta
-                              </span>
-                            )}
-                          </div>
-                          <p className="mt-1 text-sm font-bold text-slate-800">
-                            {appointment.motivo || 'Consulta odontológica'} ·{' '}
-                            {appointment.odontologo
-                              ? `Dr. ${appointment.odontologo.nombre} ${appointment.odontologo.apellido}`.trim()
-                              : 'Profesional asignado'}
-                          </p>
-                          {appointment.telemedicina && (
-                            <p className="mt-1 text-xs font-semibold text-slate-700">
-                              {appointment.consentimientoInformado
-                                ? 'Consentimiento registrado · '
-                                : 'Consentimiento pendiente · '}
-                              Sala:{' '}
-                              {appointment.estadoSala === 'DISPONIBLE'
-                                ? 'Enlace listo'
-                                : appointment.estadoSala === 'EXPIRADA'
-                                  ? 'Enlace expirado'
-                                  : appointment.estadoSala === 'REVOCADA'
-                                    ? 'Enlace revocado'
-                                    : 'Pendiente de proveedor de videollamada'}
-                            </p>
-                          )}
-                          <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => addReminder(appointment)}
-                              className="inline-flex items-center gap-1 rounded-lg border border-slate-400 bg-white px-2.5 py-1 text-xs font-bold text-slate-900 hover:bg-slate-100"
-                            >
-                              <BellPlus size={13} /> Agregar recordatorio
-                            </button>
-                            {appointment.telemedicina && appointment.enlaceFuncional && appointment.enlaceVideo && (
-                              <a
-                                href={appointment.enlaceVideo}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 rounded-lg bg-violet-700 px-2.5 py-1 text-xs font-bold text-white hover:bg-violet-800"
-                              >
-                                <ExternalLink size={13} /> Entrar a videollamada
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Botonera rápida de estado para el Odontólogo / Recepción / Admin */}
-                      <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-300 pt-2.5 sm:border-t-0 sm:pt-0">
-                        <button
-                          type="button"
-                          onClick={() => void updateAppointmentStatus(appointment, 'CONFIRMADO')}
-                          style={{ backgroundColor: '#059669', color: '#ffffff' }}
-                          className="rounded-lg border border-emerald-700 bg-emerald-600 px-2.5 py-1.5 text-xs font-extrabold text-white shadow-xs hover:bg-emerald-700"
-                        >
-                          ✓ Confirmar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void updateAppointmentStatus(appointment, 'EN_ESPERA')}
-                          style={{ backgroundColor: '#f97316', color: '#ffffff' }}
-                          className="rounded-lg border border-orange-600 bg-orange-500 px-2.5 py-1.5 text-xs font-extrabold text-white shadow-xs hover:bg-orange-600"
-                        >
-                          ⏳ En espera
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void updateAppointmentStatus(appointment, 'RECHAZADO')}
-                          style={{ backgroundColor: '#dc2626', color: '#ffffff' }}
-                          className="rounded-lg border border-red-700 bg-red-600 px-2.5 py-1.5 text-xs font-extrabold text-white shadow-xs hover:bg-red-700"
-                        >
-                          ✕ Rechazar
-                        </button>
-                        <span className="ml-1 hidden text-xs font-extrabold text-slate-700 sm:inline">
-                          #{appointment.id}
-                        </span>
-                      </div>
-                    </article>
-                  ))
-                ) : (
-                  <div className="rounded-xl border-2 border-dashed border-[#B8AE99] bg-[#F2E9D8]/70 px-4 py-10 text-center">
-                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-[#B8AE99] bg-[#FAF5E8] text-teal-800">
-                      <CalendarDays size={22} />
-                    </div>
-                    <h4 className="mt-3 text-base font-extrabold text-slate-950">Agenda libre para este día</h4>
-                    <p className="mx-auto mt-1 max-w-md text-sm font-medium leading-6 text-slate-800">
-                      {isDentist
-                        ? 'No tenés turnos asignados para este día.'
-                        : 'Pedile al asistente que busque alternativas o iniciá una solicitud de teleconsulta.'}
-                    </p>
-                    {!isDentist && (
+                {slotsWithStatus.length > 0 && (
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-[#C8BCA6] pb-3">
+                    <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filtro de horarios del día">
                       <button
-                        onClick={() => {
-                          setChatOpen(true)
-                          setTimeout(() => void submitQuestion('Buscame horarios disponibles para una teleconsulta'), 0)
-                        }}
-                        className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-teal-700 px-3.5 py-2 text-xs font-extrabold text-white hover:bg-teal-800"
+                        type="button"
+                        onClick={() => setScheduleFilter('all')}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-extrabold transition ${
+                          scheduleFilter === 'all'
+                            ? 'bg-teal-800 text-white shadow-xs'
+                            : 'bg-white border border-[#B8AE99] text-slate-800 hover:bg-teal-50'
+                        }`}
                       >
-                        <Sparkles size={14} /> Buscar con el asistente
+                        Todos los horarios ({slotsWithStatus.length})
                       </button>
-                    )}
+                      <button
+                        type="button"
+                        onClick={() => setScheduleFilter('assigned')}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-extrabold transition ${
+                          scheduleFilter === 'assigned'
+                            ? 'bg-blue-700 text-white shadow-xs'
+                            : 'bg-white border border-[#B8AE99] text-slate-800 hover:bg-blue-50'
+                        }`}
+                      >
+                        Turnos dados ({visibleAppointments.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setScheduleFilter('free')}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-extrabold transition ${
+                          scheduleFilter === 'free'
+                            ? 'bg-emerald-700 text-white shadow-xs'
+                            : 'bg-white border border-[#B8AE99] text-slate-800 hover:bg-emerald-50'
+                        }`}
+                      >
+                        Horarios disponibles ({slotsWithStatus.filter(s => !s.isDado).length})
+                      </button>
+                    </div>
+                    <span className="text-xs font-bold text-slate-700">
+                      🟢 {slotsWithStatus.filter(s => !s.isDado).length} libres · 🔵 {visibleAppointments.length} dados
+                    </span>
                   </div>
+                )}
+
+                {scheduleFilter === 'assigned' ? (
+                  visibleAppointments.length ? (
+                    visibleAppointments.map((appointment) => (
+                      <article
+                        key={appointment.id}
+                        className={`group flex flex-col gap-3 rounded-xl border-2 p-4 shadow-xs transition sm:flex-row sm:items-center sm:justify-between ${appointmentCardAccent(
+                          appointment.estado
+                        )}`}
+                      >
+                        <div className="flex gap-3 sm:gap-4">
+                          <div className="w-16 shrink-0 border-r-2 border-[#B8AE99] pr-3 pt-0.5 text-right">
+                            <span className="text-base font-extrabold text-slate-950">{appointment.hora.slice(0, 5)}</span>
+                            <span className="mt-0.5 block text-xs font-bold text-slate-700">30 min</span>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-md bg-blue-100 border border-blue-300 px-2 py-0.5 text-[11px] font-black text-blue-900 tracking-wider">
+                                TURNO DADO
+                              </span>
+                              <p className="truncate text-base font-extrabold text-slate-950">
+                                {appointment.paciente
+                                  ? `${appointment.paciente.nombre} ${appointment.paciente.apellido}`.trim()
+                                  : 'Paciente'}
+                              </p>
+                              <span className={`rounded-full border px-3 py-0.5 text-xs ${stateColor(appointment.estado)}`}>
+                                {appointment.estado || 'CONFIRMADO'}
+                              </span>
+                              {appointment.telemedicina && (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-violet-400 bg-violet-100 px-2.5 py-0.5 text-xs font-extrabold text-violet-900">
+                                  <Video size={12} /> Teleconsulta
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-1 text-sm font-bold text-slate-800">
+                              {appointment.motivo || 'Consulta odontológica'} ·{' '}
+                              {appointment.odontologo
+                               ? `Dr. ${appointment.odontologo.nombre} ${appointment.odontologo.apellido}`.trim()
+                                : 'Profesional asignado'}
+                            </p>
+                            {appointment.telemedicina && (
+                              <p className="mt-1 text-xs font-semibold text-slate-700">
+                                {appointment.consentimientoInformado
+                                  ? 'Consentimiento registrado · '
+                                  : 'Consentimiento pendiente · '}
+                                Sala:{' '}
+                                {appointment.estadoSala === 'DISPONIBLE'
+                                  ? 'Enlace listo'
+                                  : appointment.estadoSala === 'EXPIRADA'
+                                    ? 'Enlace expirado'
+                                    : appointment.estadoSala === 'REVOCADA'
+                                      ? 'Enlace revocado'
+                                      : 'Pendiente de proveedor de videollamada'}
+                              </p>
+                            )}
+                            <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => addReminder(appointment)}
+                                className="inline-flex items-center gap-1 rounded-lg border border-slate-400 bg-white px-2.5 py-1 text-xs font-bold text-slate-900 hover:bg-slate-100"
+                              >
+                                <BellPlus size={13} /> Agregar recordatorio
+                              </button>
+                              {appointment.telemedicina && appointment.enlaceFuncional && appointment.enlaceVideo && (
+                                <a
+                                  href={appointment.enlaceVideo}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 rounded-lg bg-violet-700 px-2.5 py-1 text-xs font-bold text-white hover:bg-violet-800"
+                                >
+                                  <ExternalLink size={13} /> Entrar a videollamada
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-300 pt-2.5 sm:border-t-0 sm:pt-0">
+                          <button
+                            type="button"
+                            onClick={() => void updateAppointmentStatus(appointment, 'CONFIRMADO')}
+                            style={{ backgroundColor: '#059669', color: '#ffffff' }}
+                            className="rounded-lg border border-emerald-700 bg-emerald-600 px-2.5 py-1.5 text-xs font-extrabold text-white shadow-xs hover:bg-emerald-700"
+                          >
+                            ✓ Confirmar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void updateAppointmentStatus(appointment, 'EN_ESPERA')}
+                            style={{ backgroundColor: '#f97316', color: '#ffffff' }}
+                            className="rounded-lg border border-orange-600 bg-orange-500 px-2.5 py-1.5 text-xs font-extrabold text-white shadow-xs hover:bg-orange-600"
+                          >
+                            ⏳ En espera
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void updateAppointmentStatus(appointment, 'RECHAZADO')}
+                            style={{ backgroundColor: '#dc2626', color: '#ffffff' }}
+                            className="rounded-lg border border-red-700 bg-red-600 px-2.5 py-1.5 text-xs font-extrabold text-white shadow-xs hover:bg-red-700"
+                          >
+                            ✕ Rechazar
+                          </button>
+                          <span className="ml-1 hidden text-xs font-extrabold text-slate-700 sm:inline">
+                            #{appointment.id}
+                          </span>
+                        </div>
+                      </article>
+                    ))
+                  ) : (
+                    <div className="rounded-xl border-2 border-dashed border-[#B8AE99] bg-[#F2E9D8]/70 px-4 py-10 text-center">
+                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-[#B8AE99] bg-[#FAF5E8] text-teal-800">
+                        <CalendarDays size={22} />
+                      </div>
+                      <h4 className="mt-3 text-base font-extrabold text-slate-950">No hay turnos dados para este día</h4>
+                      <p className="mx-auto mt-1 max-w-md text-sm font-medium leading-6 text-slate-800">
+                        Podés consultar los horarios disponibles o registrar un nuevo turno presencial.
+                      </p>
+                    </div>
+                  )
+                ) : scheduleFilter === 'free' ? (
+                  slotsWithStatus.filter(s => !s.isDado).length ? (
+                    slotsWithStatus.filter(s => !s.isDado).map(({ slot }) => (
+                      <div key={slot} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border-2 border-dashed border-teal-600 bg-teal-50/50 p-4 transition hover:bg-teal-50">
+                        <div className="flex items-center gap-3 sm:gap-4">
+                          <div className="w-16 shrink-0 border-r-2 border-teal-300 pr-3 text-right">
+                            <span className="text-base font-extrabold text-teal-950">{slot}</span>
+                            <span className="mt-0.5 block text-xs font-bold text-teal-700">30 min</span>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="rounded-md bg-emerald-600 px-2.5 py-0.5 text-xs font-extrabold text-white">
+                                DISPONIBLE
+                              </span>
+                              <span className="text-sm font-extrabold text-teal-950">
+                                Horario libre para atención
+                              </span>
+                            </div>
+                            <p className="mt-0.5 text-xs font-medium text-slate-600">
+                              {dentistFilter !== 'all'
+                                ? `Dra./Dr. ${dentists.find((d) => String(d.id) === dentistFilter)?.apellido || 'Odontólogo'}`
+                                : 'Sin turno asignado en esta franja horaria'}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAppointmentForm((prev) => ({
+                              ...prev,
+                              fecha: selectedDay,
+                              hora: `${slot}:00`,
+                              odontologoId: dentistFilter !== 'all' ? dentistFilter : (dentists[0] ? String(dentists[0].id) : '')
+                            }))
+                            setShowAppointmentForm(true)
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg border-2 border-teal-700 bg-white px-3 py-1.5 text-xs font-extrabold text-teal-900 shadow-xs hover:bg-teal-100"
+                        >
+                          + Asignar turno
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-xl border-2 border-dashed border-[#B8AE99] bg-[#F2E9D8]/70 px-4 py-10 text-center">
+                      <p className="font-extrabold text-slate-900">Todos los horarios de este día están ocupados.</p>
+                    </div>
+                  )
+                ) : (
+                  slotsWithStatus.length ? (
+                    slotsWithStatus.map(({ slot, appointment, isDado }) => isDado && appointment ? (
+                      <article
+                        key={appointment.id}
+                        className={`group flex flex-col gap-3 rounded-xl border-2 p-4 shadow-xs transition sm:flex-row sm:items-center sm:justify-between ${appointmentCardAccent(
+                          appointment.estado
+                        )}`}
+                      >
+                        <div className="flex gap-3 sm:gap-4">
+                          <div className="w-16 shrink-0 border-r-2 border-[#B8AE99] pr-3 pt-0.5 text-right">
+                            <span className="text-base font-extrabold text-slate-950">{appointment.hora.slice(0, 5)}</span>
+                            <span className="mt-0.5 block text-xs font-bold text-slate-700">30 min</span>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-md bg-blue-100 border border-blue-300 px-2 py-0.5 text-[11px] font-black text-blue-900 tracking-wider">
+                                TURNO DADO
+                              </span>
+                              <p className="truncate text-base font-extrabold text-slate-950">
+                                {appointment.paciente
+                                  ? `${appointment.paciente.nombre} ${appointment.paciente.apellido}`.trim()
+                                  : 'Paciente'}
+                              </p>
+                              <span className={`rounded-full border px-3 py-0.5 text-xs ${stateColor(appointment.estado)}`}>
+                                {appointment.estado || 'CONFIRMADO'}
+                              </span>
+                              {appointment.telemedicina && (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-violet-400 bg-violet-100 px-2.5 py-0.5 text-xs font-extrabold text-violet-900">
+                                  <Video size={12} /> Teleconsulta
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-1 text-sm font-bold text-slate-800">
+                              {appointment.motivo || 'Consulta odontológica'} ·{' '}
+                              {appointment.odontologo
+                                ? `Dr. ${appointment.odontologo.nombre} ${appointment.odontologo.apellido}`.trim()
+                                : 'Profesional asignado'}
+                            </p>
+                            {appointment.telemedicina && (
+                              <p className="mt-1 text-xs font-semibold text-slate-700">
+                                {appointment.consentimientoInformado
+                                  ? 'Consentimiento registrado · '
+                                  : 'Consentimiento pendiente · '}
+                                Sala:{' '}
+                                {appointment.estadoSala === 'DISPONIBLE'
+                                  ? 'Enlace listo'
+                                  : appointment.estadoSala === 'EXPIRADA'
+                                    ? 'Enlace expirado'
+                                    : appointment.estadoSala === 'REVOCADA'
+                                      ? 'Enlace revocado'
+                                      : 'Pendiente de proveedor de videollamada'}
+                              </p>
+                            )}
+                            <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => addReminder(appointment)}
+                                className="inline-flex items-center gap-1 rounded-lg border border-slate-400 bg-white px-2.5 py-1 text-xs font-bold text-slate-900 hover:bg-slate-100"
+                              >
+                                <BellPlus size={13} /> Agregar recordatorio
+                              </button>
+                              {appointment.telemedicina && appointment.enlaceFuncional && appointment.enlaceVideo && (
+                                <a
+                                  href={appointment.enlaceVideo}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 rounded-lg bg-violet-700 px-2.5 py-1 text-xs font-bold text-white hover:bg-violet-800"
+                                >
+                                  <ExternalLink size={13} /> Entrar a videollamada
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-300 pt-2.5 sm:border-t-0 sm:pt-0">
+                          <button
+                            type="button"
+                            onClick={() => void updateAppointmentStatus(appointment, 'CONFIRMADO')}
+                            style={{ backgroundColor: '#059669', color: '#ffffff' }}
+                            className="rounded-lg border border-emerald-700 bg-emerald-600 px-2.5 py-1.5 text-xs font-extrabold text-white shadow-xs hover:bg-emerald-700"
+                          >
+                            ✓ Confirmar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void updateAppointmentStatus(appointment, 'EN_ESPERA')}
+                            style={{ backgroundColor: '#f97316', color: '#ffffff' }}
+                            className="rounded-lg border border-orange-600 bg-orange-500 px-2.5 py-1.5 text-xs font-extrabold text-white shadow-xs hover:bg-orange-600"
+                          >
+                            ⏳ En espera
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void updateAppointmentStatus(appointment, 'RECHAZADO')}
+                            style={{ backgroundColor: '#dc2626', color: '#ffffff' }}
+                            className="rounded-lg border border-red-700 bg-red-600 px-2.5 py-1.5 text-xs font-extrabold text-white shadow-xs hover:bg-red-700"
+                          >
+                            ✕ Rechazar
+                          </button>
+                          <span className="ml-1 hidden text-xs font-extrabold text-slate-700 sm:inline">
+                            #{appointment.id}
+                          </span>
+                        </div>
+                      </article>
+                    ) : (
+                      <div key={slot} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border-2 border-dashed border-teal-600 bg-teal-50/50 p-4 transition hover:bg-teal-50">
+                        <div className="flex items-center gap-3 sm:gap-4">
+                          <div className="w-16 shrink-0 border-r-2 border-teal-300 pr-3 text-right">
+                            <span className="text-base font-extrabold text-teal-950">{slot}</span>
+                            <span className="mt-0.5 block text-xs font-bold text-teal-700">30 min</span>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="rounded-md bg-emerald-600 px-2.5 py-0.5 text-xs font-extrabold text-white">
+                                DISPONIBLE
+                              </span>
+                              <span className="text-sm font-extrabold text-teal-950">
+                                Horario libre para atención
+                              </span>
+                            </div>
+                            <p className="mt-0.5 text-xs font-medium text-slate-600">
+                              {dentistFilter !== 'all'
+                                ? `Dra./Dr. ${dentists.find((d) => String(d.id) === dentistFilter)?.apellido || 'Odontólogo'}`
+                                : 'Sin turno asignado en esta franja horaria'}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAppointmentForm((prev) => ({
+                              ...prev,
+                              fecha: selectedDay,
+                              hora: `${slot}:00`,
+                              odontologoId: dentistFilter !== 'all' ? dentistFilter : (dentists[0] ? String(dentists[0].id) : '')
+                            }))
+                            setShowAppointmentForm(true)
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg border-2 border-teal-700 bg-white px-3 py-1.5 text-xs font-extrabold text-teal-900 shadow-xs hover:bg-teal-100"
+                        >
+                          + Asignar turno
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-xl border-2 border-dashed border-[#B8AE99] bg-[#F2E9D8]/70 px-4 py-10 text-center">
+                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-[#B8AE99] bg-[#FAF5E8] text-teal-800">
+                        <CalendarDays size={22} />
+                      </div>
+                      <h4 className="mt-3 text-base font-extrabold text-slate-950">Agenda libre para este día</h4>
+                      <p className="mx-auto mt-1 max-w-md text-sm font-medium leading-6 text-slate-800">
+                        {isDentist
+                          ? 'No tenés turnos asignados para este día.'
+                          : 'Pedile al asistente que busque alternativas o iniciá una solicitud de teleconsulta.'}
+                      </p>
+                      {!isDentist && (
+                        <button
+                          onClick={() => {
+                            setChatOpen(true)
+                            setTimeout(() => void submitQuestion('Buscame horarios disponibles para una teleconsulta'), 0)
+                          }}
+                          className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-teal-700 px-3.5 py-2 text-xs font-extrabold text-white hover:bg-teal-800"
+                        >
+                          <Sparkles size={14} /> Buscar con el asistente
+                        </button>
+                      )}
+                    </div>
+                  )
                 )}
               </div>
             )}

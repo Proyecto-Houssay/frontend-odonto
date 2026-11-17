@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { BookPlus, ChevronDown, ShieldCheck, Sparkles, Stethoscope } from 'lucide-react'
+import { BookPlus, ChevronDown, RotateCcw, ShieldCheck, Sparkles, Stethoscope } from 'lucide-react'
 import { ApiError, apiRequest } from '../lib/api'
 import { useAuth } from '../auth/useAuth'
 import { roleFromToken, type UserRole } from '../auth/role'
@@ -121,6 +121,9 @@ export const SUGGESTIONS_BY_ROLE: Record<UserRole, readonly string[]> = {
     '¿Qué turnos hay programados para hoy?',
     '¿Qué odontólogos están activos y qué especialidad tienen?',
     '¿Qué obras sociales y horarios están vigentes?',
+    '¿Qué documentación debe presentar un paciente nuevo?',
+    '¿Cuáles son las formas de pago y aranceles particulares?',
+    '¿Cómo funciona la guardia y las urgencias de teletriaje?',
     'Ir a recepción de pacientes y alta de fichas',
   ],
 }
@@ -157,9 +160,9 @@ const ROLE_HEADER_CONFIG: Record<
     eyebrow: 'Admisión y Turnos',
     title: 'Asistente de Recepción y Agenda',
     subtitle:
-      'Consulta rápida de disponibilidad de turnos, profesionales activos y admisión de pacientes.',
+      'Asistente inteligente para consultar convenios de obras sociales, horarios, disponibilidad de agenda, odontólogos activos y protocolos de admisión.',
     emptyPrompt:
-      'Consultá los turnos programados del día, verificá qué odontólogos y especialidades están activos o accedé al alta de fichas de pacientes.',
+      'Consultá convenios vigentes de obras sociales, horarios de atención, turnos programados del día, profesionales activos o requisitos para pacientes.',
   },
 }
 
@@ -216,9 +219,18 @@ function notifyTurnoBooked() {
 
 function preguntaTurnoPropio(text: string) {
   const normalized = normalizar(text)
+  // Si está preguntando por turnos disponibles u horarios generales de la clínica (y no por sus propios turnos)
+  if (/\b(disponib|libres|horarios?|abren|atienden)\b/.test(normalized) && !/\b(mi|mis|tengo|asignad|sacado)\b/.test(normalized)) {
+    return false
+  }
+
   return /\bmis?\b.*\b(turnos?|citas?)\b/.test(normalized)
-    || /\b(cuando|cual|que)\b.*\b(mi|mis)\b.*\b(turno|cita)/.test(normalized)
-    || /\bproximo\b.*\bturno\b/.test(normalized)
+    || /\b(turnos?|citas?)\b.*\b(tengo|asignad|registrad|sacad|programad|mio|mios)\b/.test(normalized)
+    || /\b(cuando|cual|que|tengo)\b.*\b(mi|mis)\b.*\b(turnos?|citas?)/.test(normalized)
+    || /\b(que|cuales)\b.*\b(turnos?|citas?)\b.*\b(tengo|registrad|asignad)/.test(normalized)
+    || /\bproximo\b.*\b(turno|cita)\b/.test(normalized)
+    || /^(que|cuales|ver|consultar|mostrar)\s+(turnos?|citas?)(\s+tengo)?$/.test(normalized.trim())
+    || /^tengo\s+(algun\s+)?(turno|cita)/.test(normalized.trim())
 }
 
 function preguntaHorarioODisponibilidad(text: string) {
@@ -240,14 +252,31 @@ function accionesDesde(values?: string[]) {
 }
 
 function respuestaTurnos(turnos: TurnoPropio[]): string {
+  if (!turnos || turnos.length === 0) {
+    return 'No tenés turnos registrados en tu ficha clínica. Para solicitar uno, podés usar el botón "Solicitar nuevo turno" en Mis turnos o consultar con recepción.'
+  }
+
   const now = new Date()
-  const next = turnos
-    .filter(item => item.estado !== 'CANCELADO')
+  const activos = turnos.filter(item => item.estado !== 'CANCELADO')
+  const futuros = activos
     .filter(item => new Date(item.fecha + 'T' + item.hora).getTime() >= now.getTime())
-    .sort((a, b) => new Date(a.fecha + 'T' + a.hora).getTime() - new Date(b.fecha + 'T' + b.hora).getTime())[0]
-  if (!next) return 'No tenés turnos futuros registrados en tu ficha. Para confirmar o solicitar uno, consultá con recepción.'
-  return 'Tu próximo turno registrado es el ' + formatoFecha(next.fecha) + ' a las ' + next.hora.slice(0, 5)
-    + ' hs (' + next.motivo + '), con ' + next.odontologoNombre + '.'
+    .sort((a, b) => new Date(a.fecha + 'T' + a.hora).getTime() - new Date(b.fecha + 'T' + b.hora).getTime())
+
+  if (futuros.length > 0) {
+    const next = futuros[0]
+    const detalleProximo = `Tu próximo turno registrado es el ${formatoFecha(next.fecha)} a las ${next.hora.slice(0, 5)} hs (${next.motivo}), con ${next.odontologoNombre}.`
+    if (futuros.length === 1) {
+      return detalleProximo
+    }
+    const otros = futuros.slice(1).map(t => `• ${formatoFecha(t.fecha)} a las ${t.hora.slice(0, 5)} hs — ${t.motivo} con ${t.odontologoNombre} (${t.estado})`).join('\n')
+    return `${detalleProximo}\n\nOtros turnos futuros programados:\n${otros}`
+  }
+
+  // Si no hay turnos futuros pendientes, informar los turnos registrados existentes en la ficha
+  const pasados = [...turnos].sort((a, b) => new Date(b.fecha + 'T' + b.hora).getTime() - new Date(a.fecha + 'T' + a.hora).getTime())
+  const lista = pasados.slice(0, 3).map(t => `• ${formatoFecha(t.fecha)} a las ${t.hora.slice(0, 5)} hs — ${t.motivo} con ${t.odontologoNombre} (${t.estado})`).join('\n')
+
+  return `En tu ficha clínica registrás:\n${lista}\n\nActualmente no tenés turnos futuros pendientes posteriores a esa fecha. Podés solicitar un nuevo turno desde la sección "Mis turnos" o consultar con recepción.`
 }
 
 export function ChatbotPage({ compact = false }: { compact?: boolean } = {}) {
@@ -488,19 +517,23 @@ export function ChatbotPage({ compact = false }: { compact?: boolean } = {}) {
 
     if (esSaludoLocal(text)) {
       return {
-        text: '¡Hola! Soy el Asistente de Recepción y Agenda. Puedo informarte los turnos programados del día, listar qué odontólogos y especialidades están activos o llevarte a la gestión de pacientes.',
-        actions: [ACTIONS['/turnos'], ACTIONS['/pacientes'], ACTIONS['/odontologos']],
+        text: '¡Hola! Soy el Asistente de Recepción y Agenda. Puedo informarte los turnos programados del día, listar qué odontólogos y especialidades están activos, detallar convenios de obras sociales y horarios de atención, o responder cualquier duda administrativa.',
+        actions: [ACTIONS['/turnos'], ACTIONS['/pacientes'], ACTIONS['/odontologos'], ACTIONS['/teletriaje']],
       }
     }
 
-    if (/\b(turnos?|agenda|programados|hoy|citas)\b/.test(norm)) {
+    // Consultas operativas directas sobre datos en vivo
+    if (/\b(turnos? hoy|agenda hoy|programados hoy|turnos de hoy|agenda de hoy)\b/.test(norm) || (/\b(turnos?|agenda|programados)\b/.test(norm) && !/\b(obra|horario|precio|cobertura|requisito|disponib|sacar|reservar)\b/.test(norm))) {
       try {
         const turnos = await apiRequest<TurnoClinica[]>('/turnos', { token })
         const activos = (Array.isArray(turnos) ? turnos : []).filter(t => t.estado !== 'CANCELADO')
         const hoy = localDateIso()
-        const deHoy = activos.filter(t => t.fecha === hoy)
+        const deHoy = activos.filter(t => t.fecha === hoy).sort((a, b) => a.hora.localeCompare(b.hora))
+        const detalleHoy = deHoy.length > 0
+          ? '\n\nTurnos de hoy:\n' + deHoy.slice(0, 5).map(t => `• ${t.hora.slice(0, 5)} hs — ${t.paciente ? `${t.paciente.nombre} ${t.paciente.apellido}` : 'Paciente'} con Dr./Dra. ${t.odontologo ? `${t.odontologo.nombre} ${t.odontologo.apellido}` : 'Profesional'} (${t.motivo || 'Consulta'})`).join('\n')
+          : ''
         return {
-          text: `Estado de agenda para recepción: hay ${deHoy.length} turno(s) programado(s) para hoy y ${activos.length} turno(s) activo(s) en total.`,
+          text: `Estado de agenda para recepción: hay ${deHoy.length} turno(s) programado(s) para hoy y ${activos.length} turno(s) activo(s) en total.${detalleHoy}`,
           actions: [ACTIONS['/turnos'], ACTIONS['/pacientes']],
         }
       } catch {
@@ -511,7 +544,7 @@ export function ChatbotPage({ compact = false }: { compact?: boolean } = {}) {
       }
     }
 
-    if (/\b(odontologos?|profesionales|especialidad|activos|plantel)\b/.test(norm)) {
+    if (/\b(odontologos?|profesionales|especialidad|activos|plantel|doctores)\b/.test(norm) && !/\b(obra|horario|prepaga|cobertura|precio|turno|sacar|reservar)\b/.test(norm)) {
       try {
         const dentists = await apiRequest<OdontologoResumen[]>('/odontologos', { token })
         const activos = (Array.isArray(dentists) ? dentists : []).filter(d => d.activo !== false)
@@ -539,9 +572,88 @@ export function ChatbotPage({ compact = false }: { compact?: boolean } = {}) {
       }
     }
 
-    return {
-      text: 'Guía rápida de recepción: podés dar de alta o actualizar fichas en Pacientes, asignar citas por profesional en Agenda de Turnos o gestionar solicitudes en Teletriaje.',
-      actions: [ACTIONS['/pacientes'], ACTIONS['/turnos'], ACTIONS['/odontologos'], ACTIONS['/teletriaje']],
+    if (/\b(alta.*ficha|fichas?|nuevo paciente|registrar paciente|ir a recepcion)\b/.test(norm)) {
+      return {
+        text: 'Para dar de alta o gestionar pacientes, ingresá al módulo de Recepción de pacientes. Podés buscar por DNI o apellido, registrar nuevos pacientes con sus datos de contacto y consultar sus turnos asociados.',
+        actions: [ACTIONS['/pacientes'], ACTIONS['/turnos']],
+      }
+    }
+
+    if (/\b(teletriaje|cola de teletriaje|urgencias? de teletriaje)\b/.test(norm)) {
+      try {
+        const solicitudes = await apiRequest<SolicitudTeletriaje[]>('/teletriaje/solicitudes', { token })
+        const lista = Array.isArray(solicitudes) ? solicitudes : []
+        const urgentes = lista.filter(s => s.prioridad === 'ALTA' || s.prioridad === 'CRITICA' || /urgente|alarma/i.test(s.motivo || ''))
+        return {
+          text: `En la cola de teletriaje hay ${lista.length} solicitud(es) registrada(s)${urgentes.length > 0 ? ` (${urgentes.length} con prioridad alta o signos de alarma)` : ''}. Podés revisar y derivar los casos desde el módulo de teletriaje.`,
+          actions: [ACTIONS['/teletriaje'], ACTIONS['/turnos']],
+        }
+      } catch {
+        return {
+          text: 'En el módulo de Teletriaje podés revisar las solicitudes virtuales de pacientes, validar su urgencia y coordinar teleconsultas.',
+          actions: [ACTIONS['/teletriaje'], ACTIONS['/turnos']],
+        }
+      }
+    }
+
+    // Consulta con motor de Inteligencia RAG del backend
+    try {
+      const response = await apiRequest<ChatResponse>('/chatbot/ask', {
+        method: 'POST',
+        token,
+        body: { mensaje: text },
+      })
+      if (response.agenda?.turnoConfirmado) {
+        notifyTurnoBooked()
+      }
+      return {
+        text: response.respuesta,
+        citations: response.citas ?? [],
+        actions: [ACTIONS['/turnos'], ACTIONS['/pacientes'], ACTIONS['/odontologos'], ACTIONS['/teletriaje']],
+        noEvidence: !response.citas?.length && !response.agenda && response.respuesta.startsWith(NO_EVIDENCE),
+        agenda: response.agenda,
+      }
+    } catch {
+      // Fallback inteligente enriquecido con la información oficial de la clínica si el backend no responde
+      if (/\b(obras? sociales?|prepagas?|coberturas?|convenios?|osde|swiss|galeno|medicus|ioma|pami|accord|sancor)\b/.test(norm)
+        || /\b(horarios?|dias?|atencion|abren|atienden|guardia)\b/.test(norm)) {
+        return {
+          text:
+            'Información oficial de recepción — Clínica Dental NovaDent:\n\n' +
+            '• **Horarios de atención:** Lunes a viernes de 8:00 a 20:00 hs. Sábados de 9:00 a 14:00 hs.\n' +
+            '• **Guardia y urgencias:** Atención prioritaria en horario de consultorio; casos agudos se derivan vía Teletriaje.\n\n' +
+            '• **Obras Sociales y Prepagas con convenio vigente:**\n' +
+            '  - **OSDE:** Todos los planes (210, 310, 410, 450, 510). Consultas y limpiezas 100% bonificadas.\n' +
+            '  - **Swiss Medical:** Planes SMG01, SMG02, SMG20, SMG30, SMG50 y convenios corporativos.\n' +
+            '  - **Galeno:** Planes Azul, Plata y Oro.\n' +
+            '  - **Medicus:** Planes Azul, Celeste y Family.\n' +
+            '  - **IOMA:** Convenio odontológico para consultas, urgencias y odontología general.\n' +
+            '  - **PAMI:** Atención odontológica integral para adultos mayores en diagnóstico, urgencias y prótesis.\n' +
+            '  - **Accord Salud y Sancor Salud:** Planes integrales con aranceles preferenciales.\n\n' +
+            '• **Requisitos para la admisión del paciente:**\n' +
+            '  1. DNI físico o digital.\n' +
+            '  2. Credencial de obra social o prepaga al día (carnet o app oficial).\n' +
+            '  3. Menores de edad acompañados por adulto responsable.',
+          actions: [ACTIONS['/turnos'], ACTIONS['/pacientes'], ACTIONS['/odontologos']],
+        }
+      }
+
+      if (/\b(precios?|aranceles?|costos?|particulares?|cuanto sale|cuanto cuesta|medios de pago|pagos?)\b/.test(norm)) {
+        return {
+          text:
+            'Aranceles y medios de pago en recepción — NovaDent:\n\n' +
+            '• **Pacientes con obra social:** Consulta inicial 100% bonificada; copagos según plan de cartilla.\n' +
+            '• **Pacientes particulares:** Consulta y diagnóstico inicial $15.000. Limpieza dental (profilaxis) $28.000. Aranceles de ortodoncia, endodoncia e implantes con presupuesto personalizado.\n' +
+            '• **Medios de pago aceptados:** Efectivo, tarjeta de débito, tarjeta de crédito (hasta 6 cuotas) y transferencia bancaria.\n' +
+            '• **Facturación:** Se emiten facturas A y B para reintegro ante obras sociales con sistema abierto.',
+          actions: [ACTIONS['/turnos'], ACTIONS['/pacientes']],
+        }
+      }
+
+      return {
+        text: 'Guía rápida de recepción: podés dar de alta o actualizar fichas en Pacientes, asignar citas por profesional en Agenda de Turnos o gestionar solicitudes en Teletriaje.',
+        actions: [ACTIONS['/pacientes'], ACTIONS['/turnos'], ACTIONS['/odontologos'], ACTIONS['/teletriaje']],
+      }
     }
   }
 
@@ -758,6 +870,23 @@ export function ChatbotPage({ compact = false }: { compact?: boolean } = {}) {
         aria-live="polite"
         className="max-h-[340px] min-h-[200px] space-y-3 overflow-y-auto rounded-2xl border border-slate-200 bg-white/80 p-3.5 shadow-sm backdrop-blur-xl sm:max-h-[380px] sm:p-4"
       >
+        {messages.length > 0 && (
+          <div className="flex items-center justify-between border-b border-blue-100/80 pb-2">
+            <button
+              type="button"
+              onClick={() => setMessages([])}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50/90 px-2.5 py-1 text-xs font-bold text-blue-900 transition hover:bg-blue-100"
+              title="Volver a las opciones iniciales"
+            >
+              <RotateCcw size={12} className="text-blue-700" />
+              <span>Volver atrás / Ver opciones</span>
+            </button>
+            <span className="text-[11px] font-semibold text-slate-500">
+              {messages.length} mensaje{messages.length === 1 ? '' : 's'}
+            </span>
+          </div>
+        )}
+
         {messages.length === 0 && (
           <div className="space-y-2.5 rounded-xl border border-blue-100 bg-blue-50/80 p-3 text-xs text-blue-950 sm:text-sm">
             <p className="leading-5">{headerConfig.emptyPrompt}</p>
@@ -788,9 +917,23 @@ export function ChatbotPage({ compact = false }: { compact?: boolean } = {}) {
                 onBooked={handleAgendaBooked}
               />
             )}
-            {!!message.actions?.length && <div className="mt-2.5 flex flex-wrap gap-2">
-              {message.actions.map(action => <Link key={action.to} to={action.to} className="inline-flex min-h-8 items-center rounded-lg border border-blue-300 bg-white/90 px-3 py-1.5 text-xs font-semibold text-blue-900 hover:bg-blue-50">{action.label}</Link>)}
-            </div>}
+            {message.role === 'assistant' && (
+              <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                {!!message.actions?.length && message.actions.map(action => (
+                  <Link key={action.to} to={action.to} className="inline-flex min-h-8 items-center rounded-lg border border-blue-300 bg-white/90 px-3 py-1.5 text-xs font-semibold text-blue-900 hover:bg-blue-50">
+                    {action.label}
+                  </Link>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setMessages([])}
+                  className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-blue-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-blue-900 hover:bg-blue-50 transition"
+                >
+                  <RotateCcw size={12} className="text-blue-600" />
+                  <span>Ver opciones nuevamente</span>
+                </button>
+              </div>
+            )}
             {!!message.citations?.length && (
               <details className="mt-3 border-t border-blue-200/60 pt-2 text-xs text-slate-700">
                 <summary className="inline-flex cursor-pointer select-none items-center gap-1.5 font-semibold text-blue-700 hover:text-blue-900">

@@ -185,4 +185,44 @@ describe('PortalPaciente', () => {
     expect(pendingBadge.className).toContain('bg-orange-500')
     expect(rejectedBadge.className).toContain('bg-red-600')
   })
+
+  it('allows requesting a new appointment with dentist and schedule slot selection', async () => {
+    const doctors = [
+      { id: 1, nombre: 'Martino', apellido: 'Costigliolo', nombreCompleto: 'Martino Costigliolo', especialidad: 'Odontología General' },
+    ]
+    const slots = [
+      { odontologoId: 1, odontologoNombre: 'Martino Costigliolo', especialidad: 'Odontología General', fecha: '2099-11-20', hora: '09:00:00', etiquetaFecha: 'hoy', etiquetaHora: '09:00' },
+    ]
+    fetchMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path.endsWith('/perfil')) return Promise.resolve(response({ id: 7, nombre: 'Ana', apellido: 'Nieto', dni: '44239570', email: 'ana@example.com' }))
+      if (path.includes('/chatbot/doctores')) return Promise.resolve(response(doctors))
+      if (path.includes('/chatbot/turnos/disponibles')) return Promise.resolve(response(slots))
+      if (path.includes('/chatbot/turnos/reservar') && options?.method === 'POST') {
+        return Promise.resolve(response({ mensaje: 'Turno confirmado correctamente.' }))
+      }
+      if (path.endsWith('/turnos')) return Promise.resolve(response([]))
+      return Promise.resolve(response([]))
+    })
+
+    renderPortal('/mis-turnos')
+    expect(await screen.findByRole('heading', { name: 'Mis turnos' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Solicitar nuevo turno/i }))
+
+    expect(await screen.findByLabelText(/Odontólogo \/ Especialista/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Fecha del turno/i)).toBeInTheDocument()
+
+    const slotBtn = await screen.findByRole('button', { name: '09:00 hs' })
+    expect(slotBtn).toBeInTheDocument()
+    fireEvent.click(slotBtn)
+
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar turno para las 09:00 hs/i }))
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/chatbot/turnos/reservar',
+        expect.objectContaining({ method: 'POST' })
+      )
+    })
+  })
 })

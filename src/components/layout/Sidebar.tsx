@@ -44,7 +44,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   return <>
     {isOpen ? <div className="fixed inset-0 z-40 bg-slate-900/45 backdrop-blur-sm lg:hidden" onClick={onClose} aria-hidden="true" /> : null}
-    <aside className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-[#CBD5E1] bg-[#DCE6F1]/90 shadow-xl shadow-slate-900/10 backdrop-blur-xl transition-transform duration-300 lg:static lg:z-auto lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+    <aside className={`sidebar fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-[#CBD5E1] bg-[#DCE6F1]/90 shadow-xl shadow-slate-900/10 backdrop-blur-xl transition-transform duration-300 lg:static lg:z-auto lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       <div className="flex items-start justify-between gap-2 border-b border-[#CBD5E1] px-5 py-6">
         <NovadentBrand compact />
         <button type="button" onClick={onClose} className="rounded-lg p-1 text-slate-600 hover:bg-[#DBEAFE] lg:hidden" aria-label="Cerrar menú"><X className="h-5 w-5" /></button>
@@ -54,7 +54,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         <div className="mt-3 space-y-1">
           {navItems.filter(item => staffRole && item.roles.includes(staffRole)).map(({ label, to, icon: Icon }) =>
             <NavLink key={to} to={to} end={to === '/' || to === '/informes'} onClick={() => { if (window.innerWidth < 1024) onClose() }}
-              className={({ isActive }) => `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${isActive ? 'bg-[#DBEAFE] text-[#1D4ED8] font-bold border border-blue-300/70 shadow-xs' : 'text-[#475569] hover:bg-[#DBEAFE]/60 hover:text-[#1D4ED8]'}`}>
+              className={({ isActive }) => `sidebar-item flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${isActive ? 'active bg-[#DBEAFE] text-[#1D4ED8] font-bold border border-blue-300/70 shadow-xs' : 'text-[#475569] hover:bg-[#DBEAFE]/60 hover:text-[#1D4ED8]'}`}>
               <Icon aria-hidden="true" className="h-5 w-5 shrink-0" />
               <span>{label}</span>
             </NavLink>,

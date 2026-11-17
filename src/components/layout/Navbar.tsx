@@ -1,4 +1,5 @@
 import { LogOut, Menu, Moon, Sun } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { roleFromToken } from '../../auth/role'
 import { NotificationCenter } from './NotificationCenter'
@@ -17,9 +18,15 @@ const labels = {
 
 export function Navbar({ onToggleSidebar }: NavbarProps) {
   const { session, logout } = useAuth()
+  const navigate = useNavigate()
   const { theme, toggleTheme } = useTheme()
   const role = session?.role || roleFromToken(session?.token || '')
   const initials = (session?.username || 'U').slice(0, 2).toUpperCase()
+
+  const handleLogout = () => {
+    logout()
+    navigate('/', { replace: true })
+  }
 
   return (
     <header className="sticky top-0 z-30 flex min-h-16 items-center justify-between gap-4 border-b border-[#94A3B8] bg-[#E2E8F0]/90 px-4 shadow-xs backdrop-blur-xl lg:px-6">
@@ -92,7 +99,7 @@ export function Navbar({ onToggleSidebar }: NavbarProps) {
         {/* Botón Salir siempre en color rojo intenso */}
         <button
           type="button"
-          onClick={logout}
+          onClick={handleLogout}
           aria-label="Cerrar sesión"
           style={{ backgroundColor: '#dc2626', color: '#ffffff', borderColor: '#b91c1c' }}
           className="flex min-h-10 items-center gap-2 rounded-xl border border-red-700 bg-red-600 px-3.5 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"

@@ -3,6 +3,7 @@ import {
   Activity,
   AlertCircle,
   CalendarDays,
+  CalendarPlus,
   Camera,
   CheckCircle2,
   ClipboardList,
@@ -63,6 +64,24 @@ type TurnoPropio = {
   odontologoNombre: string
 }
 
+type DoctorDisponible = {
+  id: number
+  nombre: string
+  apellido: string
+  nombreCompleto: string
+  especialidad: string
+}
+
+type TurnoSlot = {
+  odontologoId: number
+  odontologoNombre: string
+  especialidad: string
+  fecha: string
+  hora: string
+  etiquetaFecha: string
+  etiquetaHora: string
+}
+
 type TratamientoPropio = {
   id: number
   fecha: string
@@ -105,6 +124,22 @@ function dateLabel(date: string) {
     month: 'long',
     year: 'numeric',
   })
+}
+
+function getClinicHoursForDate(dateStr: string): string[] {
+  if (!dateStr) return []
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const dt = new Date(y, m - 1, d)
+  const day = dt.getDay()
+  if (day === 0) return []
+  const startHour = day === 6 ? 9 : 8
+  const endHour = day === 6 ? 14 : 20
+  const slots: string[] = []
+  for (let h = startHour; h < endHour; h++) {
+    slots.push(`${String(h).padStart(2, '0')}:00`)
+    slots.push(`${String(h).padStart(2, '0')}:30`)
+  }
+  return slots
 }
 
 const DIENTES = [
@@ -204,6 +239,96 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
   const [openedAt] = useState(() => Date.now())
   const [reloadKey, setReloadKey] = useState(0)
   const { theme, toggleTheme } = useTheme()
+
+  const [showBooking, setShowBooking] = useState(false)
+  const [bookingDoctors, setBookingDoctors] = useState<DoctorDisponible[]>([])
+  const [bookingDoctorId, setBookingDoctorId] = useState('')
+  const [bookingFecha, setBookingFecha] = useState(() => new Date().toISOString().slice(0, 10))
+  const [bookingHora, setBookingHora] = useState('')
+  const [bookingMotivo, setBookingMotivo] = useState('Control general')
+  const [bookingSlots, setBookingSlots] = useState<TurnoSlot[]>([])
+  const [loadingSlots, setLoadingSlots] = useState(false)
+  const [bookingSubmitting, setBookingSubmitting] = useState(false)
+  const [bookingFormError, setBookingFormError] = useState('')
+
+  const bookingClinicHours = useMemo(() => getClinicHoursForDate(bookingFecha), [bookingFecha])
+
+  useEffect(() => {
+    if (showBooking && bookingDoctors.length === 0) {
+      void apiRequest<DoctorDisponible[]>('/chatbot/doctores', { token })
+        .then(docs => {
+          if (Array.isArray(docs)) {
+            setBookingDoctors(docs)
+            if (docs.length > 0 && !bookingDoctorId) {
+              setBookingDoctorId(String(docs[0].id))
+            }
+          }
+        })
+        .catch(() => undefined)
+    }
+  }, [showBooking, bookingDoctors.length, bookingDoctorId, token])
+
+  useEffect(() => {
+    if (showBooking && bookingDoctorId && bookingFecha) {
+      setLoadingSlots(true)
+      setBookingFormError('')
+      void apiRequest<TurnoSlot[]>(`/chatbot/turnos/disponibles?fecha=${bookingFecha}&odontologoId=${bookingDoctorId}`, { token })
+        .then(slots => {
+          if (Array.isArray(slots)) {
+            setBookingSlots(slots)
+            setBookingHora(prev =>
+              slots.length > 0 && !slots.some(s => s.hora.startsWith(prev))
+                ? slots[0].hora.slice(0, 5)
+                : slots.length === 0
+                  ? ''
+                  : prev
+            )
+          } else {
+            setBookingSlots([])
+          }
+        })
+        .catch(err => {
+          setBookingSlots([])
+          setBookingFormError(err instanceof Error ? err.message : 'No se pudieron consultar los horarios.')
+        })
+        .finally(() => setLoadingSlots(false))
+    }
+  }, [showBooking, bookingDoctorId, bookingFecha, token])
+
+  async function handleSolicitarTurno(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!bookingDoctorId || !bookingFecha || !bookingHora || !bookingMotivo.trim()) {
+      setBookingFormError('Completá todos los campos para solicitar el turno.')
+      return
+    }
+    setBookingSubmitting(true)
+    setBookingFormError('')
+    try {
+      const selectedDoc = bookingDoctors.find(d => String(d.id) === bookingDoctorId)
+      const res = await apiRequest<{ mensaje: string }>('/chatbot/turnos/reservar', {
+        method: 'POST',
+        token,
+        body: {
+          odontologoId: Number(bookingDoctorId),
+          fecha: bookingFecha,
+          hora: bookingHora.length === 5 ? `${bookingHora}:00` : bookingHora,
+          motivo: bookingMotivo.trim(),
+          pacienteId: perfil?.id,
+        },
+      })
+      setNotice(res.mensaje || `Turno agendado con éxito para el ${bookingFecha} a las ${bookingHora} hs con Dr./Dra. ${selectedDoc?.nombreCompleto || ''}.`)
+      setShowBooking(false)
+      setBookingHora('')
+      const updatedTurnos = await apiRequest<TurnoPropio[]>('/portal-paciente/turnos', { token })
+      setTurnos(updatedTurnos)
+      setTurnoFilter('ALL')
+      window.dispatchEvent(new CustomEvent('novadent:turno-booked'))
+    } catch (err) {
+      setBookingFormError(err instanceof Error ? err.message : 'No se pudo reservar el turno en este horario.')
+    } finally {
+      setBookingSubmitting(false)
+    }
+  }
 
   useEffect(() => {
     const onTurnoBooked = () => setReloadKey(value => value + 1)
@@ -345,7 +470,8 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
           consentimientoFoto: foto ? fotoConsentida : false,
         },
       })
-      setReports(await apiRequest<Reporte[]>('/portal-paciente/reportes', { token }))
+      const updatedReports = await apiRequest<Reporte[]>('/portal-paciente/reportes', { token })
+      setReports(Array.isArray(updatedReports) ? updatedReports : [])
       setSintomas('')
       setFoto(null)
       setFotoNombre('')
@@ -399,7 +525,7 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
         hasProfessionalReview: boolean
       }
     >()
-    const sorted = [...reports].sort(
+    const sorted = (Array.isArray(reports) ? [...reports] : []).sort(
       (a, b) => new Date(b.creadoEn || 0).getTime() - new Date(a.creadoEn || 0).getTime()
     )
     for (const rep of sorted) {
@@ -1073,6 +1199,13 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
                           </p>
                         </div>
                         <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowBooking(prev => !prev)}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition"
+                          >
+                            <CalendarPlus size={15} /> {showBooking ? 'Cerrar reserva' : 'Solicitar nuevo turno'}
+                          </button>
                           <Link
                             to="/check-in"
                             className="inline-flex items-center gap-1.5 rounded-xl border border-blue-300 bg-blue-50 px-3.5 py-2 text-xs font-bold text-blue-900 hover:bg-blue-100"
@@ -1081,12 +1214,278 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
                           </Link>
                           <Link
                             to="/chatbot"
-                            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-blue-700"
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-blue-300 bg-white px-3.5 py-2 text-xs font-bold text-blue-900 hover:bg-blue-50"
                           >
                             <MessageCircle size={15} /> Consultar horarios por IA
                           </Link>
                         </div>
                       </div>
+
+                      {/* Cartel informativo de Odontólogos disponibles en la clínica */}
+                      {!showBooking && bookingDoctors.length > 0 && (
+                        <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50/60 p-4 shadow-xs">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <h3 className="text-xs font-bold uppercase tracking-wider text-blue-800">
+                                Profesionales odontológicos disponibles
+                              </h3>
+                              <p className="mt-0.5 text-xs font-medium text-slate-700">
+                                Conocé a los odontólogos del consultorio y consultá sus horarios disponibles para reservar tu turno:
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setShowBooking(true)}
+                              className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition"
+                            >
+                              <CalendarPlus size={14} /> Seleccionar profesional y turno
+                            </button>
+                          </div>
+                          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                            {bookingDoctors.map(doc => (
+                              <div
+                                key={doc.id}
+                                className="flex items-center justify-between gap-3 rounded-xl border border-blue-200/90 bg-white/95 p-3 text-xs shadow-xs"
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-800 font-bold">
+                                    <Stethoscope className="h-5 w-5" />
+                                  </span>
+                                  <div className="min-w-0">
+                                    <p className="font-bold text-slate-900 truncate">Dr./Dra. {doc.nombreCompleto}</p>
+                                    <p className="text-[11px] font-semibold text-blue-700">{doc.especialidad}</p>
+                                    <span className="mt-0.5 inline-block text-[10px] font-bold text-emerald-700">
+                                      ● Horarios disponibles para atención
+                                    </span>
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setBookingDoctorId(String(doc.id))
+                                    setShowBooking(true)
+                                  }}
+                                  className="rounded-lg border border-blue-300 bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-800 hover:bg-blue-100 transition shrink-0"
+                                >
+                                  Ver horarios →
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {showBooking && (
+                        <form
+                          onSubmit={handleSolicitarTurno}
+                          className="mt-4 rounded-2xl border-2 border-blue-200 bg-blue-50/70 p-4 sm:p-5 shadow-sm space-y-5"
+                        >
+                          <div className="flex items-center justify-between border-b border-blue-200/60 pb-3">
+                            <div>
+                              <h3 className="text-sm font-extrabold text-blue-950 sm:text-base">Solicitar turno odontológico</h3>
+                              <p className="text-xs font-medium text-slate-700">Elegí el profesional odontólogo, la fecha y el horario disponible que prefieras.</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setShowBooking(false)}
+                              className="text-xs font-bold text-slate-500 hover:text-slate-800"
+                            >
+                              Cerrar ✕
+                            </button>
+                          </div>
+
+                          {/* 1. SELECCIÓN VISUAL DE ODONTÓLOGOS */}
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <label htmlFor="booking-doctor" className="block text-xs font-bold text-slate-800">
+                                Odontólogo / Especialista
+                              </label>
+                              <span className="text-[11px] font-semibold text-slate-600">
+                                {bookingDoctors.length} profesionales disponibles
+                              </span>
+                            </div>
+
+                            {/* Selector accesible vinculado por id y label para compatibilidad */}
+                            <select
+                              id="booking-doctor"
+                              value={bookingDoctorId}
+                              onChange={e => setBookingDoctorId(e.target.value)}
+                              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 focus:border-blue-600 focus:outline-none mb-3"
+                              required
+                            >
+                              <option value="">Seleccionar odontólogo...</option>
+                              {bookingDoctors.map(doc => (
+                                <option key={doc.id} value={doc.id}>
+                                  Dr./Dra. {doc.nombreCompleto} ({doc.especialidad})
+                                </option>
+                              ))}
+                            </select>
+
+                            {/* Tarjetas interactivas de odontólogos */}
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              {bookingDoctors.map(doc => {
+                                const isSelected = String(doc.id) === bookingDoctorId
+                                return (
+                                  <button
+                                    key={doc.id}
+                                    type="button"
+                                    onClick={() => setBookingDoctorId(String(doc.id))}
+                                    className={`flex items-start gap-3 rounded-xl border p-3.5 text-left transition ${
+                                      isSelected
+                                        ? 'border-blue-600 bg-blue-100/90 ring-2 ring-blue-500 shadow-xs'
+                                        : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50/50'
+                                    }`}
+                                  >
+                                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-bold ${
+                                      isSelected ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-800'
+                                    }`}>
+                                      <Stethoscope className="h-5 w-5" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-center justify-between gap-1">
+                                        <p className="truncate text-sm font-bold text-blue-950">
+                                          Dr./Dra. {doc.nombreCompleto}
+                                        </p>
+                                        {isSelected && (
+                                          <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white shrink-0">
+                                            Seleccionado
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p className="text-xs font-semibold text-blue-700">{doc.especialidad}</p>
+                                      <p className="mt-1 text-[11px] font-medium text-emerald-700">
+                                        ● Horarios de atención disponibles
+                                      </p>
+                                    </div>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+
+                          {/* 2. FECHA Y MOTIVO */}
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div>
+                              <label htmlFor="booking-fecha" className="block text-xs font-bold text-slate-800 mb-1">
+                                Fecha del turno
+                              </label>
+                              <input
+                                id="booking-fecha"
+                                type="date"
+                                min={new Date().toISOString().slice(0, 10)}
+                                value={bookingFecha}
+                                onChange={e => setBookingFecha(e.target.value)}
+                                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 focus:border-blue-600 focus:outline-none"
+                                required
+                              />
+                            </div>
+
+                            <div>
+                              <label htmlFor="booking-motivo" className="block text-xs font-bold text-slate-800 mb-1">
+                                Motivo de la consulta
+                              </label>
+                              <input
+                                id="booking-motivo"
+                                type="text"
+                                maxLength={200}
+                                placeholder="Ej: Control, limpieza, dolor..."
+                                value={bookingMotivo}
+                                onChange={e => setBookingMotivo(e.target.value)}
+                                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 focus:border-blue-600 focus:outline-none"
+                                required
+                              />
+                            </div>
+                          </div>
+
+                          {/* 3. HORARIOS DISPONIBLES Y OCUPADOS DEL PROFESIONAL */}
+                          <div>
+                            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                              <span className="block text-xs font-bold text-slate-800">
+                                Horarios del odontólogo {bookingDoctors.find(d => String(d.id) === bookingDoctorId)?.nombreCompleto ? `· Dr./Dra. ${bookingDoctors.find(d => String(d.id) === bookingDoctorId)?.nombreCompleto}` : ''}
+                              </span>
+                              <span className="text-[11px] font-semibold text-slate-600">
+                                🟢 {bookingSlots.length} libres · ⚪ {Math.max(0, bookingClinicHours.length - bookingSlots.length)} ocupados
+                              </span>
+                            </div>
+                            {loadingSlots ? (
+                              <p className="text-xs font-medium text-slate-600 animate-pulse">Consultando horarios libres en tiempo real…</p>
+                            ) : bookingClinicHours.length === 0 ? (
+                              <p className="rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-xs font-medium text-amber-900">
+                                El consultorio permanece cerrado los domingos. Por favor seleccioná un día de lunes a sábado.
+                              </p>
+                            ) : (
+                              <div className="flex flex-wrap gap-2">
+                                {bookingClinicHours.map(horaKey => {
+                                  const slotMatch = bookingSlots.find(s => s.hora.startsWith(horaKey))
+                                  const isSelected = bookingHora === horaKey
+                                  if (slotMatch) {
+                                    return (
+                                      <button
+                                        key={horaKey}
+                                        type="button"
+                                        aria-label={`${horaKey} hs`}
+                                        onClick={() => setBookingHora(horaKey)}
+                                        className={`rounded-lg px-3 py-1.5 text-xs font-bold transition inline-flex items-center gap-1.5 ${
+                                          isSelected
+                                            ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-400'
+                                            : 'bg-emerald-50 border border-emerald-400 text-emerald-950 hover:border-emerald-600 hover:bg-emerald-100'
+                                        }`}
+                                      >
+                                        <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" aria-hidden="true" />
+                                        <span>{horaKey} hs</span>
+                                        <span className="text-[10px] font-extrabold uppercase text-emerald-800 bg-emerald-200/80 px-1 py-0.5 rounded" aria-hidden="true">
+                                          Libre
+                                        </span>
+                                      </button>
+                                    )
+                                  }
+                                  return (
+                                    <span
+                                      key={horaKey}
+                                      className="rounded-lg border border-slate-200 bg-slate-100/90 px-3 py-1.5 text-xs font-semibold text-slate-400 cursor-not-allowed inline-flex items-center gap-1.5"
+                                      title="Horario ocupado (turno asignado)"
+                                    >
+                                      <span className="h-2 w-2 rounded-full bg-slate-400 shrink-0" aria-hidden="true" />
+                                      <span>{horaKey} hs</span>
+                                      <span className="text-[10px] font-bold uppercase text-slate-500 bg-slate-200 px-1 py-0.5 rounded">
+                                        Ocupado
+                                      </span>
+                                    </span>
+                                  )
+                                })}
+                              </div>
+                            )}
+                            {bookingHora && (
+                              <p className="mt-2.5 text-xs font-semibold text-blue-900">
+                                ✓ Horario seleccionado: <span className="font-extrabold">{bookingHora} hs</span> el {bookingFecha} con {bookingDoctors.find(d => String(d.id) === bookingDoctorId) ? `Dr./Dra. ${bookingDoctors.find(d => String(d.id) === bookingDoctorId)?.nombreCompleto} (${bookingDoctors.find(d => String(d.id) === bookingDoctorId)?.especialidad})` : 'el odontólogo seleccionado'}.
+                              </p>
+                            )}
+                          </div>
+
+                          {bookingFormError && (
+                            <p role="alert" className="rounded-lg bg-red-50 border border-red-200 p-2.5 text-xs font-bold text-red-900">
+                              {bookingFormError}
+                            </p>
+                          )}
+
+                          <div className="flex justify-end gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setShowBooking(false)}
+                              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="submit"
+                              disabled={bookingSubmitting || !bookingHora || !bookingDoctorId}
+                              className="rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
+                            >
+                              {bookingSubmitting ? 'Confirmando…' : `Confirmar turno para las ${bookingHora ? bookingHora + ' hs' : '...'}`}
+                            </button>
+                          </div>
+                        </form>
+                      )}
 
                       {/* Semáforo de Estados de Turno */}
                       <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -1167,9 +1566,23 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
                           {turnosError}
                         </p>
                       ) : turnos.length === 0 ? (
-                        <p className="mt-5 rounded-xl bg-blue-50 p-4 text-sm font-medium text-slate-800">
-                          Todavía no tenés turnos registrados.
-                        </p>
+                        <div className="mt-5 rounded-xl border border-blue-200 bg-blue-50/80 p-5 text-center">
+                          <p className="text-sm font-semibold text-slate-800">
+                            Todavía no tenés turnos registrados.
+                          </p>
+                          <p className="mt-1 text-xs text-slate-600">
+                            Elegí a continuación un odontólogo y un horario libre para solicitar tu turno.
+                          </p>
+                          {!showBooking && (
+                            <button
+                              type="button"
+                              onClick={() => setShowBooking(true)}
+                              className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-blue-700"
+                            >
+                              <CalendarPlus size={15} /> Solicitar mi primer turno
+                            </button>
+                          )}
+                        </div>
                       ) : (
                         <ol className="mt-5 grid gap-3.5 md:grid-cols-2">
                           {filteredTurnos.map(item => {

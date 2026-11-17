@@ -961,7 +961,7 @@ export function DrAnniePage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       {/* Encabezado Hero de Dr. Annie */}
-      <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-teal-950 p-6 text-white shadow-xl sm:p-8">
+      <section className="dark-hero overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-teal-950 p-6 text-white shadow-xl sm:p-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-teal-300/30 bg-teal-300/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-teal-100">
