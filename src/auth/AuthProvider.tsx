@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { apiRequest } from '../lib/api'
 import { AUTH_SESSION_KEY, AuthContext, type AppRole, type AuthSession } from './context'
+import { roleFromToken } from './role'
 
 type LoginResponse = {
   token: string
@@ -41,7 +42,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       method: 'POST',
       body: { usernameOrEmail, password },
     })
-    if (!response.token || !appRoles.includes(response.role)
+    const role = response.role || roleFromToken(response.token)
+    if (!response.token || !role || !appRoles.includes(role)
       || !Number.isFinite(response.expiresIn) || response.expiresIn <= 0) {
       throw new Error('El backend respondió sin un token de sesión válido.')
     }
@@ -49,10 +51,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token: response.token,
       tokenType: response.tokenType || 'Bearer',
       username: usernameOrEmail,
-      role: response.role,
+      role,
       expiresAt: Date.now() + response.expiresIn * 1000,
     })
-    return response.role
+    return role
   }, [])
 
   useEffect(() => {
