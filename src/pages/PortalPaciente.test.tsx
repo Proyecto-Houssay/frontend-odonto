@@ -145,16 +145,84 @@ describe('PortalPaciente', () => {
     expect(screen.getByText('ana@example.com')).not.toBeNull()
   })
 
-  it('offers a persistent accessible dark-mode toggle', async () => {
+  it('offers a persistent accessible dark-mode toggle with orange/sky-blue theme styling and red logout button', async () => {
     fetchMock.mockImplementation((path: string) => Promise.resolve(response(path.endsWith('/perfil')
       ? { id: 7, nombre: 'Ana', apellido: 'Nieto', dni: '44239570', email: 'ana@example.com' }
       : [])))
     renderPortal()
 
+    const logoutBtn = await screen.findByRole('button', { name: /Cerrar sesión/i })
+    expect(logoutBtn.className).toContain('bg-red-600')
+
     const toggle = await screen.findByRole('button', { name: 'Activar modo oscuro' })
+    expect(toggle.className).toContain('bg-orange-500')
     fireEvent.click(toggle)
     expect(document.documentElement.dataset.theme).toBe('dark')
     expect(localStorage.getItem('novadent-theme')).toBe('dark')
-    expect(screen.getByRole('button', { name: 'Activar modo claro' })).not.toBeNull()
+
+    const lightToggle = screen.getByRole('button', { name: 'Activar modo claro' })
+    expect(lightToggle.className).toContain('bg-sky-300')
+  })
+
+  it('color-codes appointments in green (CONFIRMADO), orange (EN_ESPERA/PROGRAMADO), and red (RECHAZADO/CANCELADO)', async () => {
+    const appointments = [
+      { id: 1, fecha: '2099-10-15', hora: '09:00:00', motivo: 'Limpieza', estado: 'CONFIRMADO', odontologoNombre: 'Dra. Pérez' },
+      { id: 2, fecha: '2099-10-16', hora: '10:30:00', motivo: 'Conducto', estado: 'EN_ESPERA', odontologoNombre: 'Dr. Gómez' },
+      { id: 3, fecha: '2099-10-17', hora: '12:00:00', motivo: 'Extracción', estado: 'RECHAZADO', odontologoNombre: 'Dra. Paz' },
+    ]
+    fetchMock.mockImplementation((path: string) => {
+      if (path.endsWith('/perfil')) return Promise.resolve(response({ id: 7, nombre: 'Ana', apellido: 'Nieto', dni: '44239570', email: 'ana@example.com' }))
+      if (path.endsWith('/turnos')) return Promise.resolve(response(appointments))
+      return Promise.resolve(response([]))
+    })
+
+    renderPortal('/mis-turnos')
+    const confirmedBadge = await screen.findByText('CONFIRMADO')
+    const pendingBadge = screen.getByText('EN_ESPERA')
+    const rejectedBadge = screen.getByText('RECHAZADO')
+
+    expect(confirmedBadge.className).toContain('bg-emerald-600')
+    expect(pendingBadge.className).toContain('bg-orange-500')
+    expect(rejectedBadge.className).toContain('bg-red-600')
+  })
+
+  it('allows requesting a new appointment with dentist and schedule slot selection', async () => {
+    const doctors = [
+      { id: 1, nombre: 'Martino', apellido: 'Costigliolo', nombreCompleto: 'Martino Costigliolo', especialidad: 'Odontología General' },
+    ]
+    const slots = [
+      { odontologoId: 1, odontologoNombre: 'Martino Costigliolo', especialidad: 'Odontología General', fecha: '2099-11-20', hora: '09:00:00', etiquetaFecha: 'hoy', etiquetaHora: '09:00' },
+    ]
+    fetchMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path.endsWith('/perfil')) return Promise.resolve(response({ id: 7, nombre: 'Ana', apellido: 'Nieto', dni: '44239570', email: 'ana@example.com' }))
+      if (path.includes('/chatbot/doctores')) return Promise.resolve(response(doctors))
+      if (path.includes('/chatbot/turnos/disponibles')) return Promise.resolve(response(slots))
+      if (path.includes('/chatbot/turnos/reservar') && options?.method === 'POST') {
+        return Promise.resolve(response({ mensaje: 'Turno confirmado correctamente.' }))
+      }
+      if (path.endsWith('/turnos')) return Promise.resolve(response([]))
+      return Promise.resolve(response([]))
+    })
+
+    renderPortal('/mis-turnos')
+    expect(await screen.findByRole('heading', { name: 'Mis turnos' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Solicitar nuevo turno/i }))
+
+    expect(await screen.findByLabelText(/Odontólogo \/ Especialista/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Fecha del turno/i)).toBeInTheDocument()
+
+    const slotBtn = await screen.findByRole('button', { name: '09:00 hs' })
+    expect(slotBtn).toBeInTheDocument()
+    fireEvent.click(slotBtn)
+
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar turno para las 09:00 hs/i }))
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/chatbot/turnos/reservar',
+        expect.objectContaining({ method: 'POST' })
+      )
+    })
   })
 })

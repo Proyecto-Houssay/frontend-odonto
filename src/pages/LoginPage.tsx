@@ -41,10 +41,13 @@ export function LoginPage() {
     try {
       if (mode === 'login') {
         const role = await login(usernameOrEmail.trim(), password)
-        if (role === 'ODONTOLOGO') {
+        if (role === 'ODONTOLOGO' || role === 'RECEPCIONISTA') {
           navigate('/', { replace: true })
         }
       } else if (mode === 'register') {
+        if (password !== repeatPassword) {
+          throw new Error('Las contraseñas no coinciden.')
+        }
         const response = await apiRequest<RegistrationResponse>('/auth/register', {
           method: 'POST',
           body: { username: username.trim(), nombre: nombre.trim(), apellido: apellido.trim(), email: email.trim(), password },
@@ -143,6 +146,7 @@ export function LoginPage() {
                     <input autoComplete="email" className={inputClass} maxLength={254} required type="email" value={email} onChange={event => setEmail(event.target.value)} />
                   </label>
                   <PasswordInput label="Contraseña" autoComplete="new-password" value={password} onChange={setPassword} />
+                  <PasswordInput label="Repetir contraseña" autoComplete="new-password" value={repeatPassword} onChange={setRepeatPassword} />
                 </>
               ) : null}
 

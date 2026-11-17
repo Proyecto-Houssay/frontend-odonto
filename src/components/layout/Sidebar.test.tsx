@@ -18,14 +18,14 @@ describe('staff navigation', () => {
     expect(screen.getByRole('link', { name: 'Pacientes' })).not.toBeNull()
     expect(screen.getByRole('link', { name: 'Odontograma' })).not.toBeNull()
     expect(screen.queryByRole('link', { name: 'Seguimiento' })).toBeNull()
-    expect(screen.queryByRole('link', { name: 'Dr. Annie (IA)' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Dra. Ziegler · Gemini' })).toBeNull()
   })
 
   it('shows clinical shortcuts and the larger brand to the odontologist', () => {
     renderAs('ODONTOLOGO')
     expect(screen.getByRole('link', { name: 'Odontograma' })).not.toBeNull()
     expect(screen.getByRole('link', { name: 'Seguimiento' })).not.toBeNull()
-    expect(screen.getByRole('link', { name: 'Dr. Annie (IA)' })).not.toBeNull()
+    expect(screen.getByRole('link', { name: 'Dra. Ziegler · Gemini' })).not.toBeNull()
     expect(screen.getByLabelText('NovaDent · Consultorio odontológico')).not.toBeNull()
   })
 })

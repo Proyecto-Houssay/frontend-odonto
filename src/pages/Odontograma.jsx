@@ -111,29 +111,103 @@ const QUADRANTS = {
   1: 'Sup. der.', 2: 'Sup. izq.', 3: 'Inf. izq.', 4: 'Inf. der.',
 }
 
-function ToothIcon({ color, lower, molar, viewMode = '2d', number = 11 }) {
-  if (viewMode === '3d') {
-    return (
-      <svg viewBox="0 0 44 56" aria-hidden="true" focusable="false" style={{ transform: lower ? 'rotate(180deg)' : undefined }}>
-        <defs>
-          <linearGradient id={`enamel-${number}`} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#ffffff" />
-            <stop offset="60%" stopColor="#f1f7ff" />
-            <stop offset="100%" stopColor="#b8cee6" />
-          </linearGradient>
-        </defs>
-        <path d="M9 5 C4 7 4 17 7 25 L12 47 Q15 56 19 38 Q22 30 25 38 Q30 56 32 47 L38 25 C42 12 36 2 29 5 Q22 8 16 5 Z"
-          fill={color !== '#94a3b8' ? color : `url(#enamel-${number})`} fillOpacity={color !== '#94a3b8' ? 0.45 : 1}
-          stroke={color} strokeWidth="2.4" />
-        <path d={molar ? 'M12 13 Q16 20 22 14 Q28 20 33 13 M22 14 V26' : 'M12 13 Q22 19 33 13'} fill="none" stroke={color !== '#94a3b8' ? color : '#8298b2'} strokeWidth="1.6" />
-        <path d="M10 26 L15 43 M34 26 L29 43" fill="none" stroke="#ffffff" strokeWidth="1.1" opacity=".8" />
-      </svg>
-    )
-  }
-  return <svg viewBox="0 0 44 56" aria-hidden="true" focusable="false" style={{ transform: lower ? 'rotate(180deg)' : undefined }}>
-    <path d="M9 5 C4 7 4 17 7 25 L12 47 Q15 56 19 38 Q22 30 25 38 Q30 56 32 47 L38 25 C42 12 36 2 29 5 Q22 8 16 5 Z" fill={color} fillOpacity=".22" stroke={color} strokeWidth="2.4" />
-    <path d={molar ? 'M12 13 Q16 20 22 14 Q28 20 33 13 M22 14 V26' : 'M12 13 Q22 19 33 13'} fill="none" stroke={color} strokeWidth="1.6" />
-  </svg>
+function ToothIcon({ color, lower, number = 11 }) {
+  const unit = number % 10
+  const isDefault = color === '#94a3b8'
+  const isMissing = color === '#6b7280'
+  const isCaries = color === '#ef4444'
+  const isFracture = color === '#f97316'
+  const isGingivitis = color === '#eab308'
+
+  const rootPath =
+    unit <= 2
+      ? 'M17 25 L19 5 Q22 1 25 5 L27 25 Z'
+      : unit === 3
+        ? 'M16 26 L20 2 Q22 0 24 2 L28 26 Z'
+        : unit <= 5
+          ? 'M13 26 L15 6 Q17 2 19 8 L22 16 L25 8 Q27 2 29 6 L31 26 Z'
+          : 'M9 26 L11 6 Q13 2 16 9 L19 18 L22 5 Q24 2 25 18 L28 9 Q31 2 33 6 L35 26 Z'
+
+  const crownPath =
+    unit <= 2
+      ? 'M11 24 C10 34 11 46 13 51 Q22 53 31 51 C33 46 34 34 33 24 Q22 21 11 24 Z'
+      : unit === 3
+        ? 'M11 24 C9 33 12 44 22 54 C32 44 35 33 33 24 Q22 21 11 24 Z'
+        : unit <= 5
+          ? 'M9 24 C6 32 8 46 14 51 Q18 54 22 48 Q26 54 30 51 C36 46 38 32 35 24 Q22 21 9 24 Z'
+          : 'M6 24 C3 32 5 47 11 51 Q16 54 20 49 Q22 46 24 49 Q28 54 33 51 C39 47 41 32 38 24 Q22 21 6 24 Z'
+
+  const occlusalGroove =
+    unit >= 6
+      ? 'M11 39 Q22 44 33 39 M22 31 L22 47 M15 34 L29 44'
+      : unit >= 4
+        ? 'M13 40 Q22 45 31 40 M22 34 L22 46'
+        : 'M15 46 Q22 48 29 46'
+
+  return (
+    <svg
+      viewBox="0 0 44 58"
+      aria-hidden="true"
+      focusable="false"
+      style={{ transform: lower ? 'scaleY(-1)' : undefined, opacity: isMissing ? 0.42 : 1 }}
+    >
+      <defs>
+        <linearGradient id={`clinical-enamel-${number}`} x1="0" y1="0" x2="0.9" y2="1">
+          <stop offset="0%" stopColor="#FFFDF8" />
+          <stop offset="45%" stopColor="#FAF2E1" />
+          <stop offset="82%" stopColor="#EBE0C8" />
+          <stop offset="100%" stopColor="#D7C4A3" />
+        </linearGradient>
+        <linearGradient id={`clinical-root-${number}`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#E6D2AF" />
+          <stop offset="100%" stopColor="#C4A777" />
+        </linearGradient>
+      </defs>
+      <path
+        d={rootPath}
+        fill={`url(#clinical-root-${number})`}
+        stroke={isDefault ? '#b5986b' : color}
+        strokeWidth="1.4"
+        strokeDasharray={isMissing ? '3 2' : undefined}
+      />
+      <path
+        d="M8 24 Q22 29 36 24"
+        fill="none"
+        stroke={isGingivitis ? '#eab308' : '#e87a90'}
+        strokeWidth={isGingivitis ? '4.2' : '2.8'}
+        strokeLinecap="round"
+      />
+      <path
+        d={crownPath}
+        fill={`url(#clinical-enamel-${number})`}
+        stroke={isDefault ? '#c7b28c' : color}
+        strokeWidth={isDefault ? '1.6' : '2.6'}
+        strokeDasharray={isMissing ? '3 2' : undefined}
+      />
+      {!isDefault && !isMissing && (
+        <path d={crownPath} fill={color} fillOpacity="0.45" />
+      )}
+      <path
+        d={occlusalGroove}
+        fill="none"
+        stroke={isDefault ? '#b59e7a' : color}
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+      {!isMissing && (
+        <path
+          d="M14 29 Q14 39 17 45"
+          fill="none"
+          stroke="#ffffff"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          opacity="0.85"
+        />
+      )}
+      {isCaries && <circle cx="22" cy="40" r="4.8" fill="#dc2626" stroke="#7f1d1d" strokeWidth="1.1" />}
+      {isFracture && <path d="M12 36 L19 41 L16 46 L25 49 L32 42" fill="none" stroke="#ea580c" strokeWidth="2.2" strokeLinecap="round" />}
+    </svg>
+  )
 }
 
 /**
@@ -161,12 +235,14 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [viewMode, setViewMode] = useState('2d')
+  const [mouthView, setMouthView] = useState('completa') // 'completa' | 'superior' | 'inferior'
   const [labelMode, setLabelMode] = useState('fdi')
   const [rotation, setRotation] = useState(0)
   const [patientSearch, setPatientSearch] = useState('')
   const [previousCharts, setPreviousCharts] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
+  const [drAnnieData, setDrAnnieData] = useState(null)
   const signatureRef = useRef(null), signatureBox = useRef(null), savingRef = useRef(false), revision = useRef(0)
   const patientId = demoMode ? patientNumber(selectedDemoPatientId) : patientNumber(pacienteId ?? manualPatient)
   const selectedDemoPatient = demoPatients.find(patient => patient.id === patientId)
@@ -198,6 +274,31 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
     revision.current += 1; setChart(demoMode ? demoCharts[patientId] || {} : {}); setSignature(null); setSaved(null); setAccepted(false); setError(''); setNotice('')
     signatureRef.current?.clear()
   }, [patientId, demoMode, demoCharts])
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('novadent_dr_annie_findings')
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        setDrAnnieData(parsed)
+      }
+    } catch {
+      // ignore
+    }
+  }, [patientId])
+
+  function aplicarHallazgosDrAnnie() {
+    if (!drAnnieData?.findings?.length || readOnly) return
+    const next = { ...chart }
+    drAnnieData.findings.forEach(f => {
+      if (f.piezaFdi && ALL_TEETH.includes(f.piezaFdi)) {
+        next[f.piezaFdi] = f.afeccionOdontograma || 'caries'
+      }
+    })
+    setChart(next)
+    revoke({ consent: false, clearCanvas: false })
+    setNotice(`Hallazgos de Dr. Annie aplicados a las piezas: ${drAnnieData.findings.map(f => f.piezaFdi).join(', ')}`)
+  }
 
   useEffect(() => {
     const controller = new AbortController()
@@ -533,6 +634,29 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
             <p>Vista del profesional: derecha del paciente a la izquierda. Seleccionar no registra una afección.</p>
           </div>
           <div className="odontogram-view-controls">
+            <div className="odontogram-control-group" role="group" aria-label="Selector de vista de la boca">
+              <button
+                type="button"
+                className={`odontogram-toggle-btn ${mouthView === 'completa' ? 'is-active' : ''}`}
+                onClick={() => setMouthView('completa')}
+              >
+                Arcada completa
+              </button>
+              <button
+                type="button"
+                className={`odontogram-toggle-btn ${mouthView === 'superior' ? 'is-active' : ''}`}
+                onClick={() => setMouthView('superior')}
+              >
+                Superior (Paladar)
+              </button>
+              <button
+                type="button"
+                className={`odontogram-toggle-btn ${mouthView === 'inferior' ? 'is-active' : ''}`}
+                onClick={() => setMouthView('inferior')}
+              >
+                Inferior (Lengua)
+              </button>
+            </div>
             <div className="odontogram-control-group">
               <button
                 type="button"
@@ -541,7 +665,7 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
                 aria-pressed={viewMode === '3d'}
                 onClick={() => setViewMode(v => v === '2d' ? '3d' : '2d')}
               >
-                {viewMode === '2d' ? 'Vista 3D interactiva' : 'Vista 2D'}
+                {viewMode === '2d' ? 'Vista 3D' : 'Vista 2D'}
               </button>
               <button
                 type="button"
@@ -550,12 +674,12 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
                 aria-pressed={labelMode === 'anatomical'}
                 onClick={() => setLabelMode(v => v === 'fdi' ? 'anatomical' : 'fdi')}
               >
-                {labelMode === 'fdi' ? 'Mostrar nombres anatómicos' : 'Mostrar números FDI'}
+                {labelMode === 'fdi' ? 'Nombres' : 'Números FDI'}
               </button>
             </div>
             {viewMode === '3d' ? (
               <div className="odontogram-rotation-box">
-                <label htmlFor="dental-arch-rotation">Rotar 3D ({rotation}°)</label>
+                <label htmlFor="dental-arch-rotation">Rotar ({rotation}°)</label>
                 <input
                   id="dental-arch-rotation"
                   aria-label="Rotar arcada dental"
@@ -570,42 +694,109 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
           </div>
         </div>
 
+        {drAnnieData?.findings?.length > 0 && (
+          <div className="odontogram-ai-banner">
+            <div className="odontogram-ai-info">
+              <span className="odontogram-ai-sparkle">✨ <strong>Dr. Annie (IA)</strong></span>
+              <span>Hallazgos radiográficos en piezas: <strong>{drAnnieData.findings.map(f => f.piezaFdi).join(', ')}</strong></span>
+            </div>
+            {!readOnly && (
+              <button
+                type="button"
+                className="odontogram-ai-apply-btn"
+                onClick={aplicarHallazgosDrAnnie}
+              >
+                Aplicar hallazgos de Dr. Annie al odontograma
+              </button>
+            )}
+          </div>
+        )}
+
         <div className={`odontogram-scroll ${viewMode === '3d' ? 'odontogram-scroll-3d' : ''}`} tabIndex={0} role="region" aria-label="Arcadas dentales, desplazamiento horizontal disponible">
           <div className="odontogram-arches">
-            {ARCHES.map((arch, index) => {
-              const isUpper = index === 0
+            {ARCHES.filter((_, idx) => {
+              if (mouthView === 'superior') return idx === 0
+              if (mouthView === 'inferior') return idx === 1
+              return true
+            }).map((arch, filteredIdx) => {
+              const isUpper = mouthView === 'inferior' ? false : (mouthView === 'superior' ? true : filteredIdx === 0)
+              const originalIndex = isUpper ? 0 : 1
               const archStyle = viewMode === '3d'
-                ? { transform: `perspective(1000px) rotateX(${isUpper ? 24 : -22}deg) rotateY(${rotation}deg)` }
+                ? { transform: `perspective(1000px) rotateX(${isUpper ? 20 : -18}deg) rotateY(${rotation}deg)` }
                 : undefined
               return (
-                <div key={index}>
-                  <h3>{isUpper ? 'Arcada superior' : 'Arcada inferior'}</h3>
-                  <div className={`odontogram-arch ${index === 1 ? 'odontogram-lower' : ''} ${viewMode === '3d' ? 'is-3d-arch' : ''}`} style={archStyle}>
+                <div key={originalIndex} className="odontogram-arch-section">
+                  <div className="odontogram-arch-header">
+                    <h3>{isUpper ? 'Arcada superior' : 'Arcada inferior'}</h3>
+                    <div className="odontogram-quadrant-badges">
+                      <span>{isUpper ? 'Cuadrante 1 (18–11)' : 'Cuadrante 4 (48–41)'}</span>
+                      <span className="odontogram-midline-tag">Línea Media</span>
+                      <span>{isUpper ? 'Cuadrante 2 (21–28)' : 'Cuadrante 3 (31–38)'}</span>
+                    </div>
+                  </div>
+
+                  {!isUpper && mouthView === 'inferior' && (
+                    <div className="odontogram-anatomy-guide is-tongue" aria-hidden="true">
+                      <svg viewBox="0 0 320 80" style={{ width: '240px', height: '62px', display: 'block', margin: '0 auto 2px' }}>
+                        <path d="M 35 10 C 38 60, 92 78, 160 78 C 228 78, 282 60, 285 10 Z" fill="#881337" />
+                        <path d="M 65 6 C 65 52, 102 74, 160 74 C 218 74, 255 52, 255 6 Q 160 0 65 6 Z" fill="#e11d48" stroke="#fecdd3" strokeWidth="1.8" />
+                        <path d="M 110 18 L 160 30 L 210 18" fill="none" stroke="#881337" strokeWidth="2" />
+                        <path d="M 160 30 L 160 66" stroke="#881337" strokeWidth="2" strokeLinecap="round" />
+                        <text x="160" y="48" textAnchor="middle" fill="#fff1f2" fontSize="9.5" fontWeight="800">LENGUA · PISO DE LA BOCA</text>
+                      </svg>
+                      <strong>Lengua</strong> — Referencia anatómica central de la arcada inferior
+                    </div>
+                  )}
+
+                  <div className={`odontogram-arch ${originalIndex === 1 ? 'odontogram-lower' : ''} ${viewMode === '3d' ? 'is-3d-arch' : 'is-2d-cruciform'}`} style={archStyle}>
                     {arch.map((number, position) => {
                       const condition = readOnly ? persisted?.dientes.find(tooth => tooth.numero === number) : CONDITION[chart[number]], color = condition?.color || '#94a3b8'
-                      const offset = Math.round(46 * Math.sin(Math.PI * position / 15))
-                      const arch3dOffset = Math.round(Math.abs(7.5 - (position % 8)) * 2)
+                      const isAiFlagged = drAnnieData?.findings?.some(f => f.piezaFdi === number)
+                      const offset = Math.round(24 * Math.sin(Math.PI * position / 15))
+                      const dist = Math.abs(7.5 - position)
+                      const arch3dOffset = Math.round(dist * dist * 0.9)
+                      const rotDeg = Math.round((position - 7.5) * (isUpper ? 1.8 : -1.8))
                       const toothStyle = viewMode === '3d'
-                        ? { transform: `translateY(${arch3dOffset}px) translateZ(12px) rotateX(-7deg)`, '--tooth-color': color }
-                        : { marginTop: index === 0 ? 46 - offset : offset, '--tooth-color': color }
+                        ? { transform: `translateY(${isUpper ? arch3dOffset : -arch3dOffset}px) rotateZ(${rotDeg}deg) translateZ(12px)`, '--tooth-color': color }
+                        : { marginTop: originalIndex === 0 ? 24 - offset : offset, '--tooth-color': color }
                       return (
                         <button
                           key={number}
                           type="button"
-                          className={`odontogram-tooth ${selected === number ? 'odontogram-selected' : ''} ${viewMode === '3d' ? 'odontogram-tooth-3d' : ''}`}
+                          className={`odontogram-tooth ${selected === number ? 'odontogram-selected' : ''} ${viewMode === '3d' ? 'odontogram-tooth-3d' : ''} ${position === 7 ? 'odontogram-midline-left' : ''} ${isAiFlagged ? 'is-ai-flagged' : ''}`}
                           style={toothStyle}
                           disabled={saving}
-                          aria-label={`Diente ${number}: ${condition?.nombre || 'Sin evaluar'}`}
+                          aria-label={`Diente ${number}: ${condition?.nombre || 'Sin evaluar'}${isAiFlagged ? ' (Dr. Annie IA)' : ''}`}
                           aria-pressed={selected === number}
                           onClick={() => setSelected(number)}
                         >
-                          <span>{labelMode === 'fdi' ? number : (TOOTH_TYPES[number % 10] || number)}</span>
-                          <ToothIcon color={color} lower={index === 1} molar={number % 10 >= 6} viewMode={viewMode} number={number} />
+                          <span>{labelMode === 'fdi' ? number : (TOOTH_TYPES[number % 10] || number)}{isAiFlagged ? '✨' : ''}</span>
+                          <ToothIcon color={color} lower={originalIndex === 1} molar={number % 10 >= 6} viewMode={viewMode} number={number} />
                           <small>{labelMode === 'anatomical' ? (QUADRANTS[Math.floor(number / 10)] || condition?.nombre || 'Sin evaluar') : (condition?.nombre || 'Sin evaluar')}</small>
                         </button>
                       )
                     })}
                   </div>
+
+                  {isUpper && mouthView === 'superior' && (
+                    <div className="odontogram-anatomy-guide is-palate" aria-hidden="true">
+                      <svg viewBox="0 0 320 78" style={{ width: '240px', height: '62px', display: 'block', margin: '0 auto 2px' }}>
+                        <path d="M 45 74 C 48 24, 96 6, 160 6 C 224 6, 272 24, 275 74 Z" fill="#d95972" stroke="#fda4af" strokeWidth="1.8" />
+                        <ellipse cx="160" cy="18" rx="5" ry="7" fill="#fca5a5" stroke="#9f1239" strokeWidth="1" />
+                        <path d="M 160 25 L 160 70" stroke="#881337" strokeWidth="1.8" />
+                        <text x="160" y="64" textAnchor="middle" fill="#fff1f2" fontSize="9.5" fontWeight="800">PALADAR SUPERIOR</text>
+                      </svg>
+                      <strong>Paladar Superior</strong> — Bóveda palatina y maxilar superior
+                    </div>
+                  )}
+
+                  {isUpper && mouthView === 'completa' && (
+                    <div className="odontogram-cruciform-plane" aria-hidden="true">
+                      <span>← Derecha (C1 / C4)</span>
+                      <span>Plano Oclusal (Línea Media)</span>
+                      <span>Izquierda (C2 / C3) →</span>
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -722,26 +913,31 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
 }
 
 const STYLES = `
-.odontogram-page{font-family:Inter,system-ui,sans-serif;color:#1E293B;max-width:1500px;margin:auto;padding:24px;line-height:1.5}
-.odontogram-page *{box-sizing:border-box}.odontogram-page h1{font-size:clamp(1.6rem,3vw,2.3rem);font-weight:750;margin:4px 0;color:#1E293B}.odontogram-page h2{font-size:1.2rem;font-weight:700;margin:0 0 8px;color:#1E293B}.odontogram-page h3{font-size:.95rem;font-weight:650;margin:10px 0;color:#1E293B}.odontogram-page p{margin:6px 0 14px;color:#475569}.odontogram-eyebrow{font-size:.7rem;letter-spacing:.12em;font-weight:700;color:#1D4ED8!important}.odontogram-header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:20px}.odontogram-badge{background:#DBEAFE;color:#1D4ED8;border:1px solid rgba(29,78,216,0.25);padding:8px 14px;border-radius:24px;white-space:nowrap;font-weight:650;font-size:.85rem}
-.odontogram-card{min-width:0;border:1px solid #94A3B8;border-radius:18px;padding:22px;background:rgba(226,232,240,0.86);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);margin-bottom:20px;box-shadow:0 4px 16px rgba(15,23,42,0.05)}
-.odontogram-card-header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:14px;margin-bottom:12px}
+.odontogram-page{font-family:Inter,system-ui,sans-serif;color:#1E293B;max-width:1400px;margin:auto;padding:12px 18px;line-height:1.4}
+.odontogram-page *{box-sizing:border-box}.odontogram-page h1{font-size:clamp(1.4rem,2.5vw,2rem);font-weight:750;margin:2px 0;color:#1E293B}.odontogram-page h2{font-size:1.1rem;font-weight:700;margin:0 0 6px;color:#1E293B}.odontogram-page h3{font-size:.88rem;font-weight:650;margin:6px 0;color:#1E293B}.odontogram-page p{margin:4px 0 10px;color:#475569}.odontogram-eyebrow{font-size:.7rem;letter-spacing:.12em;font-weight:700;color:#1D4ED8!important}.odontogram-header{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:14px}.odontogram-badge{background:#DBEAFE;color:#1D4ED8;border:1px solid rgba(29,78,216,0.25);padding:6px 12px;border-radius:20px;white-space:nowrap;font-weight:650;font-size:.82rem}
+.odontogram-card{min-width:0;border:1px solid #94A3B8;border-radius:14px;padding:14px 18px;background:rgba(226,232,240,0.86);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);margin-bottom:14px;box-shadow:0 4px 14px rgba(15,23,42,0.04)}
+.odontogram-card-header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
 .odontogram-credentials{display:flex;flex-wrap:wrap;gap:16px;align-items:end}
 .odontogram-credentials label{display:grid;gap:6px;flex:1;min-width:180px;font-size:.85rem;font-weight:600;color:#475569}
 .odontogram-credentials input,.odontogram-credentials select{border:1px solid #94A3B8;border-radius:8px;padding:11px;width:100%;min-height:44px;color:#1E293B;background:rgba(255,255,255,0.9)}
 .odontogram-access{width:100%;font-size:.8rem;margin:0!important;color:#475569}
-.odontogram-workspace{display:grid;grid-template-columns:1fr;gap:20px}
-.odontogram-page button{cursor:pointer;min-height:44px;border:1px solid #CBD5E1;border-radius:8px;padding:9px 14px;font-size:.9rem;background:white;color:#1E293B;font-weight:600}
+.odontogram-workspace{display:grid;grid-template-columns:1fr;gap:14px}
+.odontogram-page button{cursor:pointer;min-height:40px;border:1px solid #CBD5E1;border-radius:8px;padding:8px 12px;font-size:.86rem;background:white;color:#1E293B;font-weight:600}
 .odontogram-page button:disabled{opacity:.55;cursor:not-allowed}
 .odontogram-page button:focus-visible,.odontogram-page input:focus-visible,.odontogram-scroll:focus-visible{outline:3px solid #1D4ED8;outline-offset:3px}
-.odontogram-scroll{overflow-x:auto;padding:4px 3px 14px}
-.odontogram-arches{min-width:870px}
-.odontogram-arch{display:grid;grid-template-columns:repeat(16,minmax(48px,1fr));gap:4px;min-height:166px;align-items:start}
-.odontogram-page .odontogram-tooth{padding:5px 1px 7px;min-height:113px;border:1px solid #CBD5E1;background:rgba(255,255,255,0.9);display:flex;align-items:center;flex-direction:column;gap:1px;border-radius:8px}
-.odontogram-tooth svg{width:38px;height:52px}
-.odontogram-tooth span{font-size:.88rem;font-weight:750;color:#1E293B}
-.odontogram-tooth small{font-size:.56rem;color:#475569;line-height:1.2;text-align:center;padding:0 2px}
+.odontogram-scroll{overflow-x:auto;padding:2px 2px 8px}
+.odontogram-arches{min-width:760px}
+.odontogram-arch{display:grid;grid-template-columns:repeat(16,minmax(36px,1fr));gap:3px;min-height:84px;align-items:start}
+.odontogram-page .odontogram-tooth{padding:3px 1px 4px;min-height:76px;border:1px solid #CBD5E1;background:rgba(255,255,255,0.9);display:flex;align-items:center;flex-direction:column;gap:1px;border-radius:6px;transition:transform 0.15s ease}
+.odontogram-tooth svg{width:26px;height:36px}
+.odontogram-tooth span{font-size:.78rem;font-weight:750;color:#1E293B}
+.odontogram-tooth small{font-size:.52rem;color:#475569;line-height:1.15;text-align:center;padding:0 1px}
 .odontogram-page .odontogram-selected{border:2px solid #1D4ED8;background:#DBEAFE;box-shadow:0 0 0 2px rgba(29,78,216,0.25)}
+.odontogram-ai-banner{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:10px;margin-bottom:10px;font-size:0.82rem;color:#064e3b!important}
+.odontogram-ai-banner strong{color:#064e3b!important}
+.odontogram-ai-sparkle{color:#047857;font-weight:800;margin-right:4px}
+.odontogram-ai-apply-btn{padding:5px 12px!important;min-height:30px!important;font-size:0.78rem!important;background:#047857!important;color:white!important;border:0!important;border-radius:6px!important;font-weight:700!important}
+.is-ai-flagged{border-color:#10b981!important;box-shadow:0 0 0 2px rgba(16,185,129,0.4)!important}
 .odontogram-legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px;font-size:.8rem;color:#475569}
 .odontogram-legend span{display:flex;gap:6px;align-items:center}
 .odontogram-page i{display:inline-block;width:11px;height:11px;border-radius:50%;flex-shrink:0}
@@ -784,9 +980,19 @@ const STYLES = `
 .odontogram-toggle-btn.is-active{background:#1D4ED8!important;color:white!important;border-color:#1D4ED8!important}
 .odontogram-rotation-box{display:flex;align-items:center;gap:8px;font-size:0.82rem;font-weight:600;color:#1D4ED8;background:#DBEAFE;padding:5px 10px;border-radius:8px;border:1px solid #CBD5E1}
 .odontogram-rotation-box input{accent-color:#1D4ED8;width:120px;cursor:pointer}
-.odontogram-scroll-3d{perspective:1100px;overflow-x:auto;padding:12px 4px 20px}
-.is-3d-arch{transform-style:preserve-3d;transition:transform 0.2s ease}
-.odontogram-tooth-3d{border-radius:44% 44% 28% 28%!important;background:linear-gradient(145deg,rgba(255,255,255,0.98),rgba(224,236,250,0.9))!important;box-shadow:inset 2px 1px 3px rgba(255,255,255,0.95),0 5px 8px rgba(15,23,42,0.12)!important}
+.odontogram-scroll-3d{perspective:1100px;overflow-x:auto;padding:14px 8px 22px;background:radial-gradient(ellipse at center,#3b1322 0%,#1f0d18 55%,#0f172a 100%);border-radius:16px}
+.odontogram-arch-header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.odontogram-quadrant-badges{display:flex;flex-wrap:wrap;gap:6px;font-size:0.72rem;font-weight:700;color:#1e3a8a}
+.odontogram-quadrant-badges span{background:#dbeafe;padding:3px 9px;border-radius:999px;border:1px solid rgba(29,78,216,0.25)}
+.odontogram-midline-tag{background:#fce7f3!important;color:#9d174d!important;border-color:#f9a8d4!important}
+.odontogram-midline-left{margin-right:6px;box-shadow:3px 0 0 0 rgba(29,78,216,0.45)}
+.odontogram-cruciform-plane{display:flex;justify-content:space-between;align-items:center;margin:10px 0;padding:5px 14px;border-radius:999px;background:linear-gradient(90deg,#dbeafe,#ffe4e6,#dbeafe);border:1px dashed #3b82f6;font-size:0.72rem;font-weight:800;text-transform:uppercase;color:#1e3a8a}
+.odontogram-anatomy-guide{text-align:center;margin:6px auto;padding:6px 14px;border-radius:999px;font-size:0.75rem;max-width:520px}
+.odontogram-anatomy-guide.is-palate{background:rgba(244,114,182,0.22);border:1px solid rgba(244,114,182,0.5);color:#9d174d}
+.odontogram-anatomy-guide.is-tongue{background:linear-gradient(90deg,#fb7185,#e11d48,#fb7185);color:#fff1f2!important;border:1px solid #fda4af;box-shadow:0 4px 12px rgba(225,29,72,0.28)}
+.is-3d-arch{transform-style:preserve-3d;transition:transform 0.2s ease;padding:12px 10px;border-radius:24px;background:linear-gradient(180deg,rgba(225,91,116,0.72),rgba(136,19,55,0.35));border-top:4px solid #fda4af}
+.odontogram-tooth-3d{border-radius:42% 42% 28% 28%!important;background:linear-gradient(160deg,#1e293b,#0f172a)!important;color:#f8fafc!important;box-shadow:inset 0 2px 3px rgba(255,255,255,0.25),0 6px 12px rgba(0,0,0,0.45)!important}
+.odontogram-tooth-3d span,.odontogram-tooth-3d small{color:#f8fafc!important}
 .odontogram-tooth-3d:hover{transform:translateY(-2px) scale(1.03)!important;box-shadow:0 7px 12px rgba(15,23,42,0.18)!important}
 
 /* Panel de Pacientes y Casos */

@@ -21,7 +21,7 @@ function readMessage(payload: unknown, status: number): string {
   if (typeof payload === 'string' && payload.trim()) return payload
   if (payload && typeof payload === 'object') {
     const data = payload as Record<string, unknown>
-    for (const key of ['message', 'detail', 'error']) {
+    for (const key of ['message', 'mensaje', 'detail', 'error']) {
       if (typeof data[key] === 'string' && data[key]) return data[key] as string
     }
   }

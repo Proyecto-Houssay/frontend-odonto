@@ -3,19 +3,14 @@ import { Outlet, useLocation } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Navbar } from './Navbar'
 import { ChatbotFloatingWidget } from '../chatbot/ChatbotFloatingWidget'
-import { useAuth } from '../../auth/useAuth'
-import { roleFromToken } from '../../auth/role'
 
 export const DashboardLayout: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const location = useLocation()
   const isChatbotRoute = location.pathname.startsWith('/chatbot')
-  const { session } = useAuth()
-  const role = session?.role || roleFromToken(session?.token || '')
-  const isDentist = role === 'ODONTOLOGO'
 
   return (
-    <div className="clinic-backdrop flex min-h-screen relative">
+    <div className="clinic-backdrop app-container flex min-h-screen relative">
       {/* Barra lateral de navegación */}
       <Sidebar
         isOpen={isSidebarOpen}
@@ -35,8 +30,8 @@ export const DashboardLayout: React.FC = () => {
         </main>
       </div>
 
-      {/* Widget flotante del Chatbot IA accesible en todo el sistema excepto para odontólogo o vista completa */}
-      {!isChatbotRoute && !isDentist && <ChatbotFloatingWidget />}
+      {/* Widget flotante del Chatbot IA adaptado por rol en todo el sistema salvo en la vista completa */}
+      {!isChatbotRoute && <ChatbotFloatingWidget />}
     </div>
   )
 }
