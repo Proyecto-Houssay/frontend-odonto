@@ -27,7 +27,7 @@ const navItems: NavItem[] = [
   { label: 'Gestión de Usuarios', to: '/usuarios', icon: UserRoundCog, roles: ['ADMINISTRADOR'] },
   { label: 'Informes', to: '/informes', icon: BarChart3, roles: STAFF_ROLES },
   { label: 'Informes (demo)', to: '/informes/demo', icon: BarChart3, roles: ['ADMINISTRADOR'] },
-  { label: 'Asistente IA', to: '/chatbot', icon: MessageCircle, roles: ['ADMINISTRADOR'] },
+  { label: 'Asistente IA', to: '/chatbot', icon: MessageCircle, roles: STAFF_ROLES },
 ]
 
 const plannedByRole: Record<StaffRole, { label: string; icon: ElementType }[]> = {

@@ -66,7 +66,7 @@ function AppRoutes() {
         {role === 'ADMINISTRADOR' ? <Route path="usuarios" element={<UsuariosPage />} /> : null}
         <Route path="informes" element={<ReportsPage />} />
         {role === 'ADMINISTRADOR' ? <Route path="informes/demo" element={<InformesPage />} /> : null}
-        {role === 'ADMINISTRADOR' ? <Route path="chatbot" element={<ChatbotPage />} /> : null}
+        <Route path="chatbot" element={<ChatbotPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
