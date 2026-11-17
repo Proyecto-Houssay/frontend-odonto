@@ -21,13 +21,4 @@ export default defineConfig({
       },
     },
   },
-  preview: {
-    port: 4173,
-    proxy: {
-      '/api': {
-        target: process.env.ODONTO_API_TARGET || 'http://localhost:8080',
-        changeOrigin: true,
-      },
-    },
-  },
 })

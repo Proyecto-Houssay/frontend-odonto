@@ -633,14 +633,14 @@ export function TurnosPage({ token }: { token?: string } = {}) {
                 {viewMode === 'month' ? monthRangeLabel(calendarMonth) : formatDate(week, { month: 'long', year: 'numeric' })}
               </h2>
             </div>
-            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-              <label className="relative w-full sm:w-auto">
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="relative">
                 <span className="sr-only">Filtrar por odontólogo</span>
                 <Stethoscope className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-700" size={16} />
                 <select
                   value={dentistFilter}
                   onChange={(event) => setDentistFilter(event.target.value)}
-                  className="w-full sm:max-w-52 rounded-lg border-2 border-[#B8AE99] bg-white py-2 pl-9 pr-3 text-sm font-bold text-slate-900 outline-none focus:border-teal-700"
+                  className="max-w-52 rounded-lg border-2 border-[#B8AE99] bg-white py-2 pl-9 pr-3 text-sm font-bold text-slate-900 outline-none focus:border-teal-700"
                 >
                   <option value="all">Todo el equipo</option>
                   {dentists.map((dentist) => (

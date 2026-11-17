@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
 import {
   Activity,
   AlertCircle,
@@ -25,12 +25,11 @@ import { Link, NavLink, Navigate, Route, Routes, useLocation } from 'react-route
 import { ApiError, apiRequest } from '../lib/api'
 import { NovadentBrand } from '../components/brand/NovadentBrand'
 import { ChatbotFloatingWidget } from '../components/chatbot/ChatbotFloatingWidget'
+import { FaceCheckin } from '../components/FaceCheckin'
+import { ChatbotPage } from './ChatbotPage'
+import { DrAnniePage } from './DrAnniePage'
+import { MiOdontograma } from './MiOdontograma'
 import { useTheme } from '../lib/useTheme'
-
-const ChatbotPage = lazy(() => import('./ChatbotPage').then(m => ({ default: m.ChatbotPage })))
-const FaceCheckin = lazy(() => import('../components/FaceCheckin').then(m => ({ default: m.FaceCheckin })))
-const DrAnniePage = lazy(() => import('./DrAnniePage').then(m => ({ default: m.DrAnniePage })))
-const MiOdontograma = lazy(() => import('./MiOdontograma').then(m => ({ default: m.MiOdontograma })))
 
 type Perfil = {
   id: number
@@ -574,7 +573,7 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
           <NovadentBrand compact />
           <nav
             aria-label="Navegación del paciente"
-            className="mt-3 sm:mt-5 flex gap-1.5 overflow-x-auto pb-1.5 no-scrollbar border-t border-blue-100 pt-3 lg:flex-col lg:overflow-visible"
+            className="mt-5 flex flex-wrap gap-1 border-t border-blue-100 pt-4 lg:flex-col"
           >
             {PATIENT_LINKS.map(({ label, to, icon: Icon }) => (
               <NavLink
@@ -582,7 +581,7 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
                 to={to}
                 end={to === '/'}
                 className={({ isActive }) =>
-                  `flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs sm:text-sm font-semibold whitespace-nowrap transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
+                  `flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
                     isActive
                       ? 'bg-blue-600 text-white shadow-sm'
                       : 'text-slate-800 hover:bg-blue-50 hover:text-blue-800'
@@ -611,18 +610,18 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
         <div className="min-w-0">
           <header
             id="inicio"
-            className="flex flex-wrap items-center justify-between gap-3 sm:gap-4 rounded-2xl border border-slate-300 bg-white/88 px-4 py-3 sm:px-6 sm:py-4 shadow-lg shadow-blue-950/5 backdrop-blur-xl"
+            className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-300 bg-white/88 px-5 py-4 shadow-lg shadow-blue-950/5 backdrop-blur-xl sm:px-6"
           >
-            <div className="min-w-0">
-              <p className="text-[0.68rem] sm:text-[0.72rem] font-bold uppercase tracking-[0.16em] text-blue-700 truncate">
+            <div>
+              <p className="text-[0.72rem] font-bold uppercase tracking-[0.16em] text-blue-700">
                 Portal del paciente
               </p>
-              <h1 className="mt-0.5 text-xl font-extrabold tracking-tight text-slate-950 sm:text-3xl truncate">
+              <h1 className="mt-0.5 text-2xl font-extrabold tracking-tight text-slate-950 sm:text-3xl">
                 {page.title}
               </h1>
-              <p className="mt-0.5 text-xs sm:text-sm font-medium text-slate-700 line-clamp-1 sm:line-clamp-none">{page.subtitle}</p>
+              <p className="mt-0.5 text-sm font-medium text-slate-700">{page.subtitle}</p>
             </div>
-            <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+            <div className="flex items-center gap-2.5">
               {/* Botón de Tema: Modo oscuro (Naranja con Luna negra) / Modo claro (Celeste con Sol amarillo) */}
               <button
                 type="button"
@@ -633,7 +632,7 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
                     ? { backgroundColor: '#38bdf8', color: '#082f49', borderColor: '#0284c7' }
                     : { backgroundColor: '#f97316', color: '#09090b', borderColor: '#c2410c' }
                 }
-                className={`flex min-h-9 sm:min-h-10 items-center gap-1.5 sm:gap-2 rounded-xl border-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-xs sm:text-sm font-extrabold shadow-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 ${
+                className={`flex min-h-10 items-center gap-2 rounded-xl border-2 px-3.5 py-2 text-sm font-extrabold shadow-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 ${
                   theme === 'dark'
                     ? 'border-sky-500 bg-sky-300 text-slate-950 hover:bg-sky-200 focus-visible:outline-sky-400'
                     : 'border-orange-700 bg-orange-500 text-slate-950 hover:bg-orange-600 focus-visible:outline-orange-600'
@@ -642,19 +641,19 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
                 {theme === 'dark' ? (
                   <Sun
                     aria-hidden="true"
-                    size={17}
+                    size={18}
                     className="text-yellow-300 fill-yellow-400 drop-shadow-[0_1px_1px_rgba(0,0,0,0.45)]"
                     style={{ color: '#fde047', fill: '#facc15' }}
                   />
                 ) : (
                   <Moon
                     aria-hidden="true"
-                    size={17}
+                    size={18}
                     className="text-black fill-black"
                     style={{ color: '#000000', fill: '#000000' }}
                   />
                 )}
-                <span className="hidden sm:inline">{theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}</span>
+                {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
               </button>
 
               {/* Botón Cerrar sesión siempre en Rojo intenso */}
@@ -662,11 +661,9 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
                 type="button"
                 onClick={onLogout}
                 style={{ backgroundColor: '#dc2626', color: '#ffffff', borderColor: '#b91c1c' }}
-                className="flex min-h-9 sm:min-h-10 items-center gap-1.5 sm:gap-2 rounded-xl border border-red-700 bg-red-600 px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold text-white shadow-sm transition hover:bg-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+                className="flex min-h-10 items-center gap-2 rounded-xl border border-red-700 bg-red-600 px-3.5 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
               >
-                <LogOut size={15} className="text-white shrink-0" />
-                <span className="hidden sm:inline">Cerrar sesión</span>
-                <span className="sm:hidden">Salir</span>
+                <LogOut size={16} className="text-white" /> Cerrar sesión
               </button>
             </div>
           </header>
@@ -687,22 +684,16 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
             )}
 
             {location.pathname === '/chatbot' ? (
-              <Suspense fallback={<p className="rounded-xl bg-white/90 p-5 font-medium animate-pulse">Cargando asistente…</p>}>
-                <ChatbotPage />
-              </Suspense>
+              <ChatbotPage />
             ) : location.pathname === '/dr-annie' ? (
-              <Suspense fallback={<p className="rounded-xl bg-white/90 p-5 font-medium animate-pulse">Cargando Dr. Annie…</p>}>
-                <DrAnniePage />
-              </Suspense>
+              <DrAnniePage />
             ) : location.pathname === '/check-in' ? (
-              <Suspense fallback={<p className="rounded-xl bg-white/90 p-5 font-medium animate-pulse">Cargando check-in facial…</p>}>
-                <FaceCheckin
-                  token={token}
-                  role="PACIENTE"
-                  initialDni={perfil?.dni}
-                  initialPatient={perfil ? { ...perfil, telefono: perfil.telefono ?? null } : null}
-                />
-              </Suspense>
+              <FaceCheckin
+                token={token}
+                role="PACIENTE"
+                initialDni={perfil?.dni}
+                initialPatient={perfil ? { ...perfil, telefono: perfil.telefono ?? null } : null}
+              />
             ) : loading ? (
               <p className="rounded-xl bg-white/90 p-5 font-medium">Cargando tu información…</p>
             ) : !perfil ? (
@@ -757,7 +748,7 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
               </section>
             ) : (
               <Routes>
-                <Route path="/mi-odontograma" element={<Suspense fallback={<p className="rounded-xl bg-white/90 p-5 font-medium animate-pulse">Cargando odontograma…</p>}><MiOdontograma token={token} /></Suspense>} />
+                <Route path="/mi-odontograma" element={<MiOdontograma token={token} />} />
 
                 {/* RUTA 1: INICIO */}
                 <Route
@@ -1152,7 +1143,7 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
                                       <h3 className="font-extrabold text-slate-950">
                                         Pieza {item.pieza} · {nombrePieza(item.pieza)}
                                       </h3>
-                                      <time className="text-xs font-semibold text-slate-700">
+                                      <time className="text-xs font-semibold text-slate-600">
                                         {item.creadoEn
                                           ? new Date(item.creadoEn).toLocaleString('es-AR')
                                           : 'Reporte #' + item.id}
@@ -1297,7 +1288,7 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
                             <button
                               type="button"
                               onClick={() => setShowBooking(false)}
-                              className="text-xs font-bold text-slate-700 hover:text-slate-900"
+                              className="text-xs font-bold text-slate-500 hover:text-slate-800"
                             >
                               Cerrar ✕
                             </button>
@@ -1309,7 +1300,7 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
                               <label htmlFor="booking-doctor" className="block text-xs font-bold text-slate-800">
                                 Odontólogo / Especialista
                               </label>
-                              <span className="text-[11px] font-semibold text-slate-700">
+                              <span className="text-[11px] font-semibold text-slate-600">
                                 {bookingDoctors.length} profesionales disponibles
                               </span>
                             </div>
@@ -1412,12 +1403,12 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
                               <span className="block text-xs font-bold text-slate-800">
                                 Horarios del odontólogo {bookingDoctors.find(d => String(d.id) === bookingDoctorId)?.nombreCompleto ? `· Dr./Dra. ${bookingDoctors.find(d => String(d.id) === bookingDoctorId)?.nombreCompleto}` : ''}
                               </span>
-                              <span className="text-[11px] font-semibold text-slate-700">
+                              <span className="text-[11px] font-semibold text-slate-600">
                                 🟢 {bookingSlots.length} libres · ⚪ {Math.max(0, bookingClinicHours.length - bookingSlots.length)} ocupados
                               </span>
                             </div>
                             {loadingSlots ? (
-                              <p className="text-xs font-medium text-slate-700 animate-pulse">Consultando horarios libres en tiempo real…</p>
+                              <p className="text-xs font-medium text-slate-600 animate-pulse">Consultando horarios libres en tiempo real…</p>
                             ) : bookingClinicHours.length === 0 ? (
                               <p className="rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-xs font-medium text-amber-900">
                                 El consultorio permanece cerrado los domingos. Por favor seleccioná un día de lunes a sábado.
@@ -1434,7 +1425,7 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
                                         type="button"
                                         aria-label={`${horaKey} hs`}
                                         onClick={() => setBookingHora(horaKey)}
-                                        className={`rounded-lg px-3 py-2 sm:py-1.5 text-xs font-bold transition inline-flex items-center justify-center min-h-[42px] gap-1.5 active:scale-95 ${
+                                        className={`rounded-lg px-3 py-1.5 text-xs font-bold transition inline-flex items-center gap-1.5 ${
                                           isSelected
                                             ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-400'
                                             : 'bg-emerald-50 border border-emerald-400 text-emerald-950 hover:border-emerald-600 hover:bg-emerald-100'
@@ -1451,12 +1442,12 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
                                   return (
                                     <span
                                       key={horaKey}
-                                      className="rounded-lg border border-slate-200 bg-slate-100/90 px-3 py-2 sm:py-1.5 text-xs font-semibold text-slate-400 cursor-not-allowed inline-flex items-center justify-center min-h-[42px] gap-1.5"
+                                      className="rounded-lg border border-slate-200 bg-slate-100/90 px-3 py-1.5 text-xs font-semibold text-slate-400 cursor-not-allowed inline-flex items-center gap-1.5"
                                       title="Horario ocupado (turno asignado)"
                                     >
                                       <span className="h-2 w-2 rounded-full bg-slate-400 shrink-0" aria-hidden="true" />
                                       <span>{horaKey} hs</span>
-                                      <span className="text-[10px] font-bold uppercase text-slate-700 bg-slate-200 px-1 py-0.5 rounded">
+                                      <span className="text-[10px] font-bold uppercase text-slate-500 bg-slate-200 px-1 py-0.5 rounded">
                                         Ocupado
                                       </span>
                                     </span>
@@ -1579,7 +1570,7 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
                           <p className="text-sm font-semibold text-slate-800">
                             Todavía no tenés turnos registrados.
                           </p>
-                          <p className="mt-1 text-xs text-slate-700">
+                          <p className="mt-1 text-xs text-slate-600">
                             Elegí a continuación un odontólogo y un horario libre para solicitar tu turno.
                           </p>
                           {!showBooking && (
@@ -1828,21 +1819,21 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
                       <h2 className="text-xl font-extrabold text-slate-950">Mis datos</h2>
                       <dl className="mt-5 grid gap-4 sm:grid-cols-2">
                         <div>
-                          <dt className="text-xs font-bold uppercase text-slate-700">Nombre completo</dt>
+                          <dt className="text-xs font-bold uppercase text-slate-600">Nombre completo</dt>
                           <dd className="mt-1 font-bold text-slate-950">
                             {perfil.nombre} {perfil.apellido}
                           </dd>
                         </div>
                         <div>
-                          <dt className="text-xs font-bold uppercase text-slate-700">DNI</dt>
+                          <dt className="text-xs font-bold uppercase text-slate-600">DNI</dt>
                           <dd className="mt-1 font-semibold text-slate-900">{perfil.dni}</dd>
                         </div>
                         <div>
-                          <dt className="text-xs font-bold uppercase text-slate-700">Correo electrónico</dt>
+                          <dt className="text-xs font-bold uppercase text-slate-600">Correo electrónico</dt>
                           <dd className="mt-1 break-all font-semibold text-slate-900">{perfil.email}</dd>
                         </div>
                         <div>
-                          <dt className="text-xs font-bold uppercase text-slate-700">Fecha de nacimiento</dt>
+                          <dt className="text-xs font-bold uppercase text-slate-600">Fecha de nacimiento</dt>
                           <dd className="mt-1 font-semibold text-slate-900">
                             {perfil.fechaNacimiento ? dateLabel(perfil.fechaNacimiento) : 'No registrada'}
                           </dd>

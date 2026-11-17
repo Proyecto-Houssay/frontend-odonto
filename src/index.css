@@ -1120,32 +1120,3 @@ html.dark .patient-rotation-control {
     background-attachment: scroll;
   }
 }
-
-/* ==========================================================================
-   MOBILE FIRST & TOUCH OPTIMIZATIONS (Smartphones & small screens)
-   ========================================================================== */
-@media (max-width: 640px) {
-  html {
-    font-size: 15px;
-  }
-
-  .app-container {
-    overflow-x: hidden;
-    width: 100%;
-  }
-
-  /* Safe tap target sizes */
-  button, a, input, select {
-    touch-action: manipulation;
-  }
-}
-
-/* Ocultar scrollbar visual pero mantener desplazamiento táctil fluido */
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
