@@ -18,10 +18,10 @@ import { CentroInteligentePage } from './pages/CentroInteligentePage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { PortalPaciente } from './pages/PortalPaciente'
 import { SeguimientoPage } from './pages/SeguimientoPage'
-import { ChatbotPage } from './pages/ChatbotPage'
-import { DrAnniePage } from './pages/DrAnniePage'
-import { FaceCheckin } from './components/FaceCheckin'
 
+const ChatbotPage = lazy(() => import('./pages/ChatbotPage').then(m => ({ default: m.ChatbotPage })))
+const DrAnniePage = lazy(() => import('./pages/DrAnniePage').then(m => ({ default: m.DrAnniePage })))
+const FaceCheckin = lazy(() => import('./components/FaceCheckin').then(m => ({ default: m.FaceCheckin })))
 const Odontograma = lazy(() => import('./pages/Odontograma.jsx'))
 function OdontogramaRoute({ demoMode, backendMode = false }: { demoMode: boolean; backendMode?: boolean }) {
   const { pacienteId } = useParams()
@@ -64,13 +64,13 @@ function AppRoutes() {
         <Route path="turnos" element={<TurnosPage token={session.token} />} />
         <Route path="teletriaje" element={<ClinicalRoute role={role} allowReception><TeletriajePage /></ClinicalRoute>} />
         <Route path="centro-inteligente" element={<ClinicalRoute role={role}><CentroInteligentePage token={session.token} /></ClinicalRoute>} />
-        <Route path="dr-annie" element={<ClinicalRoute role={role} allowReception><DrAnniePage /></ClinicalRoute>} />
+        <Route path="dr-annie" element={<ClinicalRoute role={role} allowReception><Suspense fallback={<p className="p-4 text-sm font-semibold text-slate-600">Cargando Dr. Annie...</p>}><DrAnniePage /></Suspense></ClinicalRoute>} />
         <Route path="historias-clinicas" element={<ClinicalRoute role={role}><HistoriasClinicasPage /></ClinicalRoute>} />
         {role === 'ADMINISTRADOR' ? <Route path="usuarios" element={<UsuariosPage />} /> : null}
         <Route path="informes" element={<ReportsPage />} />
         {role === 'ADMINISTRADOR' ? <Route path="informes/demo" element={<InformesPage />} /> : null}
-        <Route path="check-in" element={<ClinicalRoute role={role}><FaceCheckin /></ClinicalRoute>} />
-        <Route path="chatbot" element={<ChatbotPage />} />
+        <Route path="check-in" element={<ClinicalRoute role={role}><Suspense fallback={<p className="p-4 text-sm font-semibold text-slate-600">Cargando check-in facial...</p>}><FaceCheckin /></Suspense></ClinicalRoute>} />
+        <Route path="chatbot" element={<Suspense fallback={<p className="p-4 text-sm font-semibold text-slate-600">Cargando asistente...</p>}><ChatbotPage /></Suspense>} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

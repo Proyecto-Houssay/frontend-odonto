@@ -1,0 +1,3 @@
+# NovaDent robots.txt
+User-agent: *
+Allow: /
