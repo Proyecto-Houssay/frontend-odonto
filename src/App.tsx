@@ -19,6 +19,7 @@ import { NotFoundPage } from './pages/NotFoundPage'
 import { PortalPaciente } from './pages/PortalPaciente'
 import { SeguimientoPage } from './pages/SeguimientoPage'
 import { ChatbotPage } from './pages/ChatbotPage'
+import { DraZieglerPage } from './pages/DraZieglerPage'
 
 const Odontograma = lazy(() => import('./pages/Odontograma.jsx'))
 function OdontogramaRoute({ demoMode, backendMode = false }: { demoMode: boolean; backendMode?: boolean }) {
@@ -62,6 +63,7 @@ function AppRoutes() {
         <Route path="turnos" element={<TurnosPage token={session.token} />} />
         <Route path="teletriaje" element={<ClinicalRoute role={role} allowReception><TeletriajePage /></ClinicalRoute>} />
         <Route path="centro-inteligente" element={<ClinicalRoute role={role}><CentroInteligentePage /></ClinicalRoute>} />
+        <Route path="dra-ziegler" element={<ClinicalRoute role={role}><DraZieglerPage token={session.token} /></ClinicalRoute>} />
         <Route path="historias-clinicas" element={<ClinicalRoute role={role}><HistoriasClinicasPage /></ClinicalRoute>} />
         {role === 'ADMINISTRADOR' ? <Route path="usuarios" element={<UsuariosPage />} /> : null}
         <Route path="informes" element={<ReportsPage />} />

@@ -21,7 +21,7 @@ function readMessage(payload: unknown, status: number): string {
   if (typeof payload === 'string' && payload.trim()) return payload
   if (payload && typeof payload === 'object') {
     const data = payload as Record<string, unknown>
-    for (const key of ['message', 'detail', 'error']) {
+    for (const key of ['message', 'mensaje', 'detail', 'error']) {
       if (typeof data[key] === 'string' && data[key]) return data[key] as string
     }
   }
@@ -33,8 +33,9 @@ function readMessage(payload: unknown, status: number): string {
 
 export async function apiRequest<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
   const { method = 'GET', token, body, signal } = options
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData
   const headers: Record<string, string> = { Accept: 'application/json' }
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  if (body !== undefined && !isFormData) headers['Content-Type'] = 'application/json'
   if (token) headers.Authorization = `Bearer ${token.replace(/^Bearer\s+/i, '')}`
 
   let response: Response
@@ -42,7 +43,7 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
     response = await fetch(`${API_BASE_URL}${path}`, {
       method,
       headers,
-      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      ...(body !== undefined ? { body: isFormData ? body as FormData : JSON.stringify(body) } : {}),
       ...(signal ? { signal } : {}),
     })
   } catch (failure) {
