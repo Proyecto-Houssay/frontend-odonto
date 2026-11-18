@@ -20,7 +20,7 @@ const navItems: NavItem[] = [
   { label: 'Turnos', to: '/turnos', icon: CalendarDays, roles: STAFF_ROLES },
   { label: 'Teletriaje', to: '/teletriaje', icon: Video, roles: STAFF_ROLES },
   { label: 'Centro inteligente', to: '/centro-inteligente', icon: Sparkles, roles: ['ADMINISTRADOR', 'ODONTOLOGO'] },
-  { label: 'Dr. Annie (IA)', to: '/dr-annie', icon: ScanLine, roles: ['ADMINISTRADOR', 'ODONTOLOGO'] },
+  { label: 'Dra. Ziegler · Gemini', to: '/dra-ziegler', icon: ScanLine, roles: ['ADMINISTRADOR', 'ODONTOLOGO'] },
   { label: 'Odontólogos', to: '/odontologos', icon: Stethoscope, roles: ['ADMINISTRADOR', 'RECEPCIONISTA'] },
   { label: 'Historias Clínicas', to: '/historias-clinicas', icon: ClipboardList, roles: ['ADMINISTRADOR', 'ODONTOLOGO'] },
   { label: 'Odontograma', to: '/odontograma', icon: ClipboardList, roles: STAFF_ROLES },
