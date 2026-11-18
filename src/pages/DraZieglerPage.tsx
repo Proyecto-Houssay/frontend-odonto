@@ -8,6 +8,7 @@ type Analysis = {
   diagnosticoSugerido: string
   modeloUtilizado: string
   fechaAnalisis: string
+  etapaDentariaVisible: 'PRIMARIA' | 'MIXTA' | 'PERMANENTE' | 'NO_DETERMINABLE'
   estimacionesPrecio: PriceEstimate[]
   aclaracionPrecio: string
 }
@@ -106,7 +107,7 @@ export function DraZieglerPage({ token }: { token: string }) {
 
       {analysis && <section className="rounded-2xl border border-cyan-100 bg-white p-5 shadow-sm sm:p-7">
         <div className="flex items-center gap-2 text-slate-900"><CircleDollarSign size={20} className="text-cyan-700" /><h2 className="font-semibold">Referencias de costo del nomenclador</h2></div>
-        <p className="mt-2 text-sm text-slate-600">Valores particulares en pesos argentinos. Son referencias de la clínica, no una cotización personalizada ni una recomendación de tratamiento.</p>
+        <p className="mt-2 text-sm text-slate-600">Aranceles particulares en pesos argentinos del tarifario recibido. La referencia cambia según la etapa dentaria que Gemini pueda observar; no es una cotización ni indica que necesites un tratamiento.</p>
         {analysis.estimacionesPrecio?.length ? <ul className="mt-4 divide-y divide-slate-100">
           {analysis.estimacionesPrecio.map((estimate) => <li key={estimate.code} className="flex flex-wrap items-baseline justify-between gap-2 py-3 text-sm">
             <span className="text-slate-700">{estimate.prestation}</span><strong className="text-slate-950">{estimate.priceArs}</strong>
