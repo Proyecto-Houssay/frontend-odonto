@@ -9,6 +9,7 @@ import { HistoriasClinicasPage } from './pages/HistoriasClinicasPage'
 import { UsuariosPage } from './pages/UsuariosPage'
 import { InformesPage } from './pages/InformesPage'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { DraZieglerAccessPage } from './pages/DraZieglerAccessPage'
 
 const Odontograma = lazy(() => import('./pages/Odontograma.jsx'))
 function OdontogramaRoute({ demoMode, backendMode = false }: { demoMode: boolean; backendMode?: boolean }) {
@@ -32,6 +33,7 @@ export function App() {
           <Route path="historias-clinicas" element={<HistoriasClinicasPage />} />
           <Route path="usuarios" element={<UsuariosPage />} />
           <Route path="informes" element={<InformesPage />} />
+          <Route path="dra-ziegler" element={<DraZieglerAccessPage />} />
         </Route>
 
         {/* Ruta para capturar cualquier enlace no encontrado (404) */}

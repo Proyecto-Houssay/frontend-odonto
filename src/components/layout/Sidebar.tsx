@@ -9,7 +9,8 @@ import {
   UserCheck,
   BarChart3,
   X,
-  HeartPulse
+  HeartPulse,
+  ScanEye
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -32,6 +33,7 @@ const navItems: NavItem[] = [
   { label: 'Odontograma', to: '/odontograma', icon: ClipboardList },
   { label: 'Gestión de Usuarios', to: '/usuarios', icon: UserCheck },
   { label: 'Informes y Caja', to: '/informes', icon: BarChart3 },
+  { label: 'Dra. Ziegler · Gemini', to: '/dra-ziegler', icon: ScanEye },
 ]
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
