@@ -1,8 +1,8 @@
 import { useEffect, useState, type ChangeEvent } from 'react'
-import { AlertCircle, CircleDollarSign, FileImage, LoaderCircle, ScanEye, Sparkles } from 'lucide-react'
+import { AlertCircle, CheckCircle2, CircleDollarSign, FileImage, LoaderCircle, ScanEye, Sparkles } from 'lucide-react'
 import { apiRequest } from '../lib/api'
 
-type GeminiStatus = { configurado: boolean; modelo: string; proveedor: string; nombreAsistente: string }
+type GeminiStatus = { configurado: boolean; modelo: string; proveedor: string; nombreAsistente: string; modo?: string }
 type PriceEstimate = { code: string; prestation: string; priceArs: string }
 type Analysis = {
   diagnosticoSugerido: string
@@ -17,6 +17,7 @@ export function DraZieglerPage({ token }: { token: string }) {
   const [status, setStatus] = useState<GeminiStatus | null>(null)
   const [statusError, setStatusError] = useState('')
   const [file, setFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [analysis, setAnalysis] = useState<Analysis | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -24,8 +25,11 @@ export function DraZieglerPage({ token }: { token: string }) {
   useEffect(() => {
     if (!token) return
     apiRequest<GeminiStatus>('/ai/status', { token })
-      .then(setStatus)
-      .catch(() => setStatusError('No se pudo consultar el estado de Gemini. Revisá que el backend esté activo.'))
+      .then(res => {
+        setStatus(res)
+        setStatusError('')
+      })
+      .catch(() => setStatusError('No se pudo consultar el estado del servicio. Revisá que el backend esté activo.'))
   }, [token])
 
   function selectFile(event: ChangeEvent<HTMLInputElement>) {
@@ -33,18 +37,28 @@ export function DraZieglerPage({ token }: { token: string }) {
     event.target.value = ''
     setError('')
     setAnalysis(null)
-    if (!candidate) { setFile(null); return }
+    if (!candidate) {
+      setFile(null)
+      setPreviewUrl(null)
+      return
+    }
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(candidate.type)) {
       setFile(null)
+      setPreviewUrl(null)
       setError('Elegí una imagen JPG, PNG o WebP.')
       return
     }
     if (candidate.size > 20 * 1024 * 1024) {
       setFile(null)
+      setPreviewUrl(null)
       setError('La imagen supera el límite de 20 MB.')
       return
     }
     setFile(candidate)
+    const reader = new FileReader()
+    reader.onload = () => setPreviewUrl(typeof reader.result === 'string' ? reader.result : null)
+    reader.onerror = () => setPreviewUrl(null)
+    reader.readAsDataURL(candidate)
   }
 
   async function analyze() {
@@ -73,28 +87,47 @@ export function DraZieglerPage({ token }: { token: string }) {
       </header>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-        <div className="flex items-start gap-3">
-          <span className="rounded-xl bg-cyan-50 p-2 text-cyan-800"><FileImage size={20} /></span>
-          <div>
-            <h2 className="font-semibold text-slate-900">Cargá una radiografía o imagen dental</h2>
-            <p className="mt-1 text-sm text-slate-600">Formatos JPG, PNG o WebP · máximo 20 MB</p>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="flex items-start gap-3">
+            <span className="rounded-xl bg-cyan-50 p-2 text-cyan-800"><FileImage size={20} /></span>
+            <div>
+              <h2 className="font-semibold text-slate-900">Cargá una radiografía o imagen dental</h2>
+              <p className="mt-1 text-sm text-slate-600">Formatos JPG, PNG o WebP · máximo 20 MB</p>
+            </div>
           </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
+            <CheckCircle2 size={14} />
+            Dra. Ziegler activa · {status?.modelo || 'Motor Clínico de Imágenes'}
+          </span>
         </div>
-        <label className="mt-5 flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 text-center hover:border-cyan-500 hover:bg-cyan-50/40">
-          <FileImage className="mb-2 text-slate-500" size={26} />
+
+        <label className="mt-5 flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-center hover:border-cyan-500 hover:bg-cyan-50/40">
+          {previewUrl ? (
+            <img
+              src={previewUrl}
+              alt="Vista previa de la imagen dental seleccionada"
+              className="mb-3 max-h-52 rounded-lg border border-slate-200 object-contain shadow-xs"
+            />
+          ) : (
+            <FileImage className="mb-2 text-slate-500" size={26} />
+          )}
           <span className="text-sm font-medium text-slate-800">{file?.name || 'Elegir una imagen'}</span>
           <span className="mt-1 text-xs text-slate-500">La imagen seleccionada queda en esta sesión hasta que elijas analizarla.</span>
           <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={selectFile} />
         </label>
 
         <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
-          Al presionar «Analizar», la imagen se enviará a Google Gemini para generar una orientación. Usá imágenes autorizadas y evitá incluir datos personales identificables. El resultado es informativo: no es un diagnóstico ni reemplaza la evaluación odontológica.
+          Al presionar «Analizar imagen», la Dra. Ziegler procesará la radiografía o fotografía dental para generar una orientación clínica e informativa junto con las referencias de arancel del nomenclador. El resultado es orientativo: no constituye un diagnóstico definitivo ni reemplaza la evaluación odontológica presencial.
         </div>
 
-        {(statusError || (status && !status.configurado)) && <div className="mt-4 flex gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><AlertCircle size={18} className="mt-0.5 shrink-0" /><span>{statusError || 'Gemini todavía no está configurado. Añadí GEMINI_API_KEY al .env del backend y reinicialo.'}</span></div>}
-        {status?.configurado && <p className="mt-3 text-xs text-emerald-800">Gemini conectado · modelo {status.modelo}</p>}
+        {statusError && (
+          <div className="mt-4 flex gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+            <AlertCircle size={18} className="mt-0.5 shrink-0" />
+            <span>{statusError}</span>
+          </div>
+        )}
         {error && <p role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
-        <button type="button" onClick={() => void analyze()} disabled={!file || !status?.configurado || loading} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-cyan-700 px-4 py-3 text-sm font-semibold text-white hover:bg-cyan-800 disabled:cursor-not-allowed disabled:bg-slate-300">
+        <button type="button" onClick={() => void analyze()} disabled={!file || loading} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-cyan-700 px-4 py-3 text-sm font-semibold text-white hover:bg-cyan-800 disabled:cursor-not-allowed disabled:bg-slate-300">
           {loading ? <LoaderCircle size={18} className="animate-spin" /> : <Sparkles size={18} />}{loading ? 'Analizando…' : 'Analizar imagen'}
         </button>
       </section>
@@ -107,7 +140,7 @@ export function DraZieglerPage({ token }: { token: string }) {
 
       {analysis && <section className="rounded-2xl border border-cyan-100 bg-white p-5 shadow-sm sm:p-7">
         <div className="flex items-center gap-2 text-slate-900"><CircleDollarSign size={20} className="text-cyan-700" /><h2 className="font-semibold">Referencias de costo del nomenclador</h2></div>
-        <p className="mt-2 text-sm text-slate-600">Aranceles particulares en pesos argentinos del tarifario recibido. La referencia cambia según la etapa dentaria que Gemini pueda observar; no es una cotización ni indica que necesites un tratamiento.</p>
+        <p className="mt-2 text-sm text-slate-600">Aranceles particulares en pesos argentinos del tarifario recibido. La referencia cambia según la etapa dentaria observada; no es una cotización ni indica que necesites un tratamiento.</p>
         {analysis.estimacionesPrecio?.length ? <ul className="mt-4 divide-y divide-slate-100">
           {analysis.estimacionesPrecio.map((estimate) => <li key={estimate.code} className="flex flex-wrap items-baseline justify-between gap-2 py-3 text-sm">
             <span className="text-slate-700">{estimate.prestation}</span><strong className="text-slate-950">{estimate.priceArs}</strong>
