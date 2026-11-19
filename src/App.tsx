@@ -20,6 +20,7 @@ import { PortalPaciente } from './pages/PortalPaciente'
 import { SeguimientoPage } from './pages/SeguimientoPage'
 import { ChatbotPage } from './pages/ChatbotPage'
 import { DraZieglerPage } from './pages/DraZieglerPage'
+import { FaceCheckin } from './components/FaceCheckin'
 
 const Odontograma = lazy(() => import('./pages/Odontograma.jsx'))
 function OdontogramaRoute({ demoMode, backendMode = false }: { demoMode: boolean; backendMode?: boolean }) {
@@ -52,22 +53,23 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<DashboardLayout />}>
-        <Route index element={<DashboardHome role={role} token={session.token} />} />
+        <Route index element={<DashboardHome role={role} token={session.token} onVerified={() => undefined} />} />
         <Route path="pacientes" element={<PacientesPage />} />
         <Route path="seguimiento" element={<ClinicalRoute role={role}><SeguimientoPage token={session.token} role={role} /></ClinicalRoute>} />
-        <Route path="odontograma" element={<ClinicalRoute role={role} allowReception><OdontogramaRoute demoMode={false} backendMode /></ClinicalRoute>} />
+        <Route path="odontograma" element={<ClinicalRoute role={role} allowReception><OdontogramaRoute demoMode={false} /></ClinicalRoute>} />
         <Route path="odontograma/backend" element={<ClinicalRoute role={role} allowReception><OdontogramaRoute demoMode={false} backendMode /></ClinicalRoute>} />
         <Route path="odontograma/demo" element={<ClinicalRoute role={role}><OdontogramaRoute demoMode /></ClinicalRoute>} />
         <Route path="pacientes/:pacienteId/odontograma" element={<ClinicalRoute role={role} allowReception><OdontogramaRoute demoMode={false} /></ClinicalRoute>} />
         <Route path="odontologos" element={<OdontologosPage />} />
         <Route path="turnos" element={<TurnosPage token={session.token} />} />
         <Route path="teletriaje" element={<ClinicalRoute role={role} allowReception><TeletriajePage /></ClinicalRoute>} />
-        <Route path="centro-inteligente" element={<ClinicalRoute role={role}><CentroInteligentePage /></ClinicalRoute>} />
+        <Route path="centro-inteligente" element={<ClinicalRoute role={role}><CentroInteligentePage token={session.token} /></ClinicalRoute>} />
         <Route path="dra-ziegler" element={<ClinicalRoute role={role}><DraZieglerPage token={session.token} /></ClinicalRoute>} />
         <Route path="historias-clinicas" element={<ClinicalRoute role={role}><HistoriasClinicasPage /></ClinicalRoute>} />
         {role === 'ADMINISTRADOR' ? <Route path="usuarios" element={<UsuariosPage />} /> : null}
         <Route path="informes" element={<ReportsPage />} />
         {role === 'ADMINISTRADOR' ? <Route path="informes/demo" element={<InformesPage />} /> : null}
+        <Route path="check-in" element={<ClinicalRoute role={role}><FaceCheckin /></ClinicalRoute>} />
         <Route path="chatbot" element={<ChatbotPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>

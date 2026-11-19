@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import {
   Activity, Accessibility, AlertTriangle, ArrowRight, CalendarClock, Check, CheckCircle2,
   CircleHelp, Eye, HeartHandshake, History, LoaderCircle, LockKeyhole,
   RefreshCw, ShieldCheck, Sparkles, Stethoscope, Users, Video,
 } from 'lucide-react'
+import { AuthContext } from '../auth/context'
 
 type Patient = { id: number; nombre: string; apellido: string; dni?: string }
 type Dentist = { id: number; nombre: string; apellido: string; activo?: boolean; especialidad?: { nombre: string } }
@@ -24,15 +25,8 @@ const SESSION_KEY = 'novadent.auth.session'
 const FOLLOWUP_KEY = 'novadent.followup.done'
 const privacyCopy = 'La prioridad del teletriaje es una orientación para ordenar la atención. No es un diagnóstico ni reemplaza la evaluación de un profesional.'
 
-function token() {
+function authToken() {
   try { return (JSON.parse(sessionStorage.getItem(SESSION_KEY) || '{}') as { token?: string }).token } catch { return undefined }
-}
-
-async function api<T>(path: string): Promise<T> {
-  const bearer = token()
-  const response = await fetch(`/api${path}`, { headers: { Accept: 'application/json', ...(bearer ? { Authorization: `Bearer ${bearer.replace(/^Bearer\s+/i, '')}` } : {}) } })
-  if (!response.ok) throw new Error(response.status === 401 ? 'Iniciá sesión para ver datos de la agenda.' : `No se pudieron cargar los datos (HTTP ${response.status}).`)
-  return response.json() as Promise<T>
 }
 
 function dateKey(date: Date) {
@@ -50,7 +44,17 @@ function Panel({ children, className = '' }: { children: React.ReactNode; classN
   return <section className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${className}`}>{children}</section>
 }
 
-export function CentroInteligentePage() {
+export function CentroInteligentePage({ token: propToken }: { token?: string } = {}) {
+  const auth = useContext(AuthContext)
+  const activeToken = propToken || auth?.session?.token?.replace(/^Bearer\s+/i, '') || authToken()
+
+  const api = useCallback(async <T,>(path: string): Promise<T> => {
+    const bearer = activeToken
+    const response = await fetch(`/api${path}`, { headers: { Accept: 'application/json', ...(bearer ? { Authorization: `Bearer ${bearer.replace(/^Bearer\s+/i, '')}` } : {}) } })
+    if (!response.ok) throw new Error(response.status === 401 ? 'Iniciá sesión para ver datos de la agenda.' : `No se pudieron cargar los datos (HTTP ${response.status}).`)
+    return response.json() as Promise<T>
+  }, [activeToken])
+
   const [tab, setTab] = useState<Tab>('resumen')
   const [patients, setPatients] = useState<Patient[]>([])
   const [dentists, setDentists] = useState<Dentist[]>([])
@@ -76,28 +80,42 @@ export function CentroInteligentePage() {
     setLoading(true); setError('')
     try {
       const today = new Date()
-      const until = new Date(today); until.setDate(until.getDate() + 90)
-      const [patientsData, dentistsData, turnosData, triageData, teleData] = await Promise.all([
-        api<Patient[]>('/pacientes'), api<Dentist[]>('/odontologos'), api<Appointment[]>('/turnos'),
+      const until = new Date(today); until.setDate(until.getDate() + 30)
+      const [patientsRes, dentistsRes, turnosRes, triageRes, teleRes] = await Promise.allSettled([
+        api<Patient[]>('/pacientes'),
+        api<Dentist[]>('/odontologos'),
+        api<Appointment[]>('/turnos'),
         api<Triage[]>('/teletriaje/solicitudes'),
         api<Array<{ turnoId: number; fecha: string; hora: string; estadoTurno?: string; pacienteId?: number; pacienteNombre?: string; odontologoId?: number; odontologoNombre?: string }>>(`/teletriaje/citas/agenda?desde=${dateKey(today)}&hasta=${dateKey(until)}`),
       ])
+
+      const patientsData = patientsRes.status === 'fulfilled' && Array.isArray(patientsRes.value) ? patientsRes.value : []
+      const dentistsData = dentistsRes.status === 'fulfilled' && Array.isArray(dentistsRes.value) ? dentistsRes.value : []
+      const turnosData = turnosRes.status === 'fulfilled' && Array.isArray(turnosRes.value) ? turnosRes.value : []
+      const triageData = triageRes.status === 'fulfilled' && Array.isArray(triageRes.value) ? triageRes.value : []
+      const teleData = teleRes.status === 'fulfilled' && Array.isArray(teleRes.value) ? teleRes.value : []
+
+      if (patientsRes.status === 'rejected' && turnosRes.status === 'rejected') {
+        const firstErr = patientsRes.reason || turnosRes.reason
+        throw firstErr instanceof Error ? firstErr : new Error('No se pudieron sincronizar los datos de la agenda.')
+      }
+
       const virtualIds = new Set(teleData.map((item) => item.turnoId))
       const teleAppointments: Appointment[] = teleData.map((item) => ({
         id: item.turnoId, fecha: item.fecha, hora: item.hora, estado: item.estadoTurno || 'Confirmado', telemedicina: true,
         paciente: item.pacienteNombre ? { id: item.pacienteId || 0, nombre: item.pacienteNombre, apellido: '' } : undefined,
         odontologo: item.odontologoNombre ? { id: item.odontologoId || 0, nombre: item.odontologoNombre, apellido: '' } : undefined,
       }))
-      setPatients(Array.isArray(patientsData) ? patientsData : [])
-      setDentists(Array.isArray(dentistsData) ? dentistsData : [])
-      const allTurns = Array.isArray(turnosData) ? turnosData.filter((item) => !virtualIds.has(item.id)) : []
+      setPatients(patientsData)
+      setDentists(dentistsData)
+      const allTurns = turnosData.filter((item) => !virtualIds.has(item.id))
       setAppointments([...allTurns, ...teleAppointments].sort((a, b) => `${a.fecha}${a.hora}`.localeCompare(`${b.fecha}${b.hora}`)))
-      setTriage(Array.isArray(triageData) ? triageData : [])
+      setTriage(triageData)
       setSelectedPatientId((current) => current || String(patientsData[0]?.id || ''))
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'No se pudo conectar con la agenda.')
     } finally { setLoading(false) }
-  }, [])
+  }, [api])
 
   useEffect(() => { void load() }, [load])
   useEffect(() => {
@@ -151,14 +169,14 @@ export function CentroInteligentePage() {
   ]
 
   return <main className={`mx-auto max-w-7xl space-y-6 p-4 md:p-8 ${largeText ? 'text-lg' : ''} ${highContrast ? 'contrast-125' : ''}`}>
-    <header className="overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-blue-950 to-cyan-900 p-6 text-white shadow-xl md:p-8">
+    <section className="dark-hero overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-blue-950 to-cyan-900 p-6 text-white shadow-xl md:p-8">
       <div className="flex flex-wrap items-start justify-between gap-5">
         <div className="max-w-3xl">
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold"><Sparkles size={14}/> NOVADENT · CUIDADO CONECTADO</div>
-          <h1 className="text-3xl font-bold tracking-tight md:text-4xl">Centro de atención inteligente</h1>
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white"><Sparkles size={14}/> NOVADENT · CUIDADO CONECTADO</div>
+          <h1 className="text-3xl font-bold tracking-tight text-white md:text-4xl">Centro de atención inteligente</h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-blue-100 md:text-base">Un recorrido coordinado desde la primera señal hasta el seguimiento, con el equipo clínico tomando las decisiones.</p>
         </div>
-        <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold hover:bg-white/20 disabled:opacity-60"><RefreshCw size={16} className={loading ? 'animate-spin' : ''}/> Actualizar</button>
+        <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/20 disabled:opacity-60"><RefreshCw size={16} className={loading ? 'animate-spin' : ''}/> Actualizar</button>
       </div>
       <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi label="Próximas atenciones" value={String(upcoming.length)} hint="Turnos y teleconsultas" icon={<CalendarClock/>}/>
@@ -166,7 +184,7 @@ export function CentroInteligentePage() {
         <Kpi label="Señales para revisión humana" value={String(alertCount)} hint="Prioridad sugerida; validar" icon={<AlertTriangle/>}/>
         <Kpi label="Profesionales activos" value={String(dentists.filter((item) => item.activo !== false).length)} hint="Disponibilidad consultable" icon={<Stethoscope/>}/>
       </div>
-    </header>
+    </section>
 
     <nav aria-label="Herramientas de atención" className="flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
       {tabs.map(({ id, label, icon: Icon }) => <button key={id} type="button" onClick={() => setTab(id)} aria-current={tab === id ? 'page' : undefined} className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${tab === id ? 'bg-blue-700 text-white shadow' : 'text-slate-600 hover:bg-slate-100'}`}><Icon size={16}/>{label}</button>)}
@@ -203,7 +221,16 @@ export function CentroInteligentePage() {
 }
 
 function Kpi({ label, value, hint, icon }: { label: string; value: string; hint: string; icon: React.ReactNode }) {
-  return <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm"><div className="flex items-center justify-between text-blue-100"><span className="text-xs font-semibold">{label}</span><span>{icon}</span></div><p className="mt-2 text-3xl font-bold">{value}</p><p className="mt-1 text-xs text-blue-100/80">{hint}</p></div>
+  return (
+    <div className="dark-kpi rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-sm text-white shadow-xs">
+      <div className="flex items-center justify-between text-blue-100">
+        <span className="text-xs font-semibold text-blue-100">{label}</span>
+        <span className="text-blue-100">{icon}</span>
+      </div>
+      <p className="mt-2 text-3xl font-bold text-white">{value}</p>
+      <p className="mt-1 text-xs text-blue-100/90">{hint}</p>
+    </div>
+  )
 }
 function Empty({ children }: { children: React.ReactNode }) {
   return <div className="rounded-xl border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">{children}</div>

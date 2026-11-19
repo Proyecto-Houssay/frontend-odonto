@@ -36,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null)
   }, [])
 
-  const login = useCallback(async (usernameOrEmail: string, password: string) => {
+  const login = useCallback(async (usernameOrEmail: string, password: string): Promise<AppRole> => {
     const response = await apiRequest<LoginResponse>('/auth/login', {
       method: 'POST',
       body: { usernameOrEmail, password },
@@ -52,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role: response.role,
       expiresAt: Date.now() + response.expiresIn * 1000,
     })
+    return response.role
   }, [])
 
   useEffect(() => {

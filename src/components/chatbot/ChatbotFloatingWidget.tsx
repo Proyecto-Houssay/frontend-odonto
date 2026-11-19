@@ -1,9 +1,35 @@
-import React, { useState } from 'react'
+import React, { useContext, useState } from 'react'
 import { X, Bot, Sparkles, ChevronDown } from 'lucide-react'
 import { ChatbotPage } from '../../pages/ChatbotPage'
+import { AuthContext } from '../../auth/context'
+import { roleFromToken, type UserRole } from '../../auth/role'
+
+const WIDGET_LABELS: Record<UserRole, { button: string; header: string }> = {
+  ODONTOLOGO: {
+    button: 'Copiloto Clínico',
+    header: 'Copiloto Clínico · Odontología',
+  },
+  ADMINISTRADOR: {
+    button: 'Asistente Admin',
+    header: 'Asistente de Gestión y RAG',
+  },
+  RECEPCIONISTA: {
+    button: 'Asistente Recepción',
+    header: 'Asistente de Recepción',
+  },
+  PACIENTE: {
+    button: 'Asistente IA',
+    header: 'Consultas rápidas con fuentes',
+  },
+}
 
 export const ChatbotFloatingWidget: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false)
+  const auth = useContext(AuthContext)
+  const session = auth?.session
+  const role: UserRole =
+    session?.role || (session?.token ? roleFromToken(session.token) : null) || 'PACIENTE'
+  const labels = WIDGET_LABELS[role]
 
   return (
     <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end">
@@ -13,7 +39,7 @@ export const ChatbotFloatingWidget: React.FC = () => {
           <div className="bg-slate-900 px-4 py-2 text-white flex items-center justify-between border-b border-slate-800">
             <div className="flex items-center gap-2 text-xs font-semibold">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Asistente RAG Novadent</span>
+              <span>{labels.header}</span>
             </div>
             <button
               type="button"
@@ -48,7 +74,7 @@ export const ChatbotFloatingWidget: React.FC = () => {
               <Bot className="w-5 h-5" />
               <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 border-2 border-indigo-600 rounded-full animate-pulse" />
             </div>
-            <span>Asistente IA</span>
+            <span>{labels.button}</span>
           </>
         )}
       </button>

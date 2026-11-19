@@ -208,7 +208,7 @@ export function ChatbotAgendaCard({ agenda, token, compact = false, onBooked }: 
 
   if (booked) {
     return (
-      <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-semibold text-emerald-900">
+      <div className="mt-3 flex items-center gap-2 rounded-xl border-2 border-emerald-500 bg-emerald-50 px-3 py-2.5 text-xs font-bold text-emerald-950">
         <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
         <span>
           Turno #{booked.turnoId} confirmado · {booked.fecha} a las {booked.hora.slice(0, 5)} hs · Dr./Dra. {booked.odontologoNombre}
@@ -222,14 +222,14 @@ export function ChatbotAgendaCard({ agenda, token, compact = false, onBooked }: 
   }
 
   return (
-    <form onSubmit={handleBook} className="mt-3 space-y-3 rounded-xl border border-blue-200 bg-white/95 p-3.5 text-slate-900 shadow-xs">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
-        <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-blue-800">
+    <form onSubmit={handleBook} className="mt-3 space-y-3 rounded-xl border-2 border-[#B8AE99] bg-[#FAF5E8] p-3.5 text-slate-950 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#B8AE99] pb-2">
+        <p className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide text-blue-900">
           <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
           Sacar turno desde el asistente
         </p>
         {selectedDoctor && (
-          <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-semibold text-blue-800">
+          <span className="rounded-full border border-blue-300 bg-blue-100 px-2.5 py-0.5 text-[11px] font-bold text-blue-950">
             {selectedDoctor.especialidad}
           </span>
         )}
@@ -237,7 +237,7 @@ export function ChatbotAgendaCard({ agenda, token, compact = false, onBooked }: 
 
       {quickSlots.length > 0 && (
         <div className="space-y-1.5">
-          <p className="text-[11px] font-semibold text-slate-600">Próximos turnos disponibles (clic rápido):</p>
+          <p className="text-[11px] font-bold text-slate-800">Próximos turnos disponibles (clic rápido):</p>
           <div className="flex flex-wrap gap-1.5">
             {quickSlots.map(slot => {
               const isSelected = String(slot.odontologoId) === doctorId && slot.fecha === fecha && slot.hora.slice(0, 5) === selectedHora
@@ -246,10 +246,10 @@ export function ChatbotAgendaCard({ agenda, token, compact = false, onBooked }: 
                   key={`${slot.odontologoId}-${slot.fecha}-${slot.hora}`}
                   type="button"
                   onClick={() => pickQuickSlot(slot)}
-                  className={`rounded-lg border px-2.5 py-1 text-left text-[11px] font-semibold transition ${
+                  className={`rounded-lg border px-2.5 py-1 text-left text-[11px] font-bold transition ${
                     isSelected
                       ? 'border-blue-700 bg-blue-700 text-white shadow-xs'
-                      : 'border-blue-200 bg-blue-50/70 text-blue-900 hover:border-blue-400 hover:bg-blue-100/70'
+                      : 'border-blue-300 bg-blue-50 text-blue-950 hover:border-blue-500 hover:bg-blue-100'
                   }`}
                 >
                   {slot.etiquetaFecha} · {slot.etiquetaHora} hs · {slot.odontologoNombre}
@@ -261,8 +261,8 @@ export function ChatbotAgendaCard({ agenda, token, compact = false, onBooked }: 
       )}
 
       <div className={`grid gap-2.5 ${compact ? 'grid-cols-1' : 'sm:grid-cols-2'}`}>
-        <label className="grid gap-1 text-xs font-semibold text-slate-700">
-          <span className="flex items-center gap-1"><Stethoscope className="h-3.5 w-3.5 text-blue-600" aria-hidden="true" /> Doctor disponible</span>
+        <label className="grid gap-1 text-xs font-bold text-slate-900">
+          <span className="flex items-center gap-1"><Stethoscope className="h-3.5 w-3.5 text-blue-700" aria-hidden="true" /> Doctor disponible</span>
           <select
             aria-label="Doctor disponible"
             value={doctorId}
@@ -271,7 +271,7 @@ export function ChatbotAgendaCard({ agenda, token, compact = false, onBooked }: 
               setSelectedHora('')
               setError('')
             }}
-            className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-900 outline-none focus:border-blue-600"
+            className="min-h-9 rounded-lg border-2 border-slate-400 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-950 outline-none focus:border-blue-600"
           >
             {agenda.doctores.map(doc => (
               <option key={doc.id} value={doc.id}>
@@ -281,9 +281,9 @@ export function ChatbotAgendaCard({ agenda, token, compact = false, onBooked }: 
           </select>
         </label>
 
-        <div className="grid gap-1 text-xs font-semibold text-slate-700">
+        <div className="grid gap-1 text-xs font-bold text-slate-900">
           <label htmlFor={`chat-date-${agenda.fechaConsultada || 'default'}`} className="flex items-center gap-1">
-            <CalendarDays className="h-3.5 w-3.5 text-blue-600" aria-hidden="true" /> Fecha del turno
+            <CalendarDays className="h-3.5 w-3.5 text-blue-700" aria-hidden="true" /> Fecha del turno
           </label>
           <div className="flex flex-wrap items-center gap-1.5">
             <input
@@ -296,24 +296,24 @@ export function ChatbotAgendaCard({ agenda, token, compact = false, onBooked }: 
                 setSelectedHora('')
                 setError('')
               }}
-              className="min-h-9 flex-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-900 outline-none focus:border-blue-600"
+              className="min-h-9 flex-1 rounded-lg border-2 border-slate-400 bg-white px-2.5 py-1 text-xs font-bold text-slate-950 outline-none focus:border-blue-600"
             />
-            <button type="button" onClick={() => { setFecha(today); setSelectedHora('') }} className={`rounded-md border px-2 py-1 text-[11px] font-semibold ${fecha === today ? 'border-blue-600 bg-blue-50 text-blue-800' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>Hoy</button>
-            <button type="button" onClick={() => { setFecha(tomorrow); setSelectedHora('') }} className={`rounded-md border px-2 py-1 text-[11px] font-semibold ${fecha === tomorrow ? 'border-blue-600 bg-blue-50 text-blue-800' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>Mañana</button>
-            <button type="button" onClick={() => { setFecha(dayAfter); setSelectedHora('') }} className={`rounded-md border px-2 py-1 text-[11px] font-semibold ${fecha === dayAfter ? 'border-blue-600 bg-blue-50 text-blue-800' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>Pasado</button>
+            <button type="button" onClick={() => { setFecha(today); setSelectedHora('') }} className={`rounded-md border px-2 py-1 text-[11px] font-bold ${fecha === today ? 'border-blue-700 bg-blue-100 text-blue-950' : 'border-slate-400 bg-white text-slate-800 hover:bg-slate-100'}`}>Hoy</button>
+            <button type="button" onClick={() => { setFecha(tomorrow); setSelectedHora('') }} className={`rounded-md border px-2 py-1 text-[11px] font-bold ${fecha === tomorrow ? 'border-blue-700 bg-blue-100 text-blue-950' : 'border-slate-400 bg-white text-slate-800 hover:bg-slate-100'}`}>Mañana</button>
+            <button type="button" onClick={() => { setFecha(dayAfter); setSelectedHora('') }} className={`rounded-md border px-2 py-1 text-[11px] font-bold ${fecha === dayAfter ? 'border-blue-700 bg-blue-100 text-blue-950' : 'border-slate-400 bg-white text-slate-800 hover:bg-slate-100'}`}>Pasado</button>
           </div>
         </div>
       </div>
 
       <div className="space-y-1.5">
-        <p className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-          <Clock3 className="h-3.5 w-3.5 text-blue-600" aria-hidden="true" />
+        <p className="flex items-center gap-1 text-xs font-bold text-slate-900">
+          <Clock3 className="h-3.5 w-3.5 text-blue-700" aria-hidden="true" />
           Horarios libres para el {fecha}
         </p>
         {loadingSlots ? (
-          <p className="text-xs text-slate-500">Consultando horarios libres…</p>
+          <p className="text-xs font-semibold text-slate-700">Consultando horarios libres…</p>
         ) : slots.length === 0 ? (
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-900">
+          <p className="rounded-lg border-2 border-amber-300 bg-amber-50 px-2.5 py-2 text-xs font-bold text-amber-950">
             No quedan horarios libres para esta fecha con el profesional elegido. Probá otro día u otro doctor.
           </p>
         ) : (
@@ -327,10 +327,10 @@ export function ChatbotAgendaCard({ agenda, token, compact = false, onBooked }: 
                   type="button"
                   aria-pressed={active}
                   onClick={() => { setSelectedHora(hhmm); setError('') }}
-                  className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${
+                  className={`rounded-lg border px-2.5 py-1 text-xs font-bold transition ${
                     active
                       ? 'border-blue-700 bg-blue-700 text-white shadow-xs'
-                      : 'border-slate-200 bg-slate-50 text-slate-800 hover:border-blue-400 hover:bg-blue-50'
+                      : 'border-slate-400 bg-white text-slate-900 hover:border-blue-500 hover:bg-blue-50'
                   }`}
                 >
                   {hhmm}
@@ -342,14 +342,14 @@ export function ChatbotAgendaCard({ agenda, token, compact = false, onBooked }: 
       </div>
 
       {agenda.esStaff && (
-        <label className="grid gap-1 text-xs font-semibold text-slate-700">
-          <span className="flex items-center gap-1"><UserRound className="h-3.5 w-3.5 text-blue-600" aria-hidden="true" /> Paciente</span>
+        <label className="grid gap-1 text-xs font-bold text-slate-900">
+          <span className="flex items-center gap-1"><UserRound className="h-3.5 w-3.5 text-blue-700" aria-hidden="true" /> Paciente</span>
           <select
             aria-label="Paciente para el turno"
             required
             value={patientId}
             onChange={event => setPatientId(event.target.value)}
-            className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-900 outline-none focus:border-blue-600"
+            className="min-h-9 rounded-lg border-2 border-slate-400 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-950 outline-none focus:border-blue-600"
           >
             <option value="">Seleccionar paciente</option>
             {patients.map(patient => (
@@ -362,10 +362,10 @@ export function ChatbotAgendaCard({ agenda, token, compact = false, onBooked }: 
       )}
 
       {!profileLinked && (
-        <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50/80 p-2.5 text-xs text-amber-950">
-          <p className="font-semibold">Para confirmar el turno vinculamos tu ficha de paciente por única vez:</p>
+        <div className="space-y-2 rounded-lg border-2 border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-950">
+          <p className="font-bold">Para confirmar el turno vinculamos tu ficha de paciente por única vez:</p>
           <div className={`grid gap-2 ${compact ? 'grid-cols-1' : 'sm:grid-cols-3'}`}>
-            <label className="grid gap-1 font-medium">
+            <label className="grid gap-1 font-bold">
               DNI
               <input
                 required
@@ -374,10 +374,10 @@ export function ChatbotAgendaCard({ agenda, token, compact = false, onBooked }: 
                 value={dni}
                 onChange={event => setDni(event.target.value)}
                 placeholder="Tu DNI"
-                className="min-h-8 rounded-md border border-amber-300 bg-white px-2 py-1 text-xs text-slate-900"
+                className="min-h-8 rounded-md border border-amber-400 bg-white px-2 py-1 text-xs font-bold text-slate-950"
               />
             </label>
-            <label className="grid gap-1 font-medium">
+            <label className="grid gap-1 font-bold">
               Fecha de nacimiento
               <input
                 required
@@ -385,17 +385,17 @@ export function ChatbotAgendaCard({ agenda, token, compact = false, onBooked }: 
                 max={today}
                 value={fechaNacimiento}
                 onChange={event => setFechaNacimiento(event.target.value)}
-                className="min-h-8 rounded-md border border-amber-300 bg-white px-2 py-1 text-xs text-slate-900"
+                className="min-h-8 rounded-md border border-amber-400 bg-white px-2 py-1 text-xs font-bold text-slate-950"
               />
             </label>
-            <label className="grid gap-1 font-medium">
+            <label className="grid gap-1 font-bold">
               Teléfono (opcional)
               <input
                 maxLength={30}
                 value={telefono}
                 onChange={event => setTelefono(event.target.value)}
                 placeholder="11..."
-                className="min-h-8 rounded-md border border-amber-300 bg-white px-2 py-1 text-xs text-slate-900"
+                className="min-h-8 rounded-md border border-amber-400 bg-white px-2 py-1 text-xs font-bold text-slate-950"
               />
             </label>
           </div>
@@ -403,7 +403,7 @@ export function ChatbotAgendaCard({ agenda, token, compact = false, onBooked }: 
       )}
 
       <div className="space-y-1.5">
-        <label className="grid gap-1 text-xs font-semibold text-slate-700">
+        <label className="grid gap-1 text-xs font-bold text-slate-900">
           Motivo de la consulta
           <input
             required
@@ -411,7 +411,7 @@ export function ChatbotAgendaCard({ agenda, token, compact = false, onBooked }: 
             value={motivo}
             onChange={event => setMotivo(event.target.value)}
             placeholder="Ej: Control general, limpieza dental, dolor en pieza..."
-            className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-900 outline-none focus:border-blue-600"
+            className="min-h-9 rounded-lg border-2 border-slate-400 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-950 outline-none focus:border-blue-600"
           />
         </label>
         <div className="flex flex-wrap gap-1.5">
@@ -420,7 +420,7 @@ export function ChatbotAgendaCard({ agenda, token, compact = false, onBooked }: 
               key={opcion}
               type="button"
               onClick={() => setMotivo(opcion)}
-              className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:border-blue-300 hover:bg-blue-50"
+              className="rounded-md border border-slate-400 bg-white px-2 py-0.5 text-[11px] font-bold text-slate-800 hover:border-blue-500 hover:bg-blue-50"
             >
               {opcion}
             </button>
@@ -428,12 +428,12 @@ export function ChatbotAgendaCard({ agenda, token, compact = false, onBooked }: 
         </div>
       </div>
 
-      {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-2 text-xs font-medium text-red-800">{error}</p>}
+      {error && <p role="alert" className="rounded-lg border-2 border-red-300 bg-red-50 px-2.5 py-2 text-xs font-bold text-red-900">{error}</p>}
 
       <button
         type="submit"
         disabled={submitting || !selectedHora || !doctorId || !motivo.trim()}
-        className="inline-flex min-h-9 w-full items-center justify-center rounded-lg bg-blue-700 px-3.5 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex min-h-9 w-full items-center justify-center rounded-lg bg-blue-700 px-3.5 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {submitting
           ? 'Confirmando turno…'

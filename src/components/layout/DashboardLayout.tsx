@@ -10,7 +10,7 @@ export const DashboardLayout: React.FC = () => {
   const isChatbotRoute = location.pathname.startsWith('/chatbot')
 
   return (
-    <div className="clinic-backdrop flex min-h-screen relative">
+    <div className="clinic-backdrop app-container flex min-h-screen relative">
       {/* Barra lateral de navegación */}
       <Sidebar
         isOpen={isSidebarOpen}
@@ -30,7 +30,7 @@ export const DashboardLayout: React.FC = () => {
         </main>
       </div>
 
-      {/* Widget flotante del Chatbot IA accesible en todo el sistema excepto en la vista completa */}
+      {/* Widget flotante del Chatbot IA adaptado por rol en todo el sistema salvo en la vista completa */}
       {!isChatbotRoute && <ChatbotFloatingWidget />}
     </div>
   )

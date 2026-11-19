@@ -154,7 +154,7 @@ describe('TeletriajePage - TR-37 y TR-38', () => {
     fireEvent.click(consentCheckbox)
 
     // Confirmar la reserva
-    const submitBtn = screen.getByRole('button', { name: /Confirmar Reserva en BE/i })
+    const submitBtn = screen.getByRole('button', { name: /Confirmar Reserva/i })
     fireEvent.submit(submitBtn.closest('form')!)
 
     // Verificar que se muestra el error 409 y NO la tarjeta de éxito
@@ -215,7 +215,7 @@ describe('TeletriajePage - TR-37 y TR-38', () => {
     })
     fireEvent.click(consentCheckbox)
 
-    const submitBtn = screen.getByRole('button', { name: /Confirmar Reserva en BE/i })
+    const submitBtn = screen.getByRole('button', { name: /Confirmar Reserva/i })
     fireEvent.submit(submitBtn.closest('form')!)
 
     // Confirmación exitosa recibida del backend

@@ -3,6 +3,11 @@ import { cleanup, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { DashboardHome } from './DashboardHome'
 
+function localDate() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
 function renderDashboard(role: 'ADMINISTRADOR' | 'ODONTOLOGO' | 'RECEPCIONISTA') {
   return render(<MemoryRouter><DashboardHome role={role} token="staff-token" /></MemoryRouter>)
 }
@@ -12,7 +17,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock)
   fetchMock.mockImplementation((path: string) => {
     if (path.endsWith('/pacientes')) return Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify([{ id: 1, nombre: 'Ana', apellido: 'Nieto', dni: '12345678' }]) })
-    if (path.endsWith('/turnos')) return Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify([{ id: 5, fecha: new Date().toISOString().slice(0, 10), hora: '10:00:00', motivo: 'Control', estado: 'PENDIENTE', paciente: { id: 1, nombre: 'Ana', apellido: 'Nieto' }, odontologo: { id: 3, nombre: 'Martín', apellido: 'Sánchez' } }]) })
+    if (path.endsWith('/turnos')) return Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify([{ id: 5, fecha: localDate(), hora: '10:00:00', motivo: 'Control', estado: 'PENDIENTE', paciente: { id: 1, nombre: 'Ana', apellido: 'Nieto' }, odontologo: { id: 3, nombre: 'Martín', apellido: 'Sánchez' } }]) })
     if (path.endsWith('/odontologos')) return Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify([{ id: 3, nombre: 'Martín', apellido: 'Sánchez', activo: true }]) })
     if (path.endsWith('/tratamientos')) return Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify([{ id: 8, descripcion: 'Limpieza dental', fecha: '2026-10-15', estado: 'EN_CURSO' }]) })
     throw new Error(`Unexpected API path: ${path}`)

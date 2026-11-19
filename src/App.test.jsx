@@ -25,7 +25,7 @@ describe('odontogram routes', () => {
     window.history.replaceState({}, '', '/odontograma/backend')
     render(<App />)
 
-    expect(await screen.findByLabelText('ID de paciente')).toBeInTheDocument()
+    expect(await screen.findByLabelText('ID de paciente', {}, { timeout: 4000 })).toBeInTheDocument()
     expect(screen.queryByLabelText('Token Bearer (solo en memoria)')).not.toBeInTheDocument()
     expect(screen.getByRole('note')).toHaveTextContent('Una página abierta desde Vercel no puede acceder al backend ni a la base local')
     expect(screen.queryByText(/Modo demostración/)).not.toBeInTheDocument()

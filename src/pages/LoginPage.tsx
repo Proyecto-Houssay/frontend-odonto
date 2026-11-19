@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { HeartPulse, LoaderCircle } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Eye, EyeOff, HeartPulse, LoaderCircle } from 'lucide-react'
 import { ApiError, apiRequest } from '../lib/api'
 import { useAuth } from '../auth/useAuth'
 
@@ -9,6 +10,7 @@ type RegistrationResponse = { emailSent: boolean; message: string }
 type PasswordResetResponse = { message: string; emailConfigured: boolean }
 
 export function LoginPage() {
+  const navigate = useNavigate()
   const { login } = useAuth()
   const [resetToken, setResetToken] = useState(() => new URLSearchParams(window.location.search).get('token'))
   const [mode, setMode] = useState<AccessMode>(() => resetToken ? 'reset' : 'login')
@@ -38,8 +40,14 @@ export function LoginPage() {
     setNotice('')
     try {
       if (mode === 'login') {
-        await login(usernameOrEmail.trim(), password)
+        const role = await login(usernameOrEmail.trim(), password)
+        if (role === 'ODONTOLOGO' || role === 'RECEPCIONISTA') {
+          navigate('/', { replace: true })
+        }
       } else if (mode === 'register') {
+        if (password !== repeatPassword) {
+          throw new Error('Las contraseñas no coinciden.')
+        }
         const response = await apiRequest<RegistrationResponse>('/auth/register', {
           method: 'POST',
           body: { username: username.trim(), nombre: nombre.trim(), apellido: apellido.trim(), email: email.trim(), password },
@@ -138,6 +146,7 @@ export function LoginPage() {
                     <input autoComplete="email" className={inputClass} maxLength={254} required type="email" value={email} onChange={event => setEmail(event.target.value)} />
                   </label>
                   <PasswordInput label="Contraseña" autoComplete="new-password" value={password} onChange={setPassword} />
+                  <PasswordInput label="Repetir contraseña" autoComplete="new-password" value={repeatPassword} onChange={setRepeatPassword} />
                 </>
               ) : null}
 
@@ -207,10 +216,36 @@ function PasswordInput({
   value: string
   onChange: (value: string) => void
 }) {
+  const [showPassword, setShowPassword] = useState(false)
+
   return (
     <label className="block text-sm font-medium text-slate-700">
       {label}
-      <input autoComplete={autoComplete} className={inputClass} minLength={8} required type="password" value={value} onChange={event => onChange(event.target.value)} />
+      <div className="relative mt-1.5">
+        <input
+          autoComplete={autoComplete}
+          className="block min-h-11 w-full rounded-lg border border-slate-300 pl-3 pr-10 text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+          minLength={8}
+          required
+          type={showPassword ? 'text' : 'password'}
+          value={value}
+          onChange={event => onChange(event.target.value)}
+        />
+        <button
+          type="button"
+          onClick={() => setShowPassword(prev => !prev)}
+          className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600 focus:outline-none"
+          aria-label={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+          title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+          tabIndex={-1}
+        >
+          {showPassword ? (
+            <EyeOff aria-hidden="true" className="h-5 w-5" />
+          ) : (
+            <Eye aria-hidden="true" className="h-5 w-5" />
+          )}
+        </button>
+      </div>
     </label>
   )
 }

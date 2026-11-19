@@ -34,6 +34,7 @@ describe('account access', () => {
     fireEvent.change(screen.getByLabelText('Nombre de usuario'), { target: { value: 'ana.nieto' } })
     fireEvent.change(screen.getByLabelText('Correo electrónico'), { target: { value: 'ana@example.com' } })
     fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'demo-password-123' } })
+    fireEvent.change(screen.getByLabelText('Repetir contraseña'), { target: { value: 'demo-password-123' } })
     fireEvent.click(screen.getByRole('button', { name: 'Crear cuenta' }))
 
     expect(await screen.findByText('Cuenta creada. No se envió correo.')).toBeInTheDocument()
@@ -44,6 +45,22 @@ describe('account access', () => {
         email: 'ana@example.com', password: 'demo-password-123',
       }),
     }))
+  })
+
+  it('validates that passwords match when registering', async () => {
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Crear una cuenta' }))
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Ana' } })
+    fireEvent.change(screen.getByLabelText('Apellido'), { target: { value: 'Nieto' } })
+    fireEvent.change(screen.getByLabelText('Nombre de usuario'), { target: { value: 'ana.nieto' } })
+    fireEvent.change(screen.getByLabelText('Correo electrónico'), { target: { value: 'ana@example.com' } })
+    fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'demo-password-123' } })
+    fireEvent.change(screen.getByLabelText('Repetir contraseña'), { target: { value: 'different-password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Crear cuenta' }))
+
+    expect(await screen.findByText('Las contraseñas no coinciden.')).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('requests recovery without implying that the email exists when SMTP is unavailable', async () => {
@@ -84,5 +101,46 @@ describe('account access', () => {
       method: 'POST', body: JSON.stringify({ token: 'one-time-token', newPassword: 'new-password-123' }),
     })))
     expect(await screen.findByText('La contraseña se actualizó. Ya podés iniciar sesión.')).toBeInTheDocument()
+  })
+
+  it('toggles password visibility when clicking the eye button', () => {
+    render(<App />)
+    const passwordInput = screen.getByLabelText('Contraseña') as HTMLInputElement
+    expect(passwordInput.type).toBe('password')
+
+    const toggleButton = screen.getByRole('button', { name: 'Ver contraseña' })
+    fireEvent.click(toggleButton)
+    expect(passwordInput.type).toBe('text')
+
+    const hideButton = screen.getByRole('button', { name: 'Ocultar contraseña' })
+    fireEvent.click(hideButton)
+    expect(passwordInput.type).toBe('password')
+  })
+
+  it('redirects receptionists to the home dashboard upon successful login', async () => {
+    window.history.replaceState({}, '', '/centro-inteligente')
+    fetchMock.mockImplementation((path: string) => {
+      if (path.endsWith('/auth/login')) {
+        return Promise.resolve(response({
+          token: 'reception-jwt',
+          tokenType: 'Bearer',
+          expiresIn: 3600,
+          role: 'RECEPCIONISTA',
+        }))
+      }
+      if (path.endsWith('/pacientes') || path.endsWith('/turnos')) {
+        return Promise.resolve(response([]))
+      }
+      return Promise.resolve(response([]))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<App />)
+    fireEvent.change(screen.getByLabelText('Usuario o correo electrónico'), { target: { value: 'recepcion@gmail.com' } })
+    fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'secret' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Ingresar' }))
+
+    expect(await screen.findByRole('heading', { name: 'Gestión de recepción' })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/')
   })
 })

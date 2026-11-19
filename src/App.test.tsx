@@ -23,7 +23,7 @@ describe('App authentication and role navigation', () => {
     expect(await screen.findByRole('heading', { name: 'Ingresar a Novadent' })).toBeInTheDocument()
   })
 
-  it('exposes operational reports to staff and keeps the demo report separate', async () => {
+  it('exposes operational reports and management modules to administrators without demo sidebar clutter', async () => {
     sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify({
       token: 'admin-token', tokenType: 'Bearer', username: 'admin', role: 'ADMINISTRADOR', expiresAt: Date.now() + 60_000,
     }))
@@ -31,7 +31,9 @@ describe('App authentication and role navigation', () => {
     render(<App />)
 
     expect(await screen.findByRole('link', { name: /^Informes$/ })).toHaveAttribute('href', '/informes')
-    expect(screen.getByRole('link', { name: 'Informes (demo)' })).toHaveAttribute('href', '/informes/demo')
+    expect(screen.getByRole('link', { name: 'Gestión de Usuarios' })).toHaveAttribute('href', '/usuarios')
+    expect(screen.getByRole('link', { name: 'Odontólogos' })).toHaveAttribute('href', '/odontologos')
+    expect(screen.queryByRole('link', { name: 'Informes (demo)' })).not.toBeInTheDocument()
   })
 
   it('does not expose staff reports in the patient portal', async () => {
