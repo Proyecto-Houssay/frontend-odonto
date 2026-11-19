@@ -21,7 +21,7 @@ describe('staff navigation', () => {
     expect(screen.getByRole('link', { name: 'Asistente IA' })).not.toBeNull()
     expect(screen.queryByRole('link', { name: 'Odontograma' })).toBeNull()
     expect(screen.queryByRole('link', { name: 'Seguimiento' })).toBeNull()
-    expect(screen.queryByRole('link', { name: 'Dra. Ziegler · Gemini' })).toBeNull()
+    expect(screen.queryByRole('link', { name: /Dra\. Ziegler/i })).toBeNull()
   })
 
   it('shows only administration and staff management modules to administrators', () => {
@@ -38,7 +38,7 @@ describe('staff navigation', () => {
     renderAs('ODONTOLOGO')
     expect(screen.getByRole('link', { name: 'Odontograma' })).not.toBeNull()
     expect(screen.getByRole('link', { name: 'Seguimiento' })).not.toBeNull()
-    expect(screen.getByRole('link', { name: 'Dra. Ziegler · Gemini' })).not.toBeNull()
+    expect(screen.getByRole('link', { name: /Dra\. Ziegler/i })).not.toBeNull()
     expect(screen.queryByRole('link', { name: 'Gestión de Usuarios' })).toBeNull()
     expect(screen.getByLabelText('NovaDent · Consultorio odontológico')).not.toBeNull()
   })

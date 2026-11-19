@@ -332,7 +332,10 @@ export function ChatbotPage({ compact = false }: { compact?: boolean } = {}) {
       }
     }
 
-    if (/\b(turnos?|agenda|pacientes.*agendados|citas|hoy|proximos)\b/.test(norm)) {
+    if (
+      /\b(turnos?|agenda|pacientes.*agendados|citas|hoy|proximos)\b/.test(norm) &&
+      !/\b(disponib|libres?|sacar|reservar|agendar)\b/.test(norm)
+    ) {
       try {
         const turnos = await apiRequest<TurnoClinica[]>('/turnos', { token })
         const activos = (Array.isArray(turnos) ? turnos : []).filter(t => t.estado !== 'CANCELADO')
@@ -422,14 +425,37 @@ export function ChatbotPage({ compact = false }: { compact?: boolean } = {}) {
       }
     }
 
-    return {
-      text: 'Protocolo clínico asistido: recordá verificar la anamnesis en Historia Clínica, registrar hallazgos por pieza en el Odontograma con firma digital y validar casos agudos en Teletriaje o Seguimiento.',
-      actions: [
-        ACTIONS['/turnos'],
-        ACTIONS['/seguimiento'],
-        ACTIONS['/historias-clinicas'],
-        ACTIONS['/odontograma'],
-      ],
+    try {
+      const response = await apiRequest<ChatResponse>('/chatbot/ask', {
+        method: 'POST',
+        token,
+        body: { mensaje: text },
+      })
+      if (response.agenda?.turnoConfirmado) {
+        notifyTurnoBooked()
+      }
+      return {
+        text: response.respuesta,
+        citations: response.citas ?? [],
+        actions: [
+          ACTIONS['/turnos'],
+          ACTIONS['/seguimiento'],
+          ACTIONS['/historias-clinicas'],
+          ACTIONS['/odontograma'],
+        ],
+        noEvidence: !response.citas?.length && !response.agenda && response.respuesta.startsWith(NO_EVIDENCE),
+        agenda: response.agenda,
+      }
+    } catch {
+      return {
+        text: 'Protocolo clínico asistido: recordá verificar la anamnesis en Historia Clínica, registrar hallazgos por pieza en el Odontograma con firma digital y validar casos agudos en Teletriaje o Seguimiento.',
+        actions: [
+          ACTIONS['/turnos'],
+          ACTIONS['/seguimiento'],
+          ACTIONS['/historias-clinicas'],
+          ACTIONS['/odontograma'],
+        ],
+      }
     }
   }
 
@@ -736,18 +762,21 @@ export function ChatbotPage({ compact = false }: { compact?: boolean } = {}) {
 
     // Flujo por defecto para PACIENTE (mantiene 100% compatibilidad con tests existentes)
     if (esSaludoLocal(text)) {
+      const greetingActions = isStaff
+        ? [ACTIONS['/turnos'], ACTIONS['/odontologos']]
+        : [ACTIONS['/mis-turnos'], ACTIONS['/mi-odontograma'], ACTIONS['/']]
       setMessages(current => [...current, {
         id: createMessageId(),
         role: 'assistant',
         text: LOCAL_GREETING_RESPONSE,
-        actions: [ACTIONS['/mis-turnos'], ACTIONS['/mi-odontograma'], ACTIONS['/']],
+        actions: greetingActions,
       }])
       return
     }
 
     setLoading(true)
     try {
-      if (preguntaTurnoPropio(text)) {
+      if (preguntaTurnoPropio(text) && !isStaff) {
         try {
           const turnos = await apiRequest<TurnoPropio[]>('/portal-paciente/turnos', { token: session.token })
           setMessages(current => [...current, {
@@ -778,8 +807,9 @@ export function ChatbotPage({ compact = false }: { compact?: boolean } = {}) {
               ? SCHEDULE_FALLBACK_RESPONSE
               : 'Ahora no hay fuentes aprobadas disponibles para responder esa consulta y no voy a inventar datos. Podés consultar tus turnos o tu odontograma desde tu cuenta.')
           : response.respuesta
+        const defaultScheduleAction = isStaff ? ACTIONS['/turnos'] : ACTIONS['/mis-turnos']
         const actions = providerFailed
-          ? (isSchedule ? [ACTIONS['/mis-turnos']] : [ACTIONS['/mis-turnos'], ACTIONS['/mi-odontograma']])
+          ? (isSchedule ? [defaultScheduleAction] : [defaultScheduleAction, ACTIONS['/mi-odontograma']])
           : (accionesDesde(response.accionesSugeridas).length > 0
               ? accionesDesde(response.accionesSugeridas)
               : (isSchedule ? [ACTIONS['/mis-turnos']] : []))
@@ -807,7 +837,7 @@ export function ChatbotPage({ compact = false }: { compact?: boolean } = {}) {
           : isSchedule
             ? 'No pude conectar con el asistente y no puedo confirmar horarios ni disponibilidad sin una fuente vigente aprobada. Podés revisar tus turnos registrados o comunicarte con recepción.'
             : 'No pude conectar con el asistente y no voy a inventar una respuesta. Probá de nuevo más tarde o usá las opciones de tu cuenta.',
-        actions: [ACTIONS['/mis-turnos'], ACTIONS['/mi-odontograma']],
+        actions: isStaff ? [ACTIONS['/turnos'], ACTIONS['/odontologos']] : [ACTIONS['/mis-turnos'], ACTIONS['/mi-odontograma']],
       }])
     } finally {
       setLoading(false)
@@ -956,14 +986,14 @@ export function ChatbotPage({ compact = false }: { compact?: boolean } = {}) {
             )}
           </article>
         ))}
-        {loading && <p role="status" className="text-xs text-slate-500 sm:text-sm">Buscando fuentes y preparando respuesta…</p>}
+        {loading && <p role="status" className="text-xs text-slate-500 sm:text-sm">Consultando agenda y preparando respuesta…</p>}
       </section>
 
       <form onSubmit={submit} className="flex gap-2">
         <label className="sr-only" htmlFor="chat-question">Tu pregunta</label>
         <input id="chat-question" maxLength={1000} value={question}
           onChange={event => setQuestion(event.target.value)}
-          placeholder="Escribí tu pregunta…" disabled={loading}
+          placeholder="Preguntá por turnos disponibles, doctores o consultas…" disabled={loading}
           className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white/90 px-3.5 py-2.5 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100" />
         <button type="submit" disabled={loading || !question.trim()}
           className="rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50">Enviar</button>
