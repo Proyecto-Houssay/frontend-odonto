@@ -118,13 +118,14 @@ export const SUGGESTIONS_BY_ROLE: Record<UserRole, readonly string[]> = {
     '¿Cómo agregar o actualizar documentos en la base de conocimiento?',
   ],
   RECEPCIONISTA: [
+    '¿Qué obras sociales y horarios están vigentes?',
+    '¿Qué obras sociales y prepagas atienden?',
+    '¿Cuáles son los medios de pago y financiación?',
+    '¿Cuáles son los horarios de atención y guardias?',
+    '¿Cuáles son los aranceles particulares de referencia?',
     '¿Qué turnos hay programados para hoy?',
     '¿Qué odontólogos están activos y qué especialidad tienen?',
-    '¿Qué obras sociales y horarios están vigentes?',
     '¿Qué documentación debe presentar un paciente nuevo?',
-    '¿Cuáles son las formas de pago y aranceles particulares?',
-    '¿Cómo funciona la guardia y las urgencias de teletriaje?',
-    'Ir a recepción de pacientes y alta de fichas',
   ],
 }
 

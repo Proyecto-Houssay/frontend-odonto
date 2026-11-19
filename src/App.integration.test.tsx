@@ -82,7 +82,7 @@ describe('frontend backed by the local API', () => {
 
   it('lists patients and creates one through the API contract', async () => {
     fetchMock
-      .mockResolvedValueOnce(response({ token: 'jwt-from-backend', tokenType: 'Bearer', expiresIn: 900, role: 'ADMINISTRADOR' }))
+      .mockResolvedValueOnce(response({ token: 'jwt-from-backend', tokenType: 'Bearer', expiresIn: 900, role: 'ODONTOLOGO' }))
       .mockResolvedValueOnce(response([patient]))
       .mockResolvedValueOnce(response('Paciente registrado correctamente'))
       .mockResolvedValueOnce(response([{ ...patient, id: 2, nombre: 'Martino', apellido: 'Costigliolo' }]))
@@ -112,7 +112,7 @@ describe('frontend backed by the local API', () => {
 
   it('updates and deletes patients through PUT and DELETE', async () => {
     fetchMock
-      .mockResolvedValueOnce(response({ token: 'jwt-from-backend', tokenType: 'Bearer', expiresIn: 900, role: 'ADMINISTRADOR' }))
+      .mockResolvedValueOnce(response({ token: 'jwt-from-backend', tokenType: 'Bearer', expiresIn: 900, role: 'ODONTOLOGO' }))
       .mockResolvedValueOnce(response([patient]))
       .mockResolvedValueOnce(response({ ...patient, nombre: 'Ana María' }))
       .mockResolvedValueOnce(response([ { ...patient, nombre: 'Ana María' } ]))
@@ -139,7 +139,7 @@ describe('frontend backed by the local API', () => {
   it('passes the authenticated token to the backend odontogram without asking for it again', async () => {
     const catalog = { versionCatalogo: VERSION, versionConsentimiento: VERSION, textoConsentimiento: CONSENT_TEXT, afecciones: CATALOG }
     fetchMock
-      .mockResolvedValueOnce(response({ token: 'jwt-from-backend', tokenType: 'Bearer', expiresIn: 900, role: 'ADMINISTRADOR' }))
+      .mockResolvedValueOnce(response({ token: 'jwt-from-backend', tokenType: 'Bearer', expiresIn: 900, role: 'ODONTOLOGO' }))
       .mockResolvedValueOnce(response(catalog))
     vi.stubGlobal('fetch', fetchMock)
 

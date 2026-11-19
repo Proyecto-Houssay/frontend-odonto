@@ -1,7 +1,7 @@
 import { useCallback, useContext, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import {
   Activity, ArrowLeft, ArrowRight, BellPlus, CalendarDays, Check, Clock3,
-  ExternalLink, MessageCircle, Search, Send, Sparkles, Stethoscope, Video, X,
+  ExternalLink, Sparkles, Stethoscope, Video, X,
 } from 'lucide-react'
 import { AuthContext } from '../auth/context'
 import { roleFromToken } from '../auth/role'
@@ -28,12 +28,9 @@ type TeleAppointment = {
 }
 type AvailabilityResponse = { odontologoId: number; fecha: string; horariosDisponibles: string[] }
 type PatientOption = { id: number; nombre: string; apellido: string; dni?: string }
-type ChatAnswer = { accionesSugeridas?: string[] }
-type ChatTurn = { role: 'user' | 'assistant'; text: string; answer?: ChatAnswer }
 
 const SESSION_KEY = 'novadent.auth.session'
 const weekdays = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
-const prompts = ['¿Qué horarios libres hay esta semana?', 'Quiero una consulta por videollamada', 'Necesito reprogramar un turno']
 
 function authToken() {
   try {
@@ -59,46 +56,6 @@ async function postJson<T>(path: string, body: unknown, sessionToken?: string): 
     throw new Error(raw || `No se pudo completar la reserva (HTTP ${response.status}).`)
   }
   return response.json() as Promise<T>
-}
-async function askJosue(message: string, sessionToken?: string) {
-  const token = sessionToken || authToken()
-  const lower = message.toLowerCase()
-  try {
-    const response = await fetch('/api/chatbot/ask', {
-      method: 'POST',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token.replace(/^Bearer\s+/i, '')}` } : {}) },
-      body: JSON.stringify({ mensaje: message }),
-    })
-    if (!response.ok) throw new Error('chat unavailable')
-    const data = await response.json() as { respuesta: string; intencion?: string; accionesSugeridas?: string[] }
-    if (data.intencion === 'error' || /no se pudo procesar/i.test(data.respuesta || '')) {
-      throw new Error('fallback')
-    }
-    return data
-  } catch {
-    if (/horario|libre|disponib|cu[aá]ndo|semana/i.test(lower)) {
-      return {
-        respuesta: 'Podés consultar los horarios disponibles de esta semana seleccionando un odontólogo y haciendo clic en "Ver horarios libres" arriba en la agenda, o eligiendo cualquier día en el calendario. Atendemos de lunes a viernes de 8:00 a 20:00.',
-        accionesSugeridas: ['Ver turnos de hoy', 'Ir a Teletriaje'],
-      }
-    }
-    if (/videollamada|teleconsulta|virtual|remota/i.test(lower)) {
-      return {
-        respuesta: 'Las teleconsultas se gestionan con prioridad clínica a través del módulo de Teletriaje. Podés iniciar una solicitud para que el equipo clínico evalúe el caso y asigne la sala virtual.',
-        accionesSugeridas: ['Ir a Teletriaje'],
-      }
-    }
-    if (/reprogram|cancel|cambiar/i.test(lower)) {
-      return {
-        respuesta: 'Para reprogramar o cancelar un turno, seleccioná la cita en el calendario o gestioná el cambio a través de recepción.',
-        accionesSugeridas: ['Ver turnos de hoy'],
-      }
-    }
-    return {
-      respuesta: '¡Hola! Podés consultar los horarios disponibles en el calendario, solicitar turnos presenciales o abrir Teletriaje para iniciar una teleconsulta.',
-      accionesSugeridas: ['Ir a Teletriaje', 'Ver turnos de hoy'],
-    }
-  }
 }
 function addReminder(appointment: Appointment) {
   const escapeIcs = (value: string) => value.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;')
@@ -199,10 +156,6 @@ export function TurnosPage({ token }: { token?: string } = {}) {
   const [scheduleFilter, setScheduleFilter] = useState<'all' | 'assigned' | 'free'>('all')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
-  const [chatOpen, setChatOpen] = useState(!isDentist)
-  const [question, setQuestion] = useState('')
-  const [chatBusy, setChatBusy] = useState(false)
-  const [chat, setChat] = useState<ChatTurn[]>([{ role: 'assistant', text: '¡Hola! Soy el asistente de Josué. Puedo ayudarte a encontrar un horario, orientarte sobre teleconsulta o llevarte al flujo de reserva.' }])
 
   const loadAgenda = useCallback(async () => {
     setLoading(true)
@@ -308,17 +261,6 @@ export function TurnosPage({ token }: { token?: string } = {}) {
   const upcomingCount = appointments.filter((appointment) => appointment.fecha >= dateKey(new Date()) && !(appointment.estado || '').toLowerCase().includes('cancel')).length
   const telemedicineCount = appointments.filter((appointment) => appointment.telemedicina).length
   const dayLabel = formatDate(new Date(`${selectedDay}T12:00:00`), { weekday: 'long', day: 'numeric', month: 'long' })
-
-  const submitQuestion = async (text = question) => {
-    const clean = text.trim()
-    if (!clean || chatBusy) return
-    setChat((current) => [...current, { role: 'user', text: clean }])
-    setQuestion('')
-    setChatBusy(true)
-    const result = await askJosue(clean, token)
-    setChat((current) => [...current, { role: 'assistant', text: result.respuesta, answer: result }])
-    setChatBusy(false)
-  }
 
   const jumpWeek = (offset: number) => {
     const next = new Date(week)
@@ -622,7 +564,7 @@ export function TurnosPage({ token }: { token?: string } = {}) {
         <SummaryCard icon={<Clock3 size={20} />} label="Día seleccionado" value={String(visibleAppointments.length)} detail="Turnos para esta fecha" color="blue" />
       </section>
 
-      <div className={`grid items-start gap-5 ${chatOpen && !isDentist ? '2xl:grid-cols-[minmax(0,1fr)_360px]' : 'grid-cols-1'}`}>
+      <div className="grid grid-cols-1 items-start gap-5">
         <section className="min-w-0 overflow-hidden rounded-2xl border-2 border-[#B8AE99] bg-[#FAF5E8] shadow-md">
           <div className="flex flex-col gap-4 border-b-2 border-[#B8AE99] bg-[#F2E9D8] p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <div>
@@ -706,14 +648,6 @@ export function TurnosPage({ token }: { token?: string } = {}) {
                   <ArrowRight size={16} />
                 </button>
               </div>
-              {!chatOpen && !isDentist && (
-                <button
-                  onClick={() => setChatOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-lg border border-violet-300 bg-violet-100 px-3 py-2 text-sm font-bold text-violet-900"
-                >
-                  <Sparkles size={15} /> Asistente
-                </button>
-              )}
             </div>
           </div>
 
@@ -1219,19 +1153,8 @@ export function TurnosPage({ token }: { token?: string } = {}) {
                       <p className="mx-auto mt-1 max-w-md text-sm font-medium leading-6 text-slate-800">
                         {isDentist
                           ? 'No tenés turnos asignados para este día.'
-                          : 'Pedile al asistente que busque alternativas o iniciá una solicitud de teleconsulta.'}
+                          : 'No hay turnos registrados para este día. Podés asignar un nuevo turno presencial o consultar horarios libres.'}
                       </p>
-                      {!isDentist && (
-                        <button
-                          onClick={() => {
-                            setChatOpen(true)
-                            setTimeout(() => void submitQuestion('Buscame horarios disponibles para una teleconsulta'), 0)
-                          }}
-                          className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-teal-700 px-3.5 py-2 text-xs font-extrabold text-white hover:bg-teal-800"
-                        >
-                          <Sparkles size={14} /> Buscar con el asistente
-                        </button>
-                      )}
                     </div>
                   )
                 )}
@@ -1243,106 +1166,6 @@ export function TurnosPage({ token }: { token?: string } = {}) {
             </div>
           </div>
         </section>
-
-        {chatOpen && !isDentist && (
-          <aside className="flex max-h-[760px] min-h-[480px] flex-col overflow-hidden rounded-2xl border-2 border-[#B8AE99] bg-[#FAF5E8] shadow-md">
-            <div className="flex items-center justify-between bg-gradient-to-r from-violet-700 to-indigo-600 px-4 py-4 text-white">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
-                  <Sparkles size={18} />
-                </div>
-                <div>
-                  <h2 className="text-sm font-bold text-white">Asistente de Josué</h2>
-                  <p className="mt-0.5 flex items-center gap-1 text-xs text-violet-100">
-                    <span className="h-2 w-2 rounded-full bg-emerald-300" /> Agenda y telemedicina
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setChatOpen(false)}
-                aria-label="Cerrar asistente"
-                className="rounded-lg p-2 text-white/90 hover:bg-white/15"
-              >
-                <X size={17} />
-              </button>
-            </div>
-            <div className="flex-1 space-y-3 overflow-y-auto bg-[#F2E9D8] p-3" aria-live="polite">
-              {chat.map((message, index) => (
-                <div key={`${index}-${message.role}`} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div
-                    className={`max-w-[92%] rounded-2xl px-3.5 py-2.5 text-xs font-medium leading-5 ${
-                      message.role === 'user'
-                        ? 'rounded-br-md bg-violet-700 text-white'
-                        : 'rounded-bl-md border border-[#B8AE99] bg-[#FAF5E8] text-slate-900 shadow-xs'
-                    }`}
-                  >
-                    <p className="whitespace-pre-wrap">{message.text}</p>
-                    {message.answer?.accionesSugeridas?.slice(0, 2).map((action) => (
-                      <button
-                        key={action}
-                        onClick={() => {
-                          if (/teletriaje/i.test(action)) window.location.assign('/teletriaje')
-                          else if (/turno|agenda|calendario/i.test(action)) setSelectedDay(dateKey(new Date()))
-                          else void submitQuestion(action)
-                        }}
-                        className="mt-2 block w-full rounded-lg border border-violet-300 bg-violet-50 px-2.5 py-1.5 text-left text-xs font-bold text-violet-900 hover:bg-violet-100"
-                      >
-                        {action} <ArrowRight className="ml-1 inline" size={12} />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-              {chatBusy && (
-                <div className="w-fit rounded-2xl rounded-bl-md border border-[#B8AE99] bg-[#FAF5E8] px-3 py-2 text-xs font-bold text-slate-700">
-                  Josué está pensando…
-                </div>
-              )}
-              {chat.length === 1 && (
-                <div className="space-y-2 pt-1">
-                  {prompts.map((prompt) => (
-                    <button
-                      key={prompt}
-                      onClick={() => void submitQuestion(prompt)}
-                      className="block w-full rounded-xl border border-[#B8AE99] bg-[#FAF5E8] px-3 py-2.5 text-left text-xs font-bold text-slate-900 transition hover:border-violet-500 hover:text-violet-800"
-                    >
-                      <MessageCircle className="mr-2 inline text-violet-600" size={14} />
-                      {prompt}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <form
-              onSubmit={(event) => {
-                event.preventDefault()
-                void submitQuestion()
-              }}
-              className="border-t-2 border-[#B8AE99] bg-[#FAF5E8] p-3"
-            >
-              <div className="flex items-center gap-2 rounded-xl border-2 border-[#B8AE99] bg-white px-3 focus-within:border-violet-600">
-                <Search size={15} className="shrink-0 text-slate-600" />
-                <input
-                  value={question}
-                  onChange={(event) => setQuestion(event.target.value)}
-                  placeholder="Preguntá por horarios…"
-                  className="min-w-0 flex-1 bg-transparent py-3 text-xs font-semibold text-slate-900 outline-none placeholder:text-slate-500"
-                />
-                <button
-                  type="submit"
-                  disabled={!question.trim() || chatBusy}
-                  aria-label="Enviar consulta"
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-700 text-white transition hover:bg-violet-800 disabled:opacity-40"
-                >
-                  <Send size={14} />
-                </button>
-              </div>
-              <p className="mt-2 text-center text-[11px] font-semibold text-slate-700">
-                La reserva se confirma en el flujo seguro de teletriaje.
-              </p>
-            </form>
-          </aside>
-        )}
       </div>
       {selectedSlot && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="presentation">

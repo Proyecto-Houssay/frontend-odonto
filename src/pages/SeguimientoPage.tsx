@@ -72,7 +72,14 @@ export function SeguimientoPage({ token, role }: { token: string; role: UserRole
       <h1 className="text-2xl font-bold">Reportes enviados por pacientes</h1>
       <p className="mt-2 text-sm text-slate-600">La información fue declarada por el paciente. No es un diagnóstico automático; requiere evaluación profesional.</p></div>
     {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</p>}
-    {notice && <p role="status" className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">{notice}</p>}
+    {notice && (
+      <div role="status" className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+        <p className="font-semibold">{notice}</p>
+        {notice === 'Revisión registrada' && (
+          <p className="mt-1 text-xs text-green-700">Revisión guardada y notificada al buzón del paciente.</p>
+        )}
+      </div>
+    )}
     <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
       <section className="rounded-2xl border bg-white p-5 shadow-sm">
         <h2 className="mb-4 flex items-center gap-2 text-lg font-bold"><Clock3 size={20} /> Bandeja de reportes</h2>

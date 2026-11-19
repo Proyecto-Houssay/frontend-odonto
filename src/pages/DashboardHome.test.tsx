@@ -29,9 +29,9 @@ describe('role dashboards', () => {
   it('shows administration shortcuts without sample statistics', () => {
     renderDashboard('ADMINISTRADOR')
     expect(screen.getByRole('heading', { name: 'Panel de administración' })).not.toBeNull()
-    expect(screen.getAllByRole('link', { name: /Ver pacientes/i })[0].getAttribute('href')).toBe('/pacientes')
+    expect(screen.getAllByRole('link', { name: /Ver profesionales/i })[0].getAttribute('href')).toBe('/odontologos')
     expect(screen.getByTestId('role-shortcut-grid').className).toContain('xl:grid-cols-4')
-    expect(screen.getByText('Agenda de turnos', { selector: 'h4' })).not.toBeNull()
+    expect(screen.getByText('Personal y Directorio', { selector: 'h4' })).not.toBeNull()
     expect(screen.queryByText('128')).toBeNull()
   })
 

@@ -31,11 +31,11 @@ function OdontogramaRoute({ demoMode, backendMode = false }: { demoMode: boolean
   return <Suspense fallback={<p>Cargando odontograma…</p>}><Odontograma pacienteId={pacienteId} token={session?.token || ''} demoMode={demoMode} backendMode={backendMode} /></Suspense>
 }
 
-function ClinicalRoute({ role, children, allowReception = false }: { role: UserRole | null; children: ReactNode; allowReception?: boolean }) {
-  if (role === 'ADMINISTRADOR' || role === 'ODONTOLOGO' || (allowReception && role === 'RECEPCIONISTA')) return children
+function RoleRoute({ role, allowedRoles, children }: { role: UserRole | null; allowedRoles: UserRole[]; children: ReactNode }) {
+  if (role && allowedRoles.includes(role)) return children
   return <section role="alert" className="rounded-2xl border border-amber-200 bg-white/95 p-6 shadow-sm">
     <h2 className="text-2xl font-bold text-slate-900">Acceso no disponible</h2>
-    <p className="mt-2 text-sm text-slate-700">Esta sección clínica está reservada a odontología y administración. Tu cuenta no puede abrirla.</p>
+    <p className="mt-2 text-sm text-slate-700">Esta sección no está habilitada para tu rol actual.</p>
     <Link to="/" className="mt-5 inline-flex min-h-10 items-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Volver al inicio</Link>
   </section>
 }
@@ -56,25 +56,26 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={<DashboardLayout />}>
         <Route index element={<DashboardHome role={role} token={session.token} onVerified={() => undefined} />} />
-        <Route path="pacientes" element={<PacientesPage />} />
-        <Route path="seguimiento" element={<ClinicalRoute role={role}><SeguimientoPage token={session.token} role={role} /></ClinicalRoute>} />
-        <Route path="odontograma" element={<ClinicalRoute role={role} allowReception><OdontogramaRoute demoMode={false} /></ClinicalRoute>} />
-        <Route path="odontograma/backend" element={<ClinicalRoute role={role} allowReception><OdontogramaRoute demoMode={false} backendMode /></ClinicalRoute>} />
-        <Route path="odontograma/demo" element={<ClinicalRoute role={role}><OdontogramaRoute demoMode /></ClinicalRoute>} />
-        <Route path="pacientes/:pacienteId/odontograma" element={<ClinicalRoute role={role} allowReception><OdontogramaRoute demoMode={false} /></ClinicalRoute>} />
-        <Route path="odontologos" element={<OdontologosPage />} />
-        <Route path="personal" element={<ClinicalRoute role={role} allowReception><PersonalPage /></ClinicalRoute>} />
+        <Route path="pacientes" element={<RoleRoute role={role} allowedRoles={['ODONTOLOGO', 'RECEPCIONISTA']}><PacientesPage /></RoleRoute>} />
+        <Route path="seguimiento" element={<RoleRoute role={role} allowedRoles={['ODONTOLOGO']}><SeguimientoPage token={session.token} role={role} /></RoleRoute>} />
+        <Route path="odontograma" element={<RoleRoute role={role} allowedRoles={['ODONTOLOGO', 'RECEPCIONISTA']}><OdontogramaRoute demoMode={false} /></RoleRoute>} />
+        <Route path="odontograma/backend" element={<RoleRoute role={role} allowedRoles={['ODONTOLOGO', 'RECEPCIONISTA']}><OdontogramaRoute demoMode={false} backendMode /></RoleRoute>} />
+        <Route path="odontograma/demo" element={<RoleRoute role={role} allowedRoles={['ODONTOLOGO']}><OdontogramaRoute demoMode /></RoleRoute>} />
+        <Route path="pacientes/:pacienteId/odontograma" element={<RoleRoute role={role} allowedRoles={['ODONTOLOGO', 'RECEPCIONISTA']}><OdontogramaRoute demoMode={false} /></RoleRoute>} />
+        <Route path="odontologos" element={<RoleRoute role={role} allowedRoles={['ADMINISTRADOR', 'RECEPCIONISTA']}><OdontologosPage /></RoleRoute>} />
+        <Route path="personal" element={<RoleRoute role={role} allowedRoles={['ADMINISTRADOR']}><PersonalPage /></RoleRoute>} />
         <Route path="mi-cuenta" element={<MiCuentaPage />} />
-        <Route path="turnos" element={<TurnosPage token={session.token} />} />
-        <Route path="teletriaje" element={<ClinicalRoute role={role} allowReception><TeletriajePage /></ClinicalRoute>} />
-        <Route path="centro-inteligente" element={<ClinicalRoute role={role}><CentroInteligentePage token={session.token} /></ClinicalRoute>} />
-        <Route path="dra-ziegler" element={<ClinicalRoute role={role}><DraZieglerPage token={session.token} /></ClinicalRoute>} />
-        <Route path="historias-clinicas" element={<ClinicalRoute role={role}><HistoriasClinicasPage /></ClinicalRoute>} />
-        {role === 'ADMINISTRADOR' ? <Route path="usuarios" element={<UsuariosPage />} /> : null}
-        <Route path="informes" element={<ReportsPage />} />
-        {role === 'ADMINISTRADOR' ? <Route path="informes/demo" element={<InformesPage />} /> : null}
-        <Route path="check-in" element={<ClinicalRoute role={role}><FaceCheckin /></ClinicalRoute>} />
-        <Route path="chatbot" element={<ChatbotPage />} />
+        <Route path="turnos" element={<RoleRoute role={role} allowedRoles={['ODONTOLOGO', 'RECEPCIONISTA']}><TurnosPage token={session.token} /></RoleRoute>} />
+        <Route path="teletriaje" element={<RoleRoute role={role} allowedRoles={['ODONTOLOGO', 'RECEPCIONISTA']}><TeletriajePage /></RoleRoute>} />
+        <Route path="centro-inteligente" element={<RoleRoute role={role} allowedRoles={['ODONTOLOGO']}><CentroInteligentePage token={session.token} /></RoleRoute>} />
+        <Route path="dra-ziegler" element={<RoleRoute role={role} allowedRoles={['ODONTOLOGO']}><DraZieglerPage token={session.token} /></RoleRoute>} />
+        <Route path="dr-annie" element={<RoleRoute role={role} allowedRoles={['ODONTOLOGO']}><DraZieglerPage token={session.token} /></RoleRoute>} />
+        <Route path="historias-clinicas" element={<RoleRoute role={role} allowedRoles={['ODONTOLOGO']}><HistoriasClinicasPage /></RoleRoute>} />
+        <Route path="usuarios" element={<RoleRoute role={role} allowedRoles={['ADMINISTRADOR']}><UsuariosPage /></RoleRoute>} />
+        <Route path="informes" element={<RoleRoute role={role} allowedRoles={['ADMINISTRADOR']}><ReportsPage /></RoleRoute>} />
+        <Route path="informes/demo" element={<RoleRoute role={role} allowedRoles={['ADMINISTRADOR']}><InformesPage /></RoleRoute>} />
+        <Route path="check-in" element={<RoleRoute role={role} allowedRoles={['RECEPCIONISTA']}><FaceCheckin /></RoleRoute>} />
+        <Route path="chatbot" element={<RoleRoute role={role} allowedRoles={['RECEPCIONISTA']}><ChatbotPage /></RoleRoute>} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
