@@ -1,6 +1,6 @@
 import type { ElementType } from 'react'
 import { NavLink } from 'react-router-dom'
-import { BarChart3, CalendarDays, Camera, ClipboardCheck, ClipboardList, LayoutDashboard, MessageCircle, ScanLine, Sparkles, Stethoscope, Users, UserRoundCog, Video, X } from 'lucide-react'
+import { BarChart3, CalendarDays, Camera, ClipboardCheck, ClipboardList, Contact2, LayoutDashboard, MessageCircle, ScanLine, Sparkles, Stethoscope, UserCircle2, Users, UserRoundCog, Video, X } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { roleFromToken, type UserRole } from '../../auth/role'
 import { NovadentBrand } from '../brand/NovadentBrand'
@@ -22,6 +22,7 @@ const navItems: NavItem[] = [
   { label: 'Centro inteligente', to: '/centro-inteligente', icon: Sparkles, roles: ['ADMINISTRADOR', 'ODONTOLOGO'] },
   { label: 'Dra. Ziegler · Gemini', to: '/dra-ziegler', icon: ScanLine, roles: ['ADMINISTRADOR', 'ODONTOLOGO'] },
   { label: 'Odontólogos', to: '/odontologos', icon: Stethoscope, roles: ['ADMINISTRADOR', 'RECEPCIONISTA'] },
+  { label: 'Personal y Directorio', to: '/personal', icon: Contact2, roles: STAFF_ROLES },
   { label: 'Historias Clínicas', to: '/historias-clinicas', icon: ClipboardList, roles: ['ADMINISTRADOR', 'ODONTOLOGO'] },
   { label: 'Odontograma', to: '/odontograma', icon: ClipboardList, roles: STAFF_ROLES },
   { label: 'Seguimiento', to: '/seguimiento', icon: ClipboardCheck, roles: ['ADMINISTRADOR', 'ODONTOLOGO'] },
@@ -29,6 +30,7 @@ const navItems: NavItem[] = [
   { label: 'Informes', to: '/informes', icon: BarChart3, roles: ['ADMINISTRADOR'] },
   { label: 'Check-in facial', to: '/check-in', icon: Camera, roles: ['ADMINISTRADOR', 'ODONTOLOGO'] },
   { label: 'Asistente IA', to: '/chatbot', icon: MessageCircle, roles: STAFF_ROLES },
+  { label: 'Mi Cuenta y Mensajes', to: '/mi-cuenta', icon: UserCircle2, roles: STAFF_ROLES },
 ]
 
 const roleLabel: Record<StaffRole, string> = {

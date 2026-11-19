@@ -1,5 +1,5 @@
 import { LogOut, Menu, Moon, Sun } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { roleFromToken } from '../../auth/role'
 import { NotificationCenter } from './NotificationCenter'
@@ -87,14 +87,19 @@ export function Navbar({ onToggleSidebar }: NavbarProps) {
 
         <NotificationCenter />
 
-        <div className="flex items-center gap-2 rounded-xl border border-[#CBD5E1] bg-[#DBEAFE]/85 p-1.5 pr-3">
+        <Link
+          to="/mi-cuenta"
+          title="Ir a Mi Cuenta y Buzón de Mensajes"
+          aria-label="Mi Cuenta y Buzón de Mensajes"
+          className="flex items-center gap-2 rounded-xl border border-[#CBD5E1] bg-[#DBEAFE]/85 p-1.5 pr-3 transition hover:bg-[#BFDBFE]"
+        >
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#1D4ED8] text-sm font-bold text-white">
             {initials}
           </span>
           <span className="hidden max-w-40 truncate text-sm font-bold text-[#0F172A] sm:block">
             {session?.username}
           </span>
-        </div>
+        </Link>
 
         {/* Botón Salir siempre en color rojo intenso */}
         <button

@@ -27,6 +27,7 @@ import { ChatbotFloatingWidget } from '../components/chatbot/ChatbotFloatingWidg
 import { FaceCheckin } from '../components/FaceCheckin'
 import { ChatbotPage } from './ChatbotPage'
 import { MiOdontograma } from './MiOdontograma'
+import { MiCuentaPage } from './MiCuentaPage'
 import { useTheme } from '../lib/useTheme'
 
 type Perfil = {
@@ -99,6 +100,7 @@ const PATIENT_LINKS = [
   { label: 'Mis tratamientos', to: '/mis-tratamientos', icon: Stethoscope },
   { label: 'Mis reportes', to: '/mis-reportes', icon: ClipboardList },
   { label: 'Mis datos', to: '/mis-datos', icon: UserRound },
+  { label: 'Mi Cuenta y Mensajes', to: '/mi-cuenta', icon: UserRound },
   { label: 'Asistente IA', to: '/chatbot', icon: MessageCircle },
 ] as const
 
@@ -111,6 +113,7 @@ const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
   '/mis-tratamientos': { title: 'Tus tratamientos', subtitle: 'Consultá los tratamientos indicados para tu ficha.' },
   '/mis-reportes': { title: 'Tus reportes', subtitle: 'Bandeja de autoevaluaciones enviadas, evidencia fotográfica y dictamen profesional.' },
   '/mis-datos': { title: 'Tus datos', subtitle: 'Revisá tus datos de contacto.' },
+  '/mi-cuenta': { title: 'Mi Cuenta y Mensajes', subtitle: 'Gestioná tu perfil, foto y buzón de mensajes internos.' },
   '/chatbot': { title: 'Asistente IA', subtitle: 'Consultá información general de NovaDent.' },
 }
 
@@ -681,6 +684,8 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
 
             {location.pathname === '/chatbot' ? (
               <ChatbotPage />
+            ) : location.pathname === '/mi-cuenta' ? (
+              <MiCuentaPage />
             ) : location.pathname === '/check-in' ? (
               <FaceCheckin
                 token={token}
