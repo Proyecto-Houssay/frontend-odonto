@@ -28,8 +28,8 @@ const navItems: NavItem[] = [
   { label: 'Seguimiento', to: '/seguimiento', icon: ClipboardCheck, roles: ['ODONTOLOGO'] },
   { label: 'Gestión de Usuarios', to: '/usuarios', icon: UserRoundCog, roles: ['ADMINISTRADOR'] },
   { label: 'Informes', to: '/informes', icon: BarChart3, roles: ['ADMINISTRADOR'] },
-  { label: 'Check-in facial', to: '/check-in', icon: Camera, roles: ['RECEPCIONISTA'] },
-  { label: 'Asistente IA', to: '/chatbot', icon: MessageCircle, roles: ['RECEPCIONISTA'] },
+  { label: 'Check-in facial', to: '/check-in', icon: Camera, roles: STAFF_ROLES },
+  { label: 'Asistente IA', to: '/chatbot', icon: MessageCircle, roles: STAFF_ROLES },
   { label: 'Mi Cuenta y Mensajes', to: '/mi-cuenta', icon: UserCircle2, roles: STAFF_ROLES },
 ]
 

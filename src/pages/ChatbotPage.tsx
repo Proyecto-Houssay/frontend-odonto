@@ -77,6 +77,7 @@ const SCHEDULE_FALLBACK_RESPONSE = 'Ahora no puedo confirmar los horarios ni la 
 
 const ACTIONS: Record<string, ChatAction> = {
   '/mis-turnos': { to: '/mis-turnos', label: 'Ver mis turnos' },
+  '/mi-seguimiento': { to: '/mi-seguimiento', label: 'Mi seguimiento' },
   '/mi-odontograma': { to: '/mi-odontograma', label: 'Ver mi odontograma' },
   '/': { to: '/', label: 'Registrar una observación' },
   '/turnos': { to: '/turnos', label: 'Agenda de turnos' },

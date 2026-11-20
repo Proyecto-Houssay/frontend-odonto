@@ -36,6 +36,7 @@ const DASHBOARDS: Record<StaffRole, Dashboard> = {
       { label: 'Personal y Directorio', to: '/personal', icon: Users },
       { label: 'Gestión de usuarios', to: '/usuarios', icon: UserRoundCog },
       { label: 'Informes operativos', to: '/informes', icon: BarChart3 },
+      { label: 'Asistente de Gestión IA', to: '/chatbot', icon: MessageCircle },
     ],
   },
   ODONTOLOGO: {
@@ -55,6 +56,7 @@ const DASHBOARDS: Record<StaffRole, Dashboard> = {
       { label: 'Odontograma clínico', to: '/odontograma', icon: ClipboardList },
       { label: 'Seguimiento de pacientes', to: '/seguimiento', icon: ClipboardCheck },
       { label: 'Dra. Ziegler · Gemini', to: '/dra-ziegler', icon: ScanLine },
+      { label: 'Copiloto Clínico IA', to: '/chatbot', icon: MessageCircle },
     ],
   },
   RECEPCIONISTA: {
