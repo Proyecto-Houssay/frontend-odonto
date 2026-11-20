@@ -74,8 +74,8 @@ function AppRoutes() {
         <Route path="usuarios" element={<RoleRoute role={role} allowedRoles={['ADMINISTRADOR']}><UsuariosPage /></RoleRoute>} />
         <Route path="informes" element={<RoleRoute role={role} allowedRoles={['ADMINISTRADOR']}><ReportsPage /></RoleRoute>} />
         <Route path="informes/demo" element={<RoleRoute role={role} allowedRoles={['ADMINISTRADOR']}><InformesPage /></RoleRoute>} />
-        <Route path="check-in" element={<RoleRoute role={role} allowedRoles={['RECEPCIONISTA']}><FaceCheckin /></RoleRoute>} />
-        <Route path="chatbot" element={<RoleRoute role={role} allowedRoles={['RECEPCIONISTA']}><ChatbotPage /></RoleRoute>} />
+        <Route path="check-in" element={<RoleRoute role={role} allowedRoles={['ADMINISTRADOR', 'ODONTOLOGO', 'RECEPCIONISTA']}><FaceCheckin /></RoleRoute>} />
+        <Route path="chatbot" element={<RoleRoute role={role} allowedRoles={['ADMINISTRADOR', 'ODONTOLOGO', 'RECEPCIONISTA']}><ChatbotPage /></RoleRoute>} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
