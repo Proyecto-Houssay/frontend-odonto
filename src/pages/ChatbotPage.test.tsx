@@ -1,0 +1,362 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
+import { ChatbotPage } from './ChatbotPage'
+
+const mockSession = {
+  current: { token: 'patient-token' } as { token: string; role?: 'PACIENTE' | 'ODONTOLOGO' | 'ADMINISTRADOR' | 'RECEPCIONISTA' },
+}
+
+vi.mock('../auth/useAuth', () => ({
+  useAuth: () => ({ session: mockSession.current }),
+}))
+
+const response = (body: unknown, status = 200) => ({
+  ok: status >= 200 && status < 300,
+  status,
+  text: async () => (body === null ? '' : JSON.stringify(body)),
+}) as Response
+
+describe('ChatbotPage', () => {
+  const fetchMock = vi.fn()
+
+  beforeEach(() => {
+    mockSession.current = { token: 'patient-token' }
+    vi.stubGlobal('fetch', fetchMock)
+  })
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.clearAllMocks() })
+
+  it('replies locally to greetings like "hola" with useful guidance and actions without failing when AI/RAG is unavailable', async () => {
+    fetchMock.mockRejectedValue(new Error('backend down'))
+    render(<MemoryRouter><ChatbotPage /></MemoryRouter>)
+
+    fireEvent.change(screen.getByLabelText('Tu pregunta'), { target: { value: 'hola' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar' }))
+
+    expect(await screen.findByText(/soy el asistente de novadent/i)).not.toBeNull()
+    expect(screen.queryByText(/No pude consultar las fuentes aprobadas ahora/i)).toBeNull()
+    expect(screen.queryByText(/No pude conectar con el asistente/i)).toBeNull()
+    expect(screen.getByRole('link', { name: 'Ver mis turnos' }).getAttribute('href')).toBe('/mis-turnos')
+    expect(screen.getByRole('link', { name: 'Ver mi odontograma' }).getAttribute('href')).toBe('/mi-odontograma')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('renders a compact conversation panel with its own scroll and concrete empty-state suggestions', async () => {
+    fetchMock.mockResolvedValue(response([{
+      id: 22, fecha: '2099-11-20', hora: '14:00:00', motivo: 'Limpieza', estado: 'CONFIRMADO', odontologoNombre: 'Dr. Gómez',
+    }]))
+    render(<MemoryRouter><ChatbotPage /></MemoryRouter>)
+
+    const conversation = screen.getByRole('region', { name: 'Conversación' })
+    expect(conversation.className).toMatch(/overflow-y-auto/)
+    expect(conversation.className).toMatch(/max-h-\[(?:320|340|360|380|400)px\]|sm:max-h-\[(?:360|380|400)px\]/)
+
+    const suggestion = screen.getByRole('button', { name: /¿Cuándo es mi próximo turno\?/i })
+    fireEvent.click(suggestion)
+
+    expect(await screen.findByText(/20 de noviembre de 2099.*14:00/i)).not.toBeNull()
+    expect(fetchMock).toHaveBeenCalledWith('/api/portal-paciente/turnos', expect.objectContaining({
+      headers: expect.objectContaining({ Authorization: 'Bearer patient-token' }),
+    }))
+  })
+
+  it('routes unanswered availability questions to the patient turnos instead of showing a dead-end error', async () => {
+    fetchMock.mockResolvedValue(response({
+      respuesta: 'Ahora no puedo confirmar los horarios ni la disponibilidad porque no hay una fuente vigente aprobada. Consultá tus turnos registrados o comunicate con recepción.',
+      intencion: 'turno',
+      accionesSugeridas: ['/mis-turnos'],
+      citas: [],
+    }))
+    render(<MemoryRouter><ChatbotPage /></MemoryRouter>)
+
+    fireEvent.change(screen.getByLabelText('Tu pregunta'), { target: { value: '¿Qué horarios tienen disponibles?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar' }))
+
+    expect(await screen.findByText(/no hay una fuente vigente aprobada/i)).not.toBeNull()
+    expect(screen.getByRole('link', { name: 'Ver mis turnos' }).getAttribute('href')).toBe('/mis-turnos')
+    expect(screen.queryByText(/No pude consultar las fuentes aprobadas ahora/i)).toBeNull()
+    expect(screen.queryByText(/No se pudo procesar la consulta en este momento/i)).toBeNull()
+  })
+
+  it('explains clearly without inventing schedules when the backend returns a legacy provider error on schedule questions', async () => {
+    fetchMock.mockResolvedValue(response({
+      respuesta: 'No se pudo procesar la consulta en este momento. Reintentá más tarde.',
+      intencion: 'error',
+      accionesSugeridas: [],
+      citas: [],
+    }))
+    render(<MemoryRouter><ChatbotPage /></MemoryRouter>)
+
+    fireEvent.change(screen.getByLabelText('Tu pregunta'), { target: { value: '¿Qué horarios de atención tienen?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar' }))
+
+    expect(await screen.findByText(/no puedo confirmar los horarios ni la disponibilidad porque no hay una fuente vigente aprobada/i)).not.toBeNull()
+    expect(screen.queryByText(/No pude consultar las fuentes aprobadas ahora/i)).toBeNull()
+    expect(screen.getByRole('link', { name: 'Ver mis turnos' }).getAttribute('href')).toBe('/mis-turnos')
+  })
+
+  it('answers a patient-specific next-appointment question only from that session’s own turnos endpoint', async () => {
+    fetchMock.mockResolvedValue(response([{
+      id: 18, fecha: '2099-10-15', hora: '10:30:00', motivo: 'Control', estado: 'PROGRAMADO', odontologoNombre: 'Dra. Pérez',
+    }]))
+    render(<MemoryRouter><ChatbotPage /></MemoryRouter>)
+
+    fireEvent.change(screen.getByLabelText('Tu pregunta'), { target: { value: '¿Cuándo es mi próximo turno?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar' }))
+
+    expect(await screen.findByText(/15 de octubre de 2099.*10:30/i)).not.toBeNull()
+    const replyBubble = screen.getByText(/15 de octubre de 2099.*10:30/i).closest('article')
+    expect(replyBubble?.className).toContain('bg-blue-50/90')
+    expect(fetchMock).toHaveBeenCalledWith('/api/portal-paciente/turnos', expect.objectContaining({
+      headers: expect.objectContaining({ Authorization: 'Bearer patient-token' }),
+    }))
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/chatbot/ask', expect.anything())
+  })
+
+  it('guides the patient to complete their profile when /portal-paciente/turnos returns 409', async () => {
+    fetchMock.mockResolvedValue(response({ message: 'Completá tu ficha antes de cargar un reporte' }, 409))
+    render(<MemoryRouter><ChatbotPage /></MemoryRouter>)
+
+    fireEvent.change(screen.getByLabelText('Tu pregunta'), { target: { value: '¿Cuándo es mi próximo turno?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar' }))
+
+    expect(await screen.findByText(/Todavía no tenés una ficha de paciente vinculada/i)).not.toBeNull()
+    expect(screen.getByRole('link', { name: 'Ver mis turnos' }).getAttribute('href')).toBe('/mis-turnos')
+  })
+
+  it('provides useful navigation when the chatbot API is unreachable', async () => {
+    fetchMock.mockRejectedValue(new Error('network unavailable'))
+    render(<MemoryRouter><ChatbotPage /></MemoryRouter>)
+
+    fireEvent.change(screen.getByLabelText('Tu pregunta'), { target: { value: '¿Hacen implantes?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar' }))
+
+    expect(await screen.findByText(/No pude conectar con el asistente/i)).not.toBeNull()
+    expect(screen.getByRole('link', { name: 'Ver mis turnos' }).getAttribute('href')).toBe('/mis-turnos')
+  })
+
+  it('acts as a clinical copilot for ODONTOLOGO and fetches scheduled patient appointments', async () => {
+    mockSession.current = { token: 'dentist-token', role: 'ODONTOLOGO' }
+    fetchMock.mockResolvedValue(response([
+      {
+        id: 41,
+        fecha: '2099-12-01',
+        hora: '09:30:00',
+        motivo: 'Endodoncia molar',
+        estado: 'CONFIRMADO',
+        paciente: { id: 4, nombre: 'Lucía', apellido: 'Paz' },
+      },
+    ]))
+
+    render(<MemoryRouter><ChatbotPage /></MemoryRouter>)
+
+    expect(screen.getByRole('heading', { name: /Copiloto Clínico IA · Odontología/i })).not.toBeNull()
+    expect(screen.queryByRole('button', { name: /¿Cuánto sale una limpieza dental\?/i })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: /¿Qué turnos de pacientes tengo agendados\?/i }))
+
+    expect(await screen.findByText(/Lucía Paz.*Endodoncia molar/i)).not.toBeNull()
+    expect(fetchMock).toHaveBeenCalledWith('/api/turnos', expect.objectContaining({
+      headers: expect.objectContaining({ Authorization: 'Bearer dentist-token' }),
+    }))
+    expect(screen.getByRole('link', { name: 'Agenda de turnos' }).getAttribute('href')).toBe('/turnos')
+  })
+
+  it('provides live system diagnostics and RAG knowledge ingestion for ADMINISTRADOR', async () => {
+    mockSession.current = { token: 'admin-token', role: 'ADMINISTRADOR' }
+    fetchMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === '/api/usuarios') {
+        return Promise.resolve(response([{ id: 1, username: 'admin', nombre: 'Admin', apellido: 'Uno', rol: 'ADMINISTRADOR', activo: true }]))
+      }
+      if (path === '/api/odontologos') {
+        return Promise.resolve(response([{ id: 2, nombre: 'Martín', apellido: 'Sánchez', matricula: 'MN-101', activo: true, especialidad: { id: 1, nombre: 'Ortodoncia' } }]))
+      }
+      if (path === '/api/turnos') {
+        return Promise.resolve(response([{ id: 9, fecha: '2099-12-10', hora: '11:00:00', estado: 'PROGRAMADO' }]))
+      }
+      if (path === '/api/chatbot/knowledge' && options?.method === 'POST') {
+        return Promise.resolve(response(null, 204))
+      }
+      return Promise.resolve(response([]))
+    })
+
+    render(<MemoryRouter><ChatbotPage /></MemoryRouter>)
+
+    expect(screen.getByRole('heading', { name: /Asistente de Gestión y Base de Conocimiento \(Admin\)/i })).not.toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: /Resumen operativo del sistema/i }))
+
+    expect(await screen.findByText(/Diagnóstico operativo del sistema en tiempo real/i)).not.toBeNull()
+    expect(screen.getByText(/Martín Sánchez/i)).not.toBeNull()
+
+    fireEvent.change(screen.getByLabelText(/Identificador de fuente/i), { target: { value: 'aranceles.md' } })
+    fireEvent.change(screen.getByLabelText(/^Versión$/i), { target: { value: '2.0' } })
+    fireEvent.change(screen.getByLabelText(/Contenido oficial/i), { target: { value: '## Aranceles\nConsulta general vigente.' } })
+    fireEvent.click(screen.getByRole('button', { name: /Indexar documento en RAG/i }))
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/chatbot/knowledge',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            source: 'aranceles.md',
+            version: '2.0',
+            content: '## Aranceles\nConsulta general vigente.',
+          }),
+        })
+      )
+    )
+    expect(await screen.findByText(/indexada correctamente en la base de conocimiento RAG/i)).not.toBeNull()
+  })
+
+  it('lists available doctors and allows booking a real appointment directly from the chatbot', async () => {
+    const slot = {
+      odontologoId: 3,
+      odontologoNombre: 'Laura Pérez',
+      especialidad: 'Ortodoncia',
+      fecha: '2099-11-12',
+      hora: '10:00:00',
+      etiquetaFecha: 'mañana 12/11',
+      etiquetaHora: '10:00',
+    }
+    fetchMock.mockImplementation((path: string, init?: RequestInit) => {
+      if (path === '/api/chatbot/ask') {
+        return Promise.resolve(response({
+          respuesta: '¡Hola! Sí, mirá, tenemos estos turnos disponibles:',
+          intencion: 'turno',
+          accionesSugeridas: ['/mis-turnos'],
+          citas: [],
+          agenda: {
+            requiereFichaPaciente: false,
+            esStaff: false,
+            doctores: [{ id: 3, nombre: 'Laura', apellido: 'Pérez', nombreCompleto: 'Laura Pérez', especialidad: 'Ortodoncia' }],
+            slotsDisponibles: [slot],
+            fechaConsultada: '2099-11-12',
+            odontologoConsultadoId: 3,
+          },
+        }))
+      }
+      if (path.startsWith('/api/chatbot/turnos/disponibles')) {
+        return Promise.resolve(response([slot]))
+      }
+      if (path === '/api/chatbot/turnos/reservar' && init?.method === 'POST') {
+        return Promise.resolve(response({
+          turnoId: 77,
+          fecha: '2099-11-12',
+          hora: '10:00:00',
+          motivo: 'Limpieza dental',
+          estado: 'PENDIENTE',
+          odontologoId: 3,
+          odontologoNombre: 'Laura Pérez',
+          pacienteId: 5,
+          pacienteNombre: 'Ana Nieto',
+          mensaje: '¡Listo! Tu turno quedó confirmado para el jueves 12 de noviembre a las 10:00 hs con Dr./Dra. Laura Pérez (Turno #77).',
+        }, 201))
+      }
+      throw new Error(`Unexpected path: ${path}`)
+    })
+
+    const bookedListener = vi.fn()
+    window.addEventListener('novadent:turno-booked', bookedListener)
+    render(<MemoryRouter><ChatbotPage /></MemoryRouter>)
+
+    fireEvent.change(screen.getByLabelText('Tu pregunta'), { target: { value: 'Hola, ¿qué turnos tienen disponibles?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar' }))
+
+    expect(await screen.findByText(/¡Hola! Sí, mirá, tenemos estos turnos disponibles/i)).not.toBeNull()
+    expect(screen.getByLabelText('Doctor disponible')).not.toBeNull()
+
+    const slotButton = await screen.findByRole('button', { name: '10:00' })
+    fireEvent.click(slotButton)
+    fireEvent.change(screen.getByLabelText('Motivo de la consulta'), { target: { value: 'Limpieza dental' } })
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar turno/i }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/chatbot/turnos/reservar', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ odontologoId: 3, fecha: '2099-11-12', hora: '10:00:00', motivo: 'Limpieza dental' }),
+    })))
+    expect(await screen.findByText(/Turno #77 confirmado/i)).not.toBeNull()
+    expect(bookedListener).toHaveBeenCalledTimes(1)
+    window.removeEventListener('novadent:turno-booked', bookedListener)
+  })
+
+  it('allows going back to initial options via "Volver atrás / Ver opciones" button', async () => {
+    fetchMock.mockResolvedValue(response({ respuesta: 'Información sobre obras sociales.', intencion: 'obras_sociales' }))
+    render(<MemoryRouter><ChatbotPage /></MemoryRouter>)
+
+    expect(screen.getByRole('button', { name: '¿Qué obras sociales atienden?' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '¿Qué obras sociales atienden?' }))
+
+    expect(await screen.findByText('Información sobre obras sociales.')).toBeInTheDocument()
+    const backButton = screen.getByRole('button', { name: /Volver atrás \/ Ver opciones/i })
+    expect(backButton).toBeInTheDocument()
+
+    fireEvent.click(backButton)
+
+    expect(screen.getByRole('button', { name: '¿Qué obras sociales atienden?' })).toBeInTheDocument()
+  })
+
+  it('answers "que turnos tengo" with registered appointments even if scheduled date is prior to today', async () => {
+    fetchMock.mockResolvedValue(response([{
+      id: 55,
+      fecha: '2026-11-11',
+      hora: '11:00:00',
+      motivo: 'Teletriaje: Consulta de control y valoración de gingivitis',
+      estado: 'CONFIRMADO',
+      odontologoNombre: 'Martino Costigliolo',
+    }]))
+    render(<MemoryRouter><ChatbotPage /></MemoryRouter>)
+
+    fireEvent.change(screen.getByLabelText('Tu pregunta'), { target: { value: 'que turnos tengo' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar' }))
+
+    expect(await screen.findByText(/En tu ficha clínica registrás:/i)).toBeInTheDocument()
+    expect(screen.getByText(/11 de noviembre de 2026.*11:00/i)).toBeInTheDocument()
+    expect(screen.getByText(/Martino Costigliolo/i)).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith('/api/portal-paciente/turnos', expect.anything())
+  })
+
+  it('answers receptionist questions about obras sociales and horarios using backend RAG', async () => {
+    mockSession.current = { token: 'reception-token', role: 'RECEPCIONISTA' }
+    fetchMock.mockResolvedValue(response({
+      respuesta: 'En NovaDent atendemos con OSDE, Swiss Medical, Galeno, Medicus, IOMA, PAMI, Accord Salud y Sancor Salud. El horario de atención es de lunes a viernes de 8:00 a 20:00 hs y sábados de 9:00 a 14:00 hs.',
+      intencion: 'obras_sociales',
+      citas: [
+        { id: '1', documento: 'obras-sociales-convenios.md', version: '1.0', fragmento: 'OSDE: Todos los planes' },
+        { id: '2', documento: 'faq-clinica.md', version: '1.0', fragmento: 'Horarios: Lunes a viernes de 8:00 a 20:00 hs' },
+      ],
+      accionesSugeridas: ['/turnos', '/pacientes'],
+    }))
+
+    render(<MemoryRouter><ChatbotPage /></MemoryRouter>)
+
+    expect(screen.getByRole('button', { name: '¿Qué obras sociales y horarios están vigentes?' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '¿Qué obras sociales y horarios están vigentes?' }))
+
+    expect(await screen.findByText(/En NovaDent atendemos con OSDE, Swiss Medical/i)).toBeInTheDocument()
+    expect(screen.getByText(/obras-sociales-convenios.md · versión 1.0/i)).toBeInTheDocument()
+    expect(screen.getByText(/faq-clinica.md · versión 1.0/i)).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith('/api/chatbot/ask', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ mensaje: '¿Qué obras sociales y horarios están vigentes?' }),
+      headers: expect.objectContaining({ Authorization: 'Bearer reception-token' }),
+    }))
+  })
+
+  it('uses rich reception knowledge fallback when backend RAG is unavailable', async () => {
+    mockSession.current = { token: 'reception-token', role: 'RECEPCIONISTA' }
+    fetchMock.mockRejectedValue(new Error('Network error'))
+
+    render(<MemoryRouter><ChatbotPage /></MemoryRouter>)
+
+    fireEvent.change(screen.getByLabelText('Tu pregunta'), { target: { value: '¿Qué obras sociales y horarios están vigentes?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar' }))
+
+    expect(await screen.findByText(/Información oficial de recepción — Clínica Dental NovaDent/i)).toBeInTheDocument()
+    expect(screen.getByText(/OSDE/i)).toBeInTheDocument()
+    expect(screen.getByText(/Swiss Medical/i)).toBeInTheDocument()
+    expect(screen.getByText(/Lunes a viernes de 8:00 a 20:00 hs/i)).toBeInTheDocument()
+  })
+})
