@@ -248,9 +248,10 @@ describe('Odontograma académico', () => {
     fireEvent.click(save)
 
     await screen.findByText(/Guardado #15/)
-    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(fetch).toHaveBeenCalledTimes(3)
     const [url, options] = fetch.mock.calls[1]
     expect(url).toBe('/api/odontograma')
+    expect(fetch.mock.calls[2][0]).toBe('/api/odontograma/15/enviar-paciente')
     expect(options.method).toBe('POST')
     expect(options.headers).toEqual({ 'Content-Type': 'application/json', Authorization: 'Bearer manual-token' })
     expect(JSON.parse(options.body)).toEqual({ pacienteId: 7, dientes: [{ numero: 11, afeccion: 'caries' }], consentimientoAceptado: true, versionConsentimiento: VERSION, firmaBase64: mocks.png })

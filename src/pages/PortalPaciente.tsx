@@ -249,11 +249,12 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [bookingSubmitting, setBookingSubmitting] = useState(false)
   const [bookingFormError, setBookingFormError] = useState('')
+  const [reportOdontologoId, setReportOdontologoId] = useState('')
 
   const bookingClinicHours = useMemo(() => getClinicHoursForDate(bookingFecha), [bookingFecha])
 
   useEffect(() => {
-    if (showBooking && bookingDoctors.length === 0) {
+    if (token && perfil && bookingDoctors.length === 0) {
       void apiRequest<DoctorDisponible[]>('/chatbot/doctores', { token })
         .then(docs => {
           if (Array.isArray(docs)) {
@@ -265,7 +266,7 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
         })
         .catch(() => undefined)
     }
-  }, [showBooking, bookingDoctors.length, bookingDoctorId, token])
+  }, [bookingDoctors.length, bookingDoctorId, perfil, token])
 
   useEffect(() => {
     if (showBooking && bookingDoctorId && bookingFecha) {
@@ -467,6 +468,7 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
           sintomas: sintomas.trim(),
           fotoBase64: foto,
           consentimientoFoto: foto ? fotoConsentida : false,
+          ...(reportOdontologoId ? { odontologoId: Number(reportOdontologoId) } : {}),
         },
       })
       const updatedReports = await apiRequest<Reporte[]>('/portal-paciente/reportes', { token })
@@ -893,6 +895,21 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
                                 {DIENTES.flat().map(number => (
                                   <option key={number} value={number}>
                                     {number} · {nombrePieza(number)}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="block text-sm font-semibold">
+                              Dirigir reporte a odontólogo
+                              <select
+                                className={inputClass}
+                                value={reportOdontologoId}
+                                onChange={event => setReportOdontologoId(event.target.value)}
+                              >
+                                <option value="">Cualquier odontólogo disponible</option>
+                                {bookingDoctors.map(doc => (
+                                  <option key={doc.id} value={String(doc.id)}>
+                                    Dr./Dra. {doc.nombreCompleto}{doc.especialidad ? ` · ${doc.especialidad}` : ''}
                                   </option>
                                 ))}
                               </select>

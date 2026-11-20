@@ -282,11 +282,14 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
       if (raw) {
         const parsed = JSON.parse(raw)
         setDrAnnieData(parsed)
+        if (pacienteId == null && parsed?.pacienteId && Number(parsed.pacienteId) > 0) {
+          setManualPatient(String(parsed.pacienteId))
+        }
       }
     } catch {
       // ignore
     }
-  }, [patientId])
+  }, [patientId, pacienteId])
 
   function aplicarHallazgosDrAnnie() {
     if (!drAnnieData?.findings?.length || readOnly) return
@@ -413,7 +416,9 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
       const list = await response.json()
       if (Array.isArray(list)) {
         setApiPatients(list)
-        if (!manualPatient && list.length > 0 && list[0]?.id) setManualPatient(String(list[0].id))
+        if (pacienteId == null && !manualPatient && !drAnnieData?.pacienteId && list.length > 0 && list[0]?.id) {
+          setManualPatient(String(list[0].id))
+        }
       }
     } catch (failure) {
       setError(failure.message || 'No se pudieron cargar los pacientes registrados.')
@@ -469,18 +474,22 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
   }
 
   function capture() {
-    if (!canSign) return
-    if (!signatureRef.current || signatureRef.current.isEmpty()) { setError('Dibuje una firma antes de capturarla.'); return }
+    if (!canSign) return null
+    if (!signatureRef.current || signatureRef.current.isEmpty()) { setError('Dibuje una firma antes de capturarla.'); return null }
     const canvas = signatureRef.current.getCanvas()
-    setSignature({ png: signatureRef.current.toDataURL('image/png'), ratio: canvas ? canvas.width / canvas.height : 500 / 180 })
+    const captured = { png: signatureRef.current.toDataURL('image/png'), ratio: canvas ? canvas.width / canvas.height : 500 / 180 }
+    setSignature(captured)
     setError(''); setNotice('Firma capturada para este paciente, presupuesto y consentimiento.')
+    return captured
   }
-  async function save() {
-    if (demoMode || readOnly || savingRef.current || !canSign || !signature || !bearer) return
+  async function save(overrideSignature = null) {
+    const activeSignature = overrideSignature && overrideSignature.png ? overrideSignature : signature
+    if (demoMode || readOnly || savingRef.current || !canSign || !activeSignature || !bearer) return null
     savingRef.current = true; setSaving(true); setError(''); setNotice('')
-    const currentRevision = revision.current, currentSnapshot = snapshot
+    const currentRevision = revision.current
+    const currentSnapshot = { ...snapshot, firmaBase64: activeSignature.png, firmaAspectRatio: activeSignature.ratio }
     const body = { pacienteId: patientId, dientes: teeth.map(({ numero, afeccion }) => ({ numero, afeccion })),
-      consentimientoAceptado: true, versionConsentimiento: VERSION, firmaBase64: signature.png }
+      consentimientoAceptado: true, versionConsentimiento: VERSION, firmaBase64: activeSignature.png }
     try {
       const response = await fetch(`${baseUrl}/odontograma`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` }, body: JSON.stringify(body) })
       if (response.status !== 201) {
@@ -491,20 +500,30 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
       const data = await response.json()
       if (!matchesSaved(data, currentSnapshot)) throw new Error('La respuesta no coincide con el presupuesto firmado. Verifique el registro en la API antes de reintentar.')
       if (revision.current === currentRevision) {
-        setSaved({ ...data, firmaAspectRatio: signature.ratio }); setNotice(`Guardado #${data.id}. Copia inmutable confirmada por la API.`)
+        setSaved({ ...data, firmaAspectRatio: activeSignature.ratio })
+        setNotice(`Guardado #${data.id}. Copia inmutable confirmada por la API.`)
+        await enviarDiagnosticoAlPaciente(data.id, `Guardado #${data.id}.`, { silentError: true })
       }
+      return data
     } catch (failure) {
       if (revision.current === currentRevision) setError(`No se guardó o no se pudo confirmar. ${failure.message || 'Revise la conexión.'} El borrador se conserva; verifique la API antes de reintentar.`)
+      return null
     } finally { savingRef.current = false; setSaving(false) }
+  }
+  async function captureAndSend() {
+    const captured = capture()
+    if (!captured || demoMode || readOnly || !bearer) return
+    await save(captured)
   }
   function download() {
     if (!signature || !accepted || !patientId || !teeth.length) return
     try { createBudgetPdf(saved || snapshot).save(`presupuesto_paciente_${patientId}.pdf`); setError('') }
     catch { setError('No se pudo generar el PDF. El odontograma y la firma se conservan.') }
   }
-  async function enviarDiagnosticoAlPaciente(targetId = saved?.id) {
+  async function enviarDiagnosticoAlPaciente(targetId = saved?.id, prefix = '', { silentError = false } = {}) {
     if (demoMode || readOnly || !targetId || !bearer || sendingToPatient) return
-    setSendingToPatient(true); setError('')
+    setSendingToPatient(true)
+    if (!silentError) setError('')
     try {
       const response = await fetch(`${baseUrl}/odontograma/${targetId}/enviar-paciente`, {
         method: 'POST',
@@ -512,9 +531,12 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
       })
       if (!response.ok) throw new Error('No se pudo enviar el diagnóstico al paciente.')
       const data = await response.json()
-      setNotice(data?.mensaje || `Guardado #${targetId}. Diagnóstico enviado al buzón del paciente.`)
+      const msg = data?.mensaje || `Diagnóstico #${targetId} enviado al buzón del paciente.`
+      setNotice(prefix ? `${prefix} ${msg}` : msg)
     } catch (failure) {
-      setError(failure.message || 'No se pudo enviar el diagnóstico al paciente.')
+      if (!silentError) {
+        setError(failure.message || 'No se pudo enviar el diagnóstico al paciente.')
+      }
     } finally {
       setSendingToPatient(false)
     }
@@ -547,6 +569,15 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
         <a className="odontogram-backend-link" href="/odontograma/backend">Abrir modo de guardado en backend local</a>
       </> : <>
         <label>ID de paciente{pacienteId != null ? <input value={pacienteId} readOnly aria-label="ID de paciente" /> : <input type="text" inputMode="numeric" value={manualPatient} disabled={saving} onChange={e => setManualPatient(e.target.value)} aria-label="ID de paciente" placeholder="ID existente en la API" />}</label>
+        {selectedPatientData ? (
+          <p className="odontogram-access" style={{ fontWeight: 700, color: '#0f172a' }}>
+            Paciente evaluado: {selectedPatientData.nombre} {selectedPatientData.apellido} · DNI {selectedPatientData.dni} (ID {selectedPatientData.id})
+          </p>
+        ) : patientId ? (
+          <p className="odontogram-access" style={{ fontWeight: 700, color: '#0f172a' }}>
+            Paciente evaluado: {drAnnieData?.pacienteId === patientId && drAnnieData?.pacienteNombre ? `${drAnnieData.pacienteNombre} · ` : ''}ID {patientId}
+          </p>
+        ) : null}
         {pacienteId == null && apiPatients.length > 0 ? <label>Paciente registrado<select aria-label="Paciente registrado" value={manualPatient} disabled={saving} onChange={e => { setManualPatient(e.target.value); setError('') }}><option value="">Seleccionar paciente…</option>{apiPatients.map(p => <option key={p.id} value={String(p.id)}>{p.nombre} {p.apellido} · DNI {p.dni} (ID {p.id})</option>)}</select></label> : null}
         {pacienteId == null && bearer ? <button type="button" disabled={loadingPatients || saving} onClick={loadApiPatients}>{loadingPatients ? 'Cargando pacientes…' : apiPatients.length > 0 ? 'Actualizar lista' : 'Elegir paciente de la lista'}</button> : null}
         {!token ? <label>Token Bearer (solo en memoria)<input type="password" autoComplete="off" value={manualToken} disabled={saving} onChange={e => setManualToken(e.target.value)} aria-label="Token Bearer (solo en memoria)" placeholder="Pegue el JWT de Swagger" /></label> : null}
@@ -928,6 +959,16 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
 
       <div className="odontogram-actions">
         <button type="button" className="odontogram-capture-btn" disabled={!canSign} onClick={capture}>Capturar firma</button>
+        {!demoMode && !readOnly && bearer ? (
+          <button
+            type="button"
+            className="odontogram-primary"
+            disabled={!canSign || saving || sendingToPatient || Boolean(saved)}
+            onClick={() => void captureAndSend()}
+          >
+            {saving || sendingToPatient ? 'Guardando y enviando…' : 'Capturar firma y enviar al paciente'}
+          </button>
+        ) : null}
         <button type="button" disabled={saving} onClick={() => { revoke({ consent: false }); setError(''); setNotice('Firma eliminada.') }}>Limpiar firma</button>
       </div>
       {signature ? <figure className="odontogram-preview"><img src={signature.png} alt="Vista previa de la firma capturada" /><figcaption>Firma vinculada al presupuesto actual.</figcaption></figure> : null}

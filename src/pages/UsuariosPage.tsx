@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   CheckCircle2,
+  Eye,
+  EyeOff,
   Link2,
   Pencil,
   Plus,
@@ -146,6 +148,7 @@ export const UsuariosPage: React.FC = () => {
 
   const [form, setForm] = useState<UsuarioFormState | null>(null)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
 
   const [linkingUser, setLinkingUser] = useState<UsuarioResponse | null>(null)
   const [selectedPacienteId, setSelectedPacienteId] = useState<string>('')
@@ -622,16 +625,26 @@ export const UsuariosPage: React.FC = () => {
                   <label htmlFor="user-password" className="block text-xs font-bold text-slate-700 mb-1">
                     Contraseña inicial
                   </label>
-                  <input
-                    id="user-password"
-                    type="password"
-                    required
-                    minLength={6}
-                    value={form.password}
-                    onChange={e => setForm({ ...form, password: e.target.value })}
-                    placeholder="Mínimo 6 caracteres"
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-purple-600 focus:outline-none"
-                  />
+                  <div className="relative">
+                    <input
+                      id="user-password"
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      minLength={6}
+                      value={form.password}
+                      onChange={e => setForm({ ...form, password: e.target.value })}
+                      placeholder="Mínimo 6 caracteres"
+                      className="w-full rounded-xl border border-slate-300 px-3 py-2 pr-10 text-sm focus:border-purple-600 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(v => !v)}
+                      aria-label={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-800"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label htmlFor="user-confirm-password" className="block text-xs font-bold text-slate-700 mb-1">
@@ -639,7 +652,7 @@ export const UsuariosPage: React.FC = () => {
                   </label>
                   <input
                     id="user-confirm-password"
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     required
                     minLength={6}
                     value={form.confirmPassword}

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import {
   BadgeCheck,
   Briefcase,
@@ -6,6 +7,8 @@ import {
   CheckCircle2,
   Clock,
   Contact2,
+  Eye,
+  EyeOff,
   Mail,
   Pencil,
   Phone,
@@ -65,25 +68,33 @@ export type DirectorioItem = {
   detalle?: string | null
 }
 
+type EspecialidadOption = {
+  id: number
+  nombre: string
+}
+
+type PersonalFormCargo = CargoPersonal | 'ODONTOLOGO'
+
 type PersonalFormState = {
   nombre: string
   apellido: string
   dni: string
   email: string
   telefono: string
-  cargo: CargoPersonal
+  cargo: PersonalFormCargo
   fechaIngreso: string
   horarioLaboral: string
   estado: EstadoPersonal
+  matricula: string
+  consultorio: string
+  especialidadId: string
+  nuevaEspecialidadNombre: string
+  username: string
+  password: string
 }
 
 const CARGOS_PERSONAL: Array<{ value: CargoPersonal; label: string }> = [
   { value: 'RECEPCIONISTA', label: 'Recepcionista' },
-  { value: 'ASISTENTE_DENTAL', label: 'Asistente Dental' },
-  { value: 'SECRETARIO', label: 'Secretario/a' },
-  { value: 'ADMINISTRATIVO', label: 'Administrativo/a' },
-  { value: 'MANTENIMIENTO', label: 'Mantenimiento' },
-  { value: 'LABORATORIO', label: 'Laboratorio Dental' },
 ]
 
 const CARGO_LABELS: Record<string, string> = {
@@ -92,7 +103,7 @@ const CARGO_LABELS: Record<string, string> = {
   SECRETARIO: 'Secretario/a',
   ADMINISTRATIVO: 'Administrativo/a',
   MANTENIMIENTO: 'Mantenimiento',
-  LABORATORIO: 'Laboratorio Dental',
+  LABORATORIO: 'Mecánico Dental / Laboratorio',
 }
 
 const TIPO_BADGE_STYLES: Record<string, string> = {
@@ -136,6 +147,12 @@ const EMPTY_FORM: PersonalFormState = {
   fechaIngreso: todayIsoDate(),
   horarioLaboral: 'Lunes a Viernes 08:00 - 16:00',
   estado: 'ACTIVO',
+  matricula: '',
+  consultorio: '',
+  especialidadId: '',
+  nuevaEspecialidadNombre: '',
+  username: '',
+  password: '',
 }
 
 export const PersonalPage: React.FC = () => {
@@ -152,8 +169,21 @@ export const PersonalPage: React.FC = () => {
 
   // Estado de Gestión de Personal
   const [personalList, setPersonalList] = useState<PersonalItem[]>([])
+  const [odontologosList, setOdontologosList] = useState<
+    Array<{
+      id: number
+      nombre: string
+      apellido: string
+      matricula: string
+      email?: string | null
+      telefono?: string | null
+      consultorio?: string | null
+      activo?: boolean
+      especialidad?: { nombre?: string | null } | null
+    }>
+  >([])
   const [personalSearch, setPersonalSearch] = useState('')
-  const [cargoFilter, setCargoFilter] = useState<'TODOS' | CargoPersonal>('TODOS')
+  const [cargoFilter, setCargoFilter] = useState<'TODOS' | PersonalFormCargo>('TODOS')
   const [estadoFilter, setEstadoFilter] = useState<'TODOS' | EstadoPersonal>('TODOS')
 
   const [loading, setLoading] = useState(true)
@@ -163,6 +193,9 @@ export const PersonalPage: React.FC = () => {
 
   const [form, setForm] = useState<PersonalFormState | null>(null)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [especialidades, setEspecialidades] = useState<EspecialidadOption[]>([])
+  const [showOdontologoPopup, setShowOdontologoPopup] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   const loadData = useCallback(
     async (signal?: AbortSignal) => {
@@ -174,6 +207,8 @@ export const PersonalPage: React.FC = () => {
         ]
         if (isAdmin) {
           requests.push(apiRequest<PersonalItem[]>('/personal', { token, signal }))
+          requests.push(apiRequest<EspecialidadOption[]>('/especialidades', { token, signal }))
+          requests.push(apiRequest<unknown[]>('/odontologos', { token, signal }))
         }
 
         const results = await Promise.allSettled(requests)
@@ -191,6 +226,20 @@ export const PersonalPage: React.FC = () => {
           const persResult = results[1]
           if (persResult.status === 'fulfilled' && Array.isArray(persResult.value)) {
             setPersonalList(persResult.value as PersonalItem[])
+          }
+        }
+
+        if (isAdmin && results[2]) {
+          const espResult = results[2]
+          if (espResult.status === 'fulfilled' && Array.isArray(espResult.value)) {
+            setEspecialidades(espResult.value as EspecialidadOption[])
+          }
+        }
+
+        if (isAdmin && results[3]) {
+          const odResult = results[3]
+          if (odResult.status === 'fulfilled' && Array.isArray(odResult.value)) {
+            setOdontologosList(odResult.value as typeof odontologosList)
           }
         }
       } catch (failure) {
@@ -232,6 +281,26 @@ export const PersonalPage: React.FC = () => {
     })
   }, [directorioItems, directorioSearch, directorioTipo])
 
+  const filteredOdontologos = useMemo(() => {
+    if (cargoFilter !== 'TODOS' && cargoFilter !== 'ODONTOLOGO') return []
+    const q = personalSearch.trim().toLocaleLowerCase('es-AR')
+    return odontologosList.filter(od => {
+      const itemEstado: EstadoPersonal = od.activo === false ? 'INACTIVO' : 'ACTIVO'
+      if (estadoFilter !== 'TODOS' && itemEstado !== estadoFilter) return false
+      if (!q) return true
+      return [
+        od.nombre,
+        od.apellido,
+        `${od.nombre} ${od.apellido}`,
+        od.matricula,
+        od.email || '',
+        od.telefono || '',
+        od.especialidad?.nombre || '',
+        'odontólogo',
+      ].some(val => val.toLocaleLowerCase('es-AR').includes(q))
+    })
+  }, [odontologosList, personalSearch, cargoFilter, estadoFilter])
+
   const filteredPersonal = useMemo(() => {
     const q = personalSearch.trim().toLocaleLowerCase('es-AR')
     return personalList.filter(item => {
@@ -265,7 +334,10 @@ export const PersonalPage: React.FC = () => {
 
   function startCreatePersonal() {
     setEditingId(null)
-    setForm({ ...EMPTY_FORM })
+    setForm({
+      ...EMPTY_FORM,
+      especialidadId: especialidades[0] ? String(especialidades[0].id) : 'NUEVA',
+    })
     setError('')
     setNotice('')
   }
@@ -273,6 +345,7 @@ export const PersonalPage: React.FC = () => {
   function startEditPersonal(person: PersonalItem) {
     setEditingId(person.id)
     setForm({
+      ...EMPTY_FORM,
       nombre: person.nombre,
       apellido: person.apellido,
       dni: person.dni,
@@ -290,6 +363,7 @@ export const PersonalPage: React.FC = () => {
   function closeForm() {
     setForm(null)
     setEditingId(null)
+    setShowOdontologoPopup(false)
   }
 
   async function handleSavePersonal(event: FormEvent<HTMLFormElement>) {
@@ -299,20 +373,72 @@ export const PersonalPage: React.FC = () => {
     setError('')
     setNotice('')
 
-    const body = {
-      nombre: form.nombre.trim(),
-      apellido: form.apellido.trim(),
-      dni: form.dni.trim(),
-      email: form.email.trim() || null,
-      telefono: form.telefono.trim() || null,
-      cargo: form.cargo,
-      fechaIngreso: form.fechaIngreso || null,
-      horarioLaboral: form.horarioLaboral.trim() || 'Lunes a Viernes 08:00 - 16:00',
-      estado: form.estado,
-      activo: form.estado === 'ACTIVO',
-    }
-
     try {
+      if (editingId === null && form.cargo === 'ODONTOLOGO') {
+        await apiRequest('/odontologos/alta-completa', {
+          method: 'POST',
+          token,
+          body: {
+            nombre: form.nombre.trim(),
+            apellido: form.apellido.trim(),
+            matricula: form.matricula.trim(),
+            email: form.email.trim() || null,
+            telefono: form.telefono.trim() || null,
+            consultorio: form.consultorio.trim() || null,
+            activo: form.estado === 'ACTIVO',
+            especialidadId:
+              form.especialidadId && form.especialidadId !== 'NUEVA'
+                ? Number(form.especialidadId)
+                : null,
+            nuevaEspecialidadNombre:
+              form.especialidadId === 'NUEVA' ? form.nuevaEspecialidadNombre.trim() : null,
+            crearCuentaUsuario: true,
+            username: form.username.trim(),
+            password: form.password,
+          },
+        })
+        setNotice(
+          `Odontólogo Dr./Dra. ${form.nombre.trim()} ${form.apellido.trim()} y cuenta "${form.username.trim()}" creados correctamente.`
+        )
+        closeForm()
+        await loadData()
+        return
+      }
+
+      let linkedUsuarioId: number | null = null
+      if (editingId === null && form.username.trim() && form.password) {
+        const createdUser = await apiRequest<{ id: number }>('/usuarios', {
+          method: 'POST',
+          token,
+          body: {
+            username: form.username.trim(),
+            nombre: form.nombre.trim(),
+            apellido: form.apellido.trim(),
+            email: form.email.trim(),
+            password: form.password,
+            rol: 'RECEPCIONISTA',
+            activo: form.estado === 'ACTIVO',
+          },
+        })
+        if (createdUser && typeof createdUser === 'object' && 'id' in createdUser) {
+          linkedUsuarioId = createdUser.id
+        }
+      }
+
+      const body = {
+        nombre: form.nombre.trim(),
+        apellido: form.apellido.trim(),
+        dni: form.dni.trim(),
+        email: form.email.trim() || null,
+        telefono: form.telefono.trim() || null,
+        cargo: form.cargo,
+        fechaIngreso: form.fechaIngreso || null,
+        horarioLaboral: form.horarioLaboral.trim() || 'Lunes a Viernes 08:00 - 16:00',
+        estado: form.estado,
+        activo: form.estado === 'ACTIVO',
+        ...(linkedUsuarioId ? { usuarioId: linkedUsuarioId } : {}),
+      }
+
       if (editingId === null) {
         const created = await apiRequest<PersonalItem>('/personal', {
           method: 'POST',
@@ -322,7 +448,11 @@ export const PersonalPage: React.FC = () => {
         if (created && typeof created === 'object' && 'id' in created) {
           setPersonalList(curr => [...curr, created])
         }
-        setNotice(`Personal ${body.nombre} ${body.apellido} registrado correctamente.`)
+        setNotice(
+          linkedUsuarioId
+            ? `Recepcionista ${body.nombre} ${body.apellido} y su cuenta "${form.username.trim()}" registrados correctamente.`
+            : `Personal ${body.nombre} ${body.apellido} registrado correctamente.`
+        )
       } else {
         const updated = await apiRequest<PersonalItem>(`/personal/${editingId}`, {
           method: 'PUT',
@@ -384,7 +514,10 @@ export const PersonalPage: React.FC = () => {
             Personal y Directorio Clínico Unificado
           </h2>
           <p className="mt-1 text-sm text-slate-600">
-            Buscador institucional centralizado de personal, profesionales médicos y pacientes, y administración del plantel auxiliar.
+            Buscador institucional centralizado de personal, profesionales médicos y pacientes.{' '}
+            <Link to="/odontologos" className="font-semibold text-blue-700 hover:underline">
+              ¿Buscás dar de alta un Odontólogo con especialidad y usuario? Ir a Odontólogos →
+            </Link>
           </p>
         </div>
 
@@ -733,22 +866,41 @@ export const PersonalPage: React.FC = () => {
                       />
                     </div>
 
-                    <div>
-                      <label
-                        htmlFor="personal-dni"
-                        className="block text-xs font-bold text-slate-700 mb-1"
-                      >
-                        DNI
-                      </label>
-                      <input
-                        id="personal-dni"
-                        required
-                        value={form.dni}
-                        onChange={e => setForm({ ...form, dni: e.target.value })}
-                        placeholder="7 a 10 dígitos numéricos"
-                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-blue-600 focus:outline-none"
-                      />
-                    </div>
+                    {form.cargo !== 'ODONTOLOGO' ? (
+                      <div>
+                        <label
+                          htmlFor="personal-dni"
+                          className="block text-xs font-bold text-slate-700 mb-1"
+                        >
+                          DNI
+                        </label>
+                        <input
+                          id="personal-dni"
+                          required
+                          value={form.dni}
+                          onChange={e => setForm({ ...form, dni: e.target.value })}
+                          placeholder="7 a 10 dígitos numéricos"
+                          className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-blue-600 focus:outline-none"
+                        />
+                      </div>
+                    ) : (
+                      <div>
+                        <label
+                          htmlFor="personal-matricula"
+                          className="block text-xs font-bold text-slate-700 mb-1"
+                        >
+                          Matrícula profesional
+                        </label>
+                        <input
+                          id="personal-matricula"
+                          required
+                          value={form.matricula}
+                          onChange={e => setForm({ ...form, matricula: e.target.value })}
+                          placeholder="Ej. MP-1234"
+                          className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-blue-600 focus:outline-none"
+                        />
+                      </div>
+                    )}
 
                     <div>
                       <label
@@ -760,11 +912,18 @@ export const PersonalPage: React.FC = () => {
                       <select
                         id="personal-cargo"
                         value={form.cargo}
-                        onChange={e =>
-                          setForm({ ...form, cargo: e.target.value as CargoPersonal })
-                        }
+                        onChange={e => {
+                          const nextCargo = e.target.value as PersonalFormCargo
+                          setForm({ ...form, cargo: nextCargo })
+                          if (nextCargo === 'ODONTOLOGO') {
+                            setShowOdontologoPopup(true)
+                          }
+                        }}
                         className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-600 focus:outline-none"
                       >
+                        {editingId === null && (
+                          <option value="ODONTOLOGO">Odontólogo</option>
+                        )}
                         {CARGOS_PERSONAL.map(c => (
                           <option key={c.value} value={c.value}>
                             {c.label}
@@ -858,6 +1017,86 @@ export const PersonalPage: React.FC = () => {
                       </select>
                     </div>
 
+                    {form.cargo === 'RECEPCIONISTA' && editingId === null && (
+                      <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
+                        <p className="md:col-span-2 text-xs font-bold text-emerald-900">
+                          Cuenta de acceso al sistema (rol RECEPCIONISTA — opcional si ya tiene usuario)
+                        </p>
+                        <div>
+                          <label htmlFor="personal-rec-user" className="block text-xs font-bold text-slate-700 mb-1">
+                            Usuario de acceso (login)
+                          </label>
+                          <input
+                            id="personal-rec-user"
+                            value={form.username}
+                            onChange={e => setForm({ ...form, username: e.target.value })}
+                            placeholder="Ej. recepcion.laura"
+                            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-blue-600 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="personal-rec-pass" className="block text-xs font-bold text-slate-700 mb-1">
+                            Contraseña inicial
+                          </label>
+                          <div className="relative">
+                            <input
+                              id="personal-rec-pass"
+                              type={showPassword ? 'text' : 'password'}
+                              minLength={6}
+                              value={form.password}
+                              onChange={e => setForm({ ...form, password: e.target.value })}
+                              placeholder="Mínimo 6 caracteres"
+                              className="w-full rounded-xl border border-slate-300 px-3 py-2 pr-10 text-sm focus:border-blue-600 focus:outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword(v => !v)}
+                              aria-label={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-800"
+                            >
+                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {form.cargo === 'ODONTOLOGO' && editingId === null && (
+                      <div className="md:col-span-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-3 text-xs text-blue-900">
+                        <div>
+                          <p className="font-bold">Configuración de Odontólogo</p>
+                          <p className="mt-0.5">
+                            Especialidad:{' '}
+                            <strong>
+                              {form.especialidadId === 'NUEVA'
+                                ? form.nuevaEspecialidadNombre || 'Nueva especialidad'
+                                : especialidades.find(e => String(e.id) === form.especialidadId)?.nombre || 'Sin seleccionar'}
+                            </strong>
+                            {form.username ? ` · Usuario: ${form.username}` : ''}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowOdontologoPopup(true)}
+                          className="rounded-lg bg-blue-600 px-3 py-1.5 font-bold text-white hover:bg-blue-700"
+                        >
+                          Elegir especialidad y cuenta
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="md:col-span-3 rounded-xl border border-blue-200 bg-blue-50/80 px-4 py-2.5 text-xs text-blue-900 flex flex-wrap items-center justify-between gap-2">
+                      <span>
+                        <strong>¿Querés dar de alta un Odontólogo?</strong> Los odontólogos requieren matrícula profesional, especialidad y cuenta médica propia.
+                      </span>
+                      <Link
+                        to="/odontologos"
+                        className="inline-flex items-center rounded-lg bg-blue-600 px-3 py-1.5 font-bold text-white hover:bg-blue-700"
+                      >
+                        Ir a Odontólogos →
+                      </Link>
+                    </div>
+
                     <div className="sm:col-span-2 lg:col-span-3 flex justify-end gap-2.5 border-t border-slate-100 pt-3">
                       <button
                         type="button"
@@ -901,11 +1140,12 @@ export const PersonalPage: React.FC = () => {
                     aria-label="Filtrar por cargo"
                     value={cargoFilter}
                     onChange={e =>
-                      setCargoFilter(e.target.value as 'TODOS' | CargoPersonal)
+                      setCargoFilter(e.target.value as 'TODOS' | PersonalFormCargo)
                     }
                     className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
                   >
                     <option value="TODOS">Todos los cargos</option>
+                    <option value="ODONTOLOGO">Odontólogo</option>
                     {CARGOS_PERSONAL.map(c => (
                       <option key={c.value} value={c.value}>
                         {c.label}
@@ -933,7 +1173,7 @@ export const PersonalPage: React.FC = () => {
                 <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
                   Cargando padrón de personal…
                 </div>
-              ) : filteredPersonal.length === 0 ? (
+              ) : filteredPersonal.length === 0 && filteredOdontologos.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center space-y-2">
                   <Briefcase className="w-8 h-8 text-slate-400 mx-auto" />
                   <p className="text-sm font-semibold text-slate-700">
@@ -942,6 +1182,79 @@ export const PersonalPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {filteredOdontologos.map(od => {
+                    const isActive = od.activo !== false
+                    return (
+                      <article
+                        key={`od-${od.id}`}
+                        className="flex flex-col justify-between rounded-2xl border border-indigo-200/80 bg-white/90 p-5 shadow-xs hover:shadow-md transition-shadow space-y-4"
+                      >
+                        <div className="space-y-2.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <h3 className="text-base font-bold text-slate-900">
+                                Dr./Dra. {od.nombre} {od.apellido}
+                              </h3>
+                              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">
+                                  MP {od.matricula}
+                                </span>
+                                <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700">
+                                  Odontólogo · {od.especialidad?.nombre || 'General'}
+                                </span>
+                              </div>
+                            </div>
+
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                isActive
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-rose-100 text-rose-800'
+                              }`}
+                            >
+                              {isActive ? (
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                              ) : (
+                                <XCircle className="w-3.5 h-3.5" />
+                              )}
+                              {isActive ? 'ACTIVO' : 'INACTIVO'}
+                            </span>
+                          </div>
+
+                          <div className="space-y-1 text-xs text-slate-600 border-t border-slate-100 pt-2.5">
+                            {od.email && (
+                              <p className="flex items-center gap-2">
+                                <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <span className="truncate">{od.email}</span>
+                              </p>
+                            )}
+                            {od.telefono && (
+                              <p className="flex items-center gap-2">
+                                <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <span>{od.telefono}</span>
+                              </p>
+                            )}
+                            {od.consultorio && (
+                              <p className="flex items-center gap-2">
+                                <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <span>Consultorio: {od.consultorio}</span>
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+                          <Link
+                            to="/odontologos"
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                            Gestionar en Odontólogos →
+                          </Link>
+                        </div>
+                      </article>
+                    )
+                  })}
                   {filteredPersonal.map(person => {
                     const personEstado = resolvePersonalEstado(person)
                     const isActive = personEstado === 'ACTIVO'
@@ -1033,6 +1346,142 @@ export const PersonalPage: React.FC = () => {
             </>
           )}
         </section>
+      )}
+
+      {showOdontologoPopup && form && form.cargo === 'ODONTOLOGO' && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="odontologo-popup-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+        >
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <h3 id="odontologo-popup-title" className="text-lg font-bold text-slate-900">
+                Especialidad y Cuenta del Odontólogo
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowOdontologoPopup(false)}
+                className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
+                aria-label="Cerrar ventana de especialidad"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="popup-esp" className="block text-xs font-bold text-slate-700 mb-1">
+                  Especialidad del odontólogo
+                </label>
+                <select
+                  id="popup-esp"
+                  value={form.especialidadId}
+                  onChange={e => setForm({ ...form, especialidadId: e.target.value })}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-600 focus:outline-none"
+                >
+                  {especialidades.map(esp => (
+                    <option key={esp.id} value={String(esp.id)}>
+                      {esp.nombre}
+                    </option>
+                  ))}
+                  <option value="NUEVA">+ Otra (crear nueva especialidad)</option>
+                </select>
+              </div>
+
+              {form.especialidadId === 'NUEVA' && (
+                <div>
+                  <label htmlFor="popup-esp-nueva" className="block text-xs font-bold text-slate-700 mb-1">
+                    Nombre de la nueva especialidad
+                  </label>
+                  <input
+                    id="popup-esp-nueva"
+                    value={form.nuevaEspecialidadNombre}
+                    onChange={e => setForm({ ...form, nuevaEspecialidadNombre: e.target.value })}
+                    placeholder="Ej. Ortodoncia"
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-blue-600 focus:outline-none"
+                  />
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="popup-matricula" className="block text-xs font-bold text-slate-700 mb-1">
+                    Matrícula profesional
+                  </label>
+                  <input
+                    id="popup-matricula"
+                    value={form.matricula}
+                    onChange={e => setForm({ ...form, matricula: e.target.value })}
+                    placeholder="Ej. MP-1234"
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-blue-600 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="popup-consultorio" className="block text-xs font-bold text-slate-700 mb-1">
+                    Consultorio
+                  </label>
+                  <input
+                    id="popup-consultorio"
+                    value={form.consultorio}
+                    onChange={e => setForm({ ...form, consultorio: e.target.value })}
+                    placeholder="Ej. Box 1"
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-blue-600 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-slate-100 pt-3">
+                <div>
+                  <label htmlFor="popup-od-user" className="block text-xs font-bold text-slate-700 mb-1">
+                    Usuario de acceso (login)
+                  </label>
+                  <input
+                    id="popup-od-user"
+                    value={form.username}
+                    onChange={e => setForm({ ...form, username: e.target.value })}
+                    placeholder="Ej. joseperalta"
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-blue-600 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="popup-od-pass" className="block text-xs font-bold text-slate-700 mb-1">
+                    Contraseña inicial
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="popup-od-pass"
+                      type={showPassword ? 'text' : 'password'}
+                      value={form.password}
+                      onChange={e => setForm({ ...form, password: e.target.value })}
+                      placeholder="Mínimo 6 caracteres"
+                      className="w-full rounded-xl border border-slate-300 px-3 py-2 pr-10 text-sm focus:border-blue-600 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(v => !v)}
+                      aria-label={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-800"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-3">
+              <button
+                type="button"
+                onClick={() => setShowOdontologoPopup(false)}
+                className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

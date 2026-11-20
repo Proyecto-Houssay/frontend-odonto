@@ -67,8 +67,8 @@ async function getHumanInstance(): Promise<HumanInstanceLike> {
         cacheSensitivity: 0,
         warmup: 'none',
         filter: {
-          enabled: false,
-          equalization: false,
+          enabled: true,
+          equalization: true,
         },
         face: {
           enabled: true,
@@ -230,6 +230,7 @@ export const FaceCheckin = ({
   const [customHolderName, setCustomHolderName] = useState('')
   const [isExternalDni, setIsExternalDni] = useState(false)
   const [cameraReady, setCameraReady] = useState(false)
+  const [liveFaceDetected, setLiveFaceDetected] = useState<boolean | null>(null)
   const [consentAccepted, setConsentAccepted] = useState(false)
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState('')
@@ -288,11 +289,34 @@ export const FaceCheckin = ({
     [previewUrl]
   )
 
+  useEffect(() => {
+    if (!cameraReady || busy) return
+    let cancelled = false
+    const timer = window.setInterval(async () => {
+      if (cancelled || !videoRef.current || videoRef.current.readyState < 2) return
+      try {
+        const human = await getHumanInstance()
+        const canvas = drawSourceToCanvas(videoRef.current, 0, 0)
+        const result = await human.detect(canvas)
+        if (!cancelled) {
+          setLiveFaceDetected(extractValidFaces(result.face).length > 0)
+        }
+      } catch {
+        // Ignore transient frame errors during live preview
+      }
+    }, 900)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [cameraReady, busy])
+
   const stopCamera = () => {
     streamRef.current?.getTracks().forEach(track => track.stop())
     streamRef.current = null
     if (videoRef.current) videoRef.current.srcObject = null
     setCameraReady(false)
+    setLiveFaceDetected(null)
   }
 
   const selectReference = (event: ChangeEvent<HTMLInputElement>) => {
@@ -302,6 +326,7 @@ export const FaceCheckin = ({
     setIsExternalDni(false)
     setSimilarityPct(null)
     setVerifiedAt(null)
+    setLiveFaceDetected(null)
     onVerified(null)
     setError('')
     setStatus('')
@@ -314,6 +339,7 @@ export const FaceCheckin = ({
     setIsExternalDni(false)
     setSimilarityPct(null)
     setVerifiedAt(null)
+    setLiveFaceDetected(null)
     onVerified(null)
     if (!consentAccepted) {
       setError('Leé y aceptá el consentimiento antes de activar la cámara o comparar los rostros.')
@@ -399,6 +425,7 @@ export const FaceCheckin = ({
     setIsExternalDni(false)
     setSimilarityPct(null)
     setVerifiedAt(null)
+    setLiveFaceDetected(null)
     onVerified(null)
 
     if (!consentAccepted) {
@@ -455,20 +482,15 @@ export const FaceCheckin = ({
         }
       }
 
-      if (referenceEmbeddings.length === 0) {
-        setError(
-          'No se pudo detectar un rostro nítido en la foto subida. Utilizá una imagen donde el rostro se vea de frente y con buena luz.'
-        )
-        return
-      }
-
       let bestRawSimilarity = 0
       let liveDetected = false
-      for (let attempt = 0; attempt < 3; attempt += 1) {
+      let lastLiveCanvas: HTMLCanvasElement | null = null
+      for (let attempt = 0; attempt < 6; attempt += 1) {
         if (attempt > 0) {
-          await new Promise(resolve => setTimeout(resolve, 140))
+          await new Promise(resolve => setTimeout(resolve, 220))
         }
         const liveCanvas = drawSourceToCanvas(videoRef.current, 0, 0)
+        lastLiveCanvas = liveCanvas
         const liveResult = await human.detect(liveCanvas)
         const liveFaces = extractValidFaces(liveResult.face)
         const liveFace = liveFaces[0]
@@ -483,11 +505,13 @@ export const FaceCheckin = ({
             }
           }
 
-          for (const liveEmb of candidateLiveEmbeddings) {
-            for (const refEmb of referenceEmbeddings) {
-              const sim = human.match.similarity(refEmb, liveEmb)
-              if (sim > bestRawSimilarity) {
-                bestRawSimilarity = sim
+          if (referenceEmbeddings.length > 0) {
+            for (const liveEmb of candidateLiveEmbeddings) {
+              for (const refEmb of referenceEmbeddings) {
+                const sim = human.match.similarity(refEmb, liveEmb)
+                if (sim > bestRawSimilarity) {
+                  bestRawSimilarity = sim
+                }
               }
             }
           }
@@ -495,23 +519,83 @@ export const FaceCheckin = ({
         }
       }
 
-      if (!liveDetected) {
+      const calibratedSimilarity = calibrateBiometricSimilarity(bestRawSimilarity)
+      let pct = Math.min(99, Math.round(calibratedSimilarity * 100))
+      let verifiedMatch = referenceEmbeddings.length > 0 && liveDetected && calibratedSimilarity >= MATCH_THRESHOLD
+      let extractedDni = dni.replace(/\D/g, '')
+      let extractedName = customHolderName.trim()
+
+      // Si el motor local no detectó el rostro en el DNI, no alcanzó el umbral, o falta el número de DNI,
+      // analizamos el rostro en vivo junto con la foto del DNI usando Gemini Vision en el backend.
+      if ((!verifiedMatch || !extractedDni) && lastLiveCanvas && activeToken) {
+        setStatus('Analizando el rostro en vivo junto al DNI cargado…')
+        try {
+          const dniDataUrl = baseRefCanvas.toDataURL('image/jpeg', 0.88)
+          const liveDataUrl = lastLiveCanvas.toDataURL('image/jpeg', 0.88)
+          const aiVerify = await apiRequest<{
+            disponible?: boolean
+            coincide?: boolean
+            similitudPct?: number
+            dniDetectado?: string
+            nombreDetectado?: string
+            motivo?: string
+          }>('/ai/verificar-dni', {
+            method: 'POST',
+            token: activeToken,
+            body: { dniImagenBase64: dniDataUrl, camaraImagenBase64: liveDataUrl },
+          })
+
+          if (aiVerify?.disponible) {
+            if (!extractedDni && aiVerify.dniDetectado) {
+              extractedDni = aiVerify.dniDetectado.replace(/\D/g, '')
+              if (extractedDni) setDni(extractedDni)
+            }
+            if (!extractedName && aiVerify.nombreDetectado) {
+              extractedName = aiVerify.nombreDetectado.trim()
+              if (extractedName) setCustomHolderName(extractedName)
+            }
+            if (!verifiedMatch) {
+              const aiPct = Math.max(0, Math.min(99, Math.round(aiVerify.similitudPct ?? 0)))
+              pct = Math.max(pct, aiPct)
+              verifiedMatch = Boolean(aiVerify.coincide) && aiPct >= Math.round(MATCH_THRESHOLD * 100)
+              if (!verifiedMatch) {
+                setSimilarityPct(pct)
+                setError(
+                  aiVerify.motivo
+                    ? `${aiVerify.motivo} (similitud: ${pct}%).`
+                    : `El rostro en cámara no coincide con el DNI cargado (similitud: ${pct}%).`
+                )
+                return
+              }
+            }
+          }
+        } catch {
+          // Si falla la llamada remota, continúa con el resultado biométrico local
+        }
+      }
+
+      if (referenceEmbeddings.length === 0 && !verifiedMatch) {
+        setError(
+          'No se pudo detectar un rostro nítido en la foto subida. Utilizá una imagen donde el rostro se vea de frente y con buena luz.'
+        )
+        return
+      }
+
+      if (!liveDetected && !verifiedMatch) {
         setError('No se detectó tu rostro frente a la cámara. Asegurate de mirar de frente con buena iluminación.')
         return
       }
 
-      const calibratedSimilarity = calibrateBiometricSimilarity(bestRawSimilarity)
-      const pct = Math.min(99, Math.round(calibratedSimilarity * 100))
       setSimilarityPct(pct)
 
-      if (calibratedSimilarity < MATCH_THRESHOLD) {
+      if (!verifiedMatch) {
         setError(
           `El rostro en cámara no coincide con la fotografía de referencia (similitud biométrica: ${pct}%). La ficha clínica permanece protegida.`
         )
         return
       }
 
-      const normalizedDni = dni.replace(/\D/g, '')
+      const normalizedDni = extractedDni
       let matchedPatient: CheckinPatient | undefined
 
       if (activeRole === 'PACIENTE') {
@@ -534,14 +618,12 @@ export const FaceCheckin = ({
             : await apiRequest<CheckinPatient[]>('/pacientes', { token: activeToken }).catch(() => [])
         if (normalizedDni) {
           matchedPatient = list.find(candidate => candidate.dni.replace(/\D/g, '') === normalizedDni)
-        } else if (list.length > 0) {
-          matchedPatient = list[0]
         }
       }
 
       if (!matchedPatient) {
         setIsExternalDni(true)
-        const trimmedCustom = customHolderName.trim()
+        const trimmedCustom = extractedName
         const parts = trimmedCustom ? trimmedCustom.split(/\s+/) : []
         const holderFirstName =
           parts.length > 0
@@ -591,6 +673,7 @@ export const FaceCheckin = ({
     setIsExternalDni(false)
     setSimilarityPct(null)
     setVerifiedAt(null)
+    setLiveFaceDetected(null)
     onVerified(null)
     setReference(null)
     setPreviewUrl(null)
@@ -765,7 +848,19 @@ export const FaceCheckin = ({
           <div>
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-base font-extrabold text-slate-950 dark:text-slate-50">2. Cámara</h2>
-              {similarityPct !== null && (
+              <div className="flex items-center gap-2">
+                {cameraReady && !busy && liveFaceDetected !== null && (
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                      liveFaceDetected
+                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                        : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                    }`}
+                  >
+                    {liveFaceDetected ? 'Rostro en foco' : 'Centrá tu rostro'}
+                  </span>
+                )}
+                {similarityPct !== null && (
                 <span
                   style={
                     similarityPct >= Math.round(MATCH_THRESHOLD * 100)
@@ -776,7 +871,8 @@ export const FaceCheckin = ({
                 >
                   Coincidencia: {similarityPct}%
                 </span>
-              )}
+                )}
+              </div>
             </div>
             <p className="mt-1 text-xs font-medium text-slate-700 dark:text-slate-300">
               Activá la cámara, mirá de frente con buena iluminación y pulsá &ldquo;Verificar rostro&rdquo;.

@@ -235,6 +235,7 @@ export type DrAnnieSyncedPayload = {
   tipoImagen: TipoImagenDental
   fechaAnalisis: string
   pacienteId: number | null
+  pacienteNombre?: string
   diagnosticoSugerido: string
   findings: DrAnnieToothFinding[]
 }
@@ -295,13 +296,16 @@ export function extractFdiTeethFromHallazgos(
   return Array.from(byTooth.values())
 }
 
-export function saveDrAnnieFindingsToStorage(response: AnalisisImagenResponse): DrAnnieSyncedPayload {
+export function saveDrAnnieFindingsToStorage(
+  response: AnalisisImagenResponse & { pacienteNombre?: string }
+): DrAnnieSyncedPayload {
   const findings = extractFdiTeethFromHallazgos(response.hallazgos)
   const payload: DrAnnieSyncedPayload = {
     estudioId: response.id,
     tipoImagen: response.tipoImagen,
     fechaAnalisis: response.fechaAnalisis,
     pacienteId: response.pacienteId ?? null,
+    pacienteNombre: response.pacienteNombre,
     diagnosticoSugerido: response.diagnosticoSugerido,
     findings,
   }
@@ -861,8 +865,22 @@ export function DrAnniePage() {
 
   function handleEnviarAlOdontograma() {
     if (!resultado) return
-    saveDrAnnieFindingsToStorage(resultado)
-    navigate(isStaff ? '/odontograma' : '/mi-odontograma')
+    const targetPacienteId =
+      resultado.pacienteId ?? (selectedPacienteId ? Number(selectedPacienteId) : null)
+    const matchedPatient = pacientes.find((p) => p.id === targetPacienteId)
+    const pacienteNombre = matchedPatient
+      ? `${matchedPatient.nombre} ${matchedPatient.apellido}`
+      : undefined
+    saveDrAnnieFindingsToStorage({
+      ...resultado,
+      pacienteId: targetPacienteId,
+      pacienteNombre,
+    })
+    if (isStaff) {
+      navigate(targetPacienteId ? `/pacientes/${targetPacienteId}/odontograma` : '/odontograma')
+    } else {
+      navigate('/mi-odontograma')
+    }
   }
 
   async function handleDerivarAlOdontologo() {
