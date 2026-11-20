@@ -243,6 +243,7 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [drAnnieData, setDrAnnieData] = useState(null)
+  const [sendingToPatient, setSendingToPatient] = useState(false)
   const signatureRef = useRef(null), signatureBox = useRef(null), savingRef = useRef(false), revision = useRef(0)
   const patientId = demoMode ? patientNumber(selectedDemoPatientId) : patientNumber(pacienteId ?? manualPatient)
   const selectedDemoPatient = demoPatients.find(patient => patient.id === patientId)
@@ -297,7 +298,7 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
     })
     setChart(next)
     revoke({ consent: false, clearCanvas: false })
-    setNotice(`Hallazgos de Dr. Annie aplicados a las piezas: ${drAnnieData.findings.map(f => f.piezaFdi).join(', ')}`)
+    setNotice(`Hallazgos de Dra. Ziegler aplicados a las piezas: ${drAnnieData.findings.map(f => f.piezaFdi).join(', ')}`)
   }
 
   useEffect(() => {
@@ -501,6 +502,23 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
     try { createBudgetPdf(saved || snapshot).save(`presupuesto_paciente_${patientId}.pdf`); setError('') }
     catch { setError('No se pudo generar el PDF. El odontograma y la firma se conservan.') }
   }
+  async function enviarDiagnosticoAlPaciente(targetId = saved?.id) {
+    if (demoMode || readOnly || !targetId || !bearer || sendingToPatient) return
+    setSendingToPatient(true); setError('')
+    try {
+      const response = await fetch(`${baseUrl}/odontograma/${targetId}/enviar-paciente`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${bearer}` },
+      })
+      if (!response.ok) throw new Error('No se pudo enviar el diagnóstico al paciente.')
+      const data = await response.json()
+      setNotice(data?.mensaje || `Guardado #${targetId}. Diagnóstico enviado al buzón del paciente.`)
+    } catch (failure) {
+      setError(failure.message || 'No se pudo enviar el diagnóstico al paciente.')
+    } finally {
+      setSendingToPatient(false)
+    }
+  }
 
   const filteredPatients = apiPatients.filter(p => !patientSearch || `${p.nombre} ${p.apellido} ${p.dni} ${p.id}`.toLowerCase().includes(patientSearch.toLowerCase()))
   const selectedPatientData = apiPatients.find(p => String(p.id) === String(patientId))
@@ -602,13 +620,23 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
                             <div className="odontogram-history-total">Total estimado: {formatMoney(hist.totalPresupuesto)} ARS</div>
                           </div>
                           {!readOnly ? (
-                            <button
-                              type="button"
-                              className="odontogram-btn-small"
-                              onClick={() => void loadPreviousChart(hist.id)}
-                            >
-                              Cargar en odontograma
-                            </button>
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                              <button
+                                type="button"
+                                className="odontogram-btn-small"
+                                onClick={() => void loadPreviousChart(hist.id)}
+                              >
+                                Cargar en odontograma
+                              </button>
+                              <button
+                                type="button"
+                                className="odontogram-btn-small"
+                                disabled={sendingToPatient}
+                                onClick={() => void enviarDiagnosticoAlPaciente(hist.id)}
+                              >
+                                Enviar diagnóstico al paciente
+                              </button>
+                            </div>
                           ) : null}
                         </div>
                       ))
@@ -697,7 +725,7 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
         {drAnnieData?.findings?.length > 0 && (
           <div className="odontogram-ai-banner">
             <div className="odontogram-ai-info">
-              <span className="odontogram-ai-sparkle">✨ <strong>Dr. Annie (IA)</strong></span>
+              <span className="odontogram-ai-sparkle">✨ <strong>Dra. Ziegler (IA)</strong></span>
               <span>Hallazgos radiográficos en piezas: <strong>{drAnnieData.findings.map(f => f.piezaFdi).join(', ')}</strong></span>
             </div>
             {!readOnly && (
@@ -706,7 +734,7 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
                 className="odontogram-ai-apply-btn"
                 onClick={aplicarHallazgosDrAnnie}
               >
-                Aplicar hallazgos de Dr. Annie al odontograma
+                Aplicar hallazgos de Dra. Ziegler al odontograma
               </button>
             )}
           </div>
@@ -766,7 +794,7 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
                           className={`odontogram-tooth ${selected === number ? 'odontogram-selected' : ''} ${viewMode === '3d' ? 'odontogram-tooth-3d' : ''} ${position === 7 ? 'odontogram-midline-left' : ''} ${isAiFlagged ? 'is-ai-flagged' : ''}`}
                           style={toothStyle}
                           disabled={saving}
-                          aria-label={`Diente ${number}: ${condition?.nombre || 'Sin evaluar'}${isAiFlagged ? ' (Dr. Annie IA)' : ''}`}
+                          aria-label={`Diente ${number}: ${condition?.nombre || 'Sin evaluar'}${isAiFlagged ? ' (Dra. Ziegler IA)' : ''}`}
                           aria-pressed={selected === number}
                           onClick={() => setSelected(number)}
                         >
@@ -906,6 +934,16 @@ export default function Odontograma({ pacienteId, token = '', apiUrl = '/api', d
       <div className="odontogram-actions">
         <button type="button" className="odontogram-primary" disabled={demoMode || !canSign || !signature || !bearer || Boolean(saved)} onClick={save}>{demoMode ? 'Guardar requiere backend' : saving ? 'Guardando…' : 'Guardar odontograma'}</button>
         <button type="button" disabled={!signature || !accepted || !patientId || !teeth.length || saving} onClick={download}>Descargar PDF con Firma</button>
+        {!demoMode && !readOnly && saved?.id ? (
+          <button
+            type="button"
+            className="odontogram-primary"
+            disabled={sendingToPatient}
+            onClick={() => void enviarDiagnosticoAlPaciente(saved.id)}
+          >
+            {sendingToPatient ? 'Enviando al paciente…' : 'Enviar diagnóstico al paciente'}
+          </button>
+        ) : null}
       </div>
       <p>{demoMode ? 'El PDF se descarga como borrador académico firmado y no se guarda en MySQL ni en el backend. No es un comprobante de pago.' : 'El PDF puede descargarse como borrador firmado; solo se informa guardado tras recibir HTTP 201 y verificar la respuesta. No es un comprobante de pago.'}</p>
     </section>}

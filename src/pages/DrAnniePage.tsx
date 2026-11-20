@@ -965,10 +965,10 @@ export function DrAnniePage() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-teal-300/30 bg-teal-300/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-teal-100">
-              <Sparkles className="h-4 w-4" /> Diagnóstico por Imagen con IA
+              <Sparkles className="h-4 w-4" /> Diagnóstico por Imagen con IA · Gemini Vision
             </div>
             <h1 className="text-2xl font-extrabold tracking-tight text-white sm:text-4xl">
-              Dr. Annie · Asistente Radiográfico IA
+              Dra. Ziegler · Asistente Radiográfico IA
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-200">
               Detección asistida de patologías dentales, cálculo de severidad y triaje de urgencia en radiografías panorámicas, periapicales, bite-wing, fotografías intraorales y tomografías CBCT 3D.
@@ -1175,7 +1175,7 @@ export function DrAnniePage() {
               className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-extrabold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-60"
             >
               <Sparkles className="h-4 w-4" />
-              {analyzing ? 'Analizando estudio dental...' : 'Analizar con Dr. Annie'}
+              {analyzing ? 'Analizando estudio dental...' : 'Analizar con Dr. Annie · Dra. Ziegler'}
             </button>
           </form>
 

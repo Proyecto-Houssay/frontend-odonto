@@ -31,6 +31,8 @@ export type Odontologo = {
   matricula: string
   email?: string | null
   telefono?: string | null
+  consultorio?: string | null
+  usuarioId?: number | null
   activo?: boolean
   especialidad?: Especialidad | null
 }
@@ -49,8 +51,13 @@ type OdontologoFormState = {
   matricula: string
   email: string
   telefono: string
+  consultorio: string
   activo: boolean
   especialidadId: string
+  nuevaEspecialidadNombre: string
+  crearCuentaUsuario: boolean
+  username: string
+  password: string
 }
 
 const EMPTY_FORM: OdontologoFormState = {
@@ -59,8 +66,13 @@ const EMPTY_FORM: OdontologoFormState = {
   matricula: '',
   email: '',
   telefono: '',
+  consultorio: '',
   activo: true,
   especialidadId: '',
+  nuevaEspecialidadNombre: '',
+  crearCuentaUsuario: false,
+  username: '',
+  password: '',
 }
 
 const SUGGESTED_SPECIALTIES = [
@@ -201,8 +213,13 @@ export const OdontologosPage: React.FC = () => {
       matricula: dentist.matricula,
       email: dentist.email || '',
       telefono: dentist.telefono || '',
+      consultorio: dentist.consultorio || '',
       activo: dentist.activo !== false,
       especialidadId: dentist.especialidad?.id ? String(dentist.especialidad.id) : '',
+      nuevaEspecialidadNombre: '',
+      crearCuentaUsuario: false,
+      username: '',
+      password: '',
     })
     setError('')
     setNotice('')
@@ -220,27 +237,63 @@ export const OdontologosPage: React.FC = () => {
     setError('')
     setNotice('')
 
+    const useAltaCompleta =
+      editingId === null &&
+      (form.crearCuentaUsuario || (form.especialidadId === 'NUEVA' && form.nuevaEspecialidadNombre.trim().length > 0))
+
     const body = {
       nombre: form.nombre.trim(),
       apellido: form.apellido.trim(),
       matricula: form.matricula.trim(),
       email: form.email.trim() || null,
       telefono: form.telefono.trim() || null,
+      ...(form.consultorio.trim() ? { consultorio: form.consultorio.trim() } : {}),
       activo: form.activo,
-      especialidad: form.especialidadId ? { id: Number(form.especialidadId) } : null,
+      especialidad: form.especialidadId && form.especialidadId !== 'NUEVA' ? { id: Number(form.especialidadId) } : null,
     }
 
     try {
       if (editingId === null) {
-        const created = await apiRequest<Odontologo>('/odontologos', {
-          method: 'POST',
-          token,
-          body,
-        })
-        if (created && typeof created === 'object' && 'id' in created) {
-          setDentists(current => [...current, created])
+        if (useAltaCompleta) {
+          const created = await apiRequest<Odontologo>('/odontologos/alta-completa', {
+            method: 'POST',
+            token,
+            body: {
+              nombre: form.nombre.trim(),
+              apellido: form.apellido.trim(),
+              matricula: form.matricula.trim(),
+              email: form.email.trim() || null,
+              telefono: form.telefono.trim() || null,
+              consultorio: form.consultorio.trim() || null,
+              activo: form.activo,
+              especialidadId:
+                form.especialidadId && form.especialidadId !== 'NUEVA' ? Number(form.especialidadId) : null,
+              nuevaEspecialidadNombre:
+                form.especialidadId === 'NUEVA' ? form.nuevaEspecialidadNombre.trim() : null,
+              crearCuentaUsuario: form.crearCuentaUsuario,
+              username: form.crearCuentaUsuario ? form.username.trim() : null,
+              password: form.crearCuentaUsuario ? form.password : null,
+            },
+          })
+          if (created && typeof created === 'object' && 'id' in created) {
+            setDentists(current => [...current, created])
+          }
+          setNotice(
+            form.crearCuentaUsuario
+              ? `Profesional Dr./Dra. ${body.nombre} ${body.apellido} y cuenta de acceso "${form.username.trim()}" registrados correctamente.`
+              : `Profesional Dr./Dra. ${body.nombre} ${body.apellido} registrado correctamente.`
+          )
+        } else {
+          const created = await apiRequest<Odontologo>('/odontologos', {
+            method: 'POST',
+            token,
+            body,
+          })
+          if (created && typeof created === 'object' && 'id' in created) {
+            setDentists(current => [...current, created])
+          }
+          setNotice(`Profesional Dr./Dra. ${body.nombre} ${body.apellido} registrado correctamente.`)
         }
-        setNotice(`Profesional Dr./Dra. ${body.nombre} ${body.apellido} registrado correctamente.`)
       } else {
         const updated = await apiRequest<Odontologo>(`/odontologos/${editingId}`, {
           method: 'PUT',
@@ -639,8 +692,27 @@ export const OdontologosPage: React.FC = () => {
                     {esp.nombre}
                   </option>
                 ))}
+                {editingId === null && (
+                  <option value="NUEVA">+ Crear nueva especialidad…</option>
+                )}
               </select>
             </div>
+
+            {editingId === null && form.especialidadId === 'NUEVA' && (
+              <div>
+                <label htmlFor="dentist-nueva-especialidad" className="block text-xs font-bold text-indigo-700 mb-1">
+                  Nombre de la nueva especialidad
+                </label>
+                <input
+                  id="dentist-nueva-especialidad"
+                  required
+                  value={form.nuevaEspecialidadNombre}
+                  onChange={e => setForm({ ...form, nuevaEspecialidadNombre: e.target.value })}
+                  placeholder="Ej. Implantología"
+                  className="w-full rounded-xl border border-indigo-300 bg-indigo-50/40 px-3 py-2 text-sm focus:border-indigo-600 focus:outline-none"
+                />
+              </div>
+            )}
 
             <div>
               <label htmlFor="dentist-email" className="block text-xs font-bold text-slate-700 mb-1">
@@ -669,6 +741,19 @@ export const OdontologosPage: React.FC = () => {
               />
             </div>
 
+            <div>
+              <label htmlFor="dentist-consultorio" className="block text-xs font-bold text-slate-700 mb-1">
+                Consultorio / Box
+              </label>
+              <input
+                id="dentist-consultorio"
+                value={form.consultorio}
+                onChange={e => setForm({ ...form, consultorio: e.target.value })}
+                placeholder="Ej. Box 1"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-indigo-600 focus:outline-none"
+              />
+            </div>
+
             <div className="flex items-center gap-2 pt-2">
               <input
                 id="dentist-activo"
@@ -681,6 +766,55 @@ export const OdontologosPage: React.FC = () => {
                 Profesional activo para asignación de turnos
               </label>
             </div>
+
+            {editingId === null && (
+              <div className="sm:col-span-2 lg:col-span-3 rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    id="dentist-crear-cuenta"
+                    type="checkbox"
+                    checked={form.crearCuentaUsuario}
+                    onChange={e => setForm({ ...form, crearCuentaUsuario: e.target.checked })}
+                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <label htmlFor="dentist-crear-cuenta" className="text-sm font-bold text-indigo-950">
+                    Crear cuenta de acceso (login) como Odontólogo
+                  </label>
+                </div>
+                {form.crearCuentaUsuario && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label htmlFor="dentist-username" className="block text-xs font-bold text-slate-700 mb-1">
+                        Usuario de acceso (login)
+                      </label>
+                      <input
+                        id="dentist-username"
+                        required
+                        value={form.username}
+                        onChange={e => setForm({ ...form, username: e.target.value })}
+                        placeholder="Ej. dra.paz"
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-indigo-600 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="dentist-password" className="block text-xs font-bold text-slate-700 mb-1">
+                        Contraseña inicial
+                      </label>
+                      <input
+                        id="dentist-password"
+                        type="password"
+                        required
+                        minLength={6}
+                        value={form.password}
+                        onChange={e => setForm({ ...form, password: e.target.value })}
+                        placeholder="Mínimo 6 caracteres"
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-indigo-600 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="sm:col-span-2 lg:col-span-3 flex justify-end gap-2.5 border-t border-slate-100 pt-3">
               <button

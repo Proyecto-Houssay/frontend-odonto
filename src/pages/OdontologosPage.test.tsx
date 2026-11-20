@@ -74,6 +74,25 @@ describe('OdontologosPage', () => {
         dentists.push(created)
         return Promise.resolve(jsonResponse(created, 201))
       }
+      if (path === '/api/odontologos/alta-completa' && options?.method === 'POST') {
+        const parsed = JSON.parse(options.body || '{}')
+        const created = {
+          id: 3,
+          nombre: String(parsed.nombre || ''),
+          apellido: String(parsed.apellido || ''),
+          matricula: String(parsed.matricula || ''),
+          email: String(parsed.email || 'lmendez@novadent.com'),
+          telefono: String(parsed.telefono || '1144556677'),
+          activo: true,
+          especialidad: {
+            id: 12,
+            nombre: String(parsed.nuevaEspecialidadNombre || 'Ortodoncia'),
+            descripcion: 'Especialidad clínica',
+          },
+        }
+        dentists.push(created)
+        return Promise.resolve(jsonResponse(created, 201))
+      }
       return Promise.resolve(jsonResponse([]))
     })
 
@@ -114,5 +133,25 @@ describe('OdontologosPage', () => {
       )
     )
     expect(await screen.findByRole('heading', { name: /Dr\.\/Dra\. Valeria Paz/i })).not.toBeNull()
+
+    // Registrar odontólogo con nueva especialidad y cuenta de usuario (alta-completa)
+    fireEvent.click(screen.getByRole('button', { name: /\+ Registrar Odontólogo/i }))
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Lucas' } })
+    fireEvent.change(screen.getByLabelText('Apellido'), { target: { value: 'Méndez' } })
+    fireEvent.change(screen.getByLabelText('Matrícula profesional'), { target: { value: 'MN-7788' } })
+    fireEvent.change(screen.getByLabelText('Especialidad'), { target: { value: 'NUEVA' } })
+    fireEvent.change(screen.getByLabelText('Nombre de la nueva especialidad'), { target: { value: 'Implantología' } })
+    fireEvent.click(screen.getByLabelText('Crear cuenta de acceso (login) como Odontólogo'))
+    fireEvent.change(screen.getByLabelText('Usuario de acceso (login)'), { target: { value: 'dr.mendez' } })
+    fireEvent.change(screen.getByLabelText('Contraseña inicial'), { target: { value: 'Odonto123' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar odontólogo' }))
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/odontologos/alta-completa',
+        expect.objectContaining({ method: 'POST' })
+      )
+    )
+    expect(await screen.findByRole('heading', { name: /Dr\.\/Dra\. Lucas Méndez/i })).not.toBeNull()
   })
 })
