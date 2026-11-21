@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import {
   Activity, ArrowLeft, ArrowRight, BellPlus, CalendarDays, Check, Clock3,
   ExternalLink, Sparkles, Stethoscope, Video, X,
@@ -138,6 +138,7 @@ export function TurnosPage({ token }: { token?: string } = {}) {
   const [appointmentSaving, setAppointmentSaving] = useState(false)
   const [appointmentError, setAppointmentError] = useState('')
   const [appointmentSuccess, setAppointmentSuccess] = useState('')
+  const appointmentFormRef = useRef<HTMLFormElement | null>(null)
   const [selectedSlot, setSelectedSlot] = useState<{ fecha: string; hora: string; odontologoId: number } | null>(null)
   const [selectedPatientId, setSelectedPatientId] = useState('')
   const [bookingReason, setBookingReason] = useState('')
@@ -341,17 +342,43 @@ export function TurnosPage({ token }: { token?: string } = {}) {
     } finally { setBookingBusy(false) }
   }
 
-  const openAppointmentForm = async () => {
-    setAppointmentError('')
-    setAppointmentSuccess('')
-    setShowAppointmentForm((open) => !open)
-    if (appointmentPatients.length) return
+  const ensurePatientsLoaded = useCallback(async () => {
+    if (appointmentPatients.length > 0) return
     try {
       const foundPatients = await getJson<PatientOption[]>('/pacientes', token)
       setAppointmentPatients(Array.isArray(foundPatients) ? foundPatients : [])
     } catch (error) {
       setAppointmentError(error instanceof Error ? error.message : 'No se pudo cargar la lista de pacientes.')
     }
+  }, [appointmentPatients.length, token])
+
+  useEffect(() => {
+    if (showAppointmentForm && appointmentPatients.length === 0) {
+      void ensurePatientsLoaded()
+    }
+  }, [showAppointmentForm, appointmentPatients.length, ensurePatientsLoaded])
+
+  const openAppointmentForm = async () => {
+    setAppointmentError('')
+    setAppointmentSuccess('')
+    setShowAppointmentForm((open) => !open)
+    await ensurePatientsLoaded()
+  }
+
+  const openAppointmentFormForSlot = (slot: string) => {
+    setAppointmentError('')
+    setAppointmentSuccess('')
+    setAppointmentForm((prev) => ({
+      ...prev,
+      fecha: selectedDay,
+      hora: `${slot}:00`,
+      odontologoId: dentistFilter !== 'all' ? dentistFilter : (dentists[0] ? String(dentists[0].id) : '')
+    }))
+    setShowAppointmentForm(true)
+    void ensurePatientsLoaded()
+    window.setTimeout(() => {
+      appointmentFormRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })
+    }, 50)
   }
 
   const createAppointment = async (event: FormEvent<HTMLFormElement>) => {
@@ -375,6 +402,7 @@ export function TurnosPage({ token }: { token?: string } = {}) {
       setAppointmentSuccess('Turno presencial registrado correctamente.')
       setAppointmentForm({ pacienteId: '', odontologoId: '', fecha: dateKey(new Date()), hora: '', motivo: '' })
       setShowAppointmentForm(false)
+      await loadAgenda()
     } catch (error) {
       setAppointmentError(error instanceof Error ? error.message : 'No se pudo registrar el turno.')
     } finally {
@@ -465,6 +493,7 @@ export function TurnosPage({ token }: { token?: string } = {}) {
       )}
       {showAppointmentForm && (
         <form
+          ref={appointmentFormRef}
           onSubmit={(event) => void createAppointment(event)}
           className="grid gap-4 rounded-2xl border-2 border-[#B8AE99] bg-[#FAF5E8] p-5 shadow-md sm:grid-cols-2"
         >
@@ -978,15 +1007,7 @@ export function TurnosPage({ token }: { token?: string } = {}) {
                         </div>
                         <button
                           type="button"
-                          onClick={() => {
-                            setAppointmentForm((prev) => ({
-                              ...prev,
-                              fecha: selectedDay,
-                              hora: `${slot}:00`,
-                              odontologoId: dentistFilter !== 'all' ? dentistFilter : (dentists[0] ? String(dentists[0].id) : '')
-                            }))
-                            setShowAppointmentForm(true)
-                          }}
+                          onClick={() => openAppointmentFormForSlot(slot)}
                           className="inline-flex items-center gap-1.5 rounded-lg border-2 border-teal-700 bg-white px-3 py-1.5 text-xs font-extrabold text-teal-900 shadow-xs hover:bg-teal-100"
                         >
                           + Asignar turno
@@ -1129,15 +1150,7 @@ export function TurnosPage({ token }: { token?: string } = {}) {
                         </div>
                         <button
                           type="button"
-                          onClick={() => {
-                            setAppointmentForm((prev) => ({
-                              ...prev,
-                              fecha: selectedDay,
-                              hora: `${slot}:00`,
-                              odontologoId: dentistFilter !== 'all' ? dentistFilter : (dentists[0] ? String(dentists[0].id) : '')
-                            }))
-                            setShowAppointmentForm(true)
-                          }}
+                          onClick={() => openAppointmentFormForSlot(slot)}
                           className="inline-flex items-center gap-1.5 rounded-lg border-2 border-teal-700 bg-white px-3 py-1.5 text-xs font-extrabold text-teal-900 shadow-xs hover:bg-teal-100"
                         >
                           + Asignar turno

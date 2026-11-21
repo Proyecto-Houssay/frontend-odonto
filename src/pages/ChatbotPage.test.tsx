@@ -359,4 +359,41 @@ describe('ChatbotPage', () => {
     expect(screen.getByText(/Swiss Medical/i)).toBeInTheDocument()
     expect(screen.getByText(/Lunes a viernes de 8:00 a 20:00 hs/i)).toBeInTheDocument()
   })
+
+  it('forwards receptionist booking queries ("Quiero asignar un turno") to /api/chatbot/ask instead of intercepting with a static count', async () => {
+    mockSession.current = { token: 'reception-token', role: 'RECEPCIONISTA' }
+    fetchMock.mockImplementation((path: string) => {
+      if (path === '/api/chatbot/ask') {
+        return Promise.resolve(response({
+          respuesta: '¡Hola! Sí, mirá, tenemos estos turnos disponibles:',
+          intencion: 'turno',
+          accionesSugeridas: ['/turnos'],
+          citas: [],
+          agenda: {
+            requiereFichaPaciente: false,
+            esStaff: true,
+            doctores: [{ id: 1, nombre: 'Martino', apellido: 'Costigliolo', nombreCompleto: 'Martino Costigliolo', especialidad: 'Odontología General' }],
+            slotsDisponibles: [],
+            fechaConsultada: '2099-11-12',
+            odontologoConsultadoId: 1,
+          },
+        }))
+      }
+      if (path === '/api/pacientes') {
+        return Promise.resolve(response([{ id: 1, nombre: 'Ana', apellido: 'Nieto', dni: '44239570' }]))
+      }
+      return Promise.resolve(response([]))
+    })
+
+    render(<MemoryRouter><ChatbotPage /></MemoryRouter>)
+
+    const suggestion = screen.getByRole('button', { name: 'Quiero asignar un turno' })
+    fireEvent.click(suggestion)
+
+    expect(await screen.findByText(/¡Hola! Sí, mirá, tenemos estos turnos disponibles/i)).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith('/api/chatbot/ask', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ mensaje: 'Quiero asignar un turno' }),
+    }))
+  })
 })

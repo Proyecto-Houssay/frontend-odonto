@@ -125,6 +125,40 @@ function dateLabel(date: string) {
   })
 }
 
+function formatLocalIsoDate(dt: Date): string {
+  const y = dt.getFullYear()
+  const m = String(dt.getMonth() + 1).padStart(2, '0')
+  const d = String(dt.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function getNextClinicOpenDate(now = new Date()): string {
+  const candidate = new Date(now)
+  const day = candidate.getDay()
+  const hour = candidate.getHours()
+  if (day === 0) {
+    candidate.setDate(candidate.getDate() + 1)
+  } else if (day === 6 && hour >= 14) {
+    candidate.setDate(candidate.getDate() + 2)
+  } else if (day >= 1 && day <= 5 && hour >= 18) {
+    candidate.setDate(candidate.getDate() + (day === 5 ? 1 : 1))
+    if (candidate.getDay() === 0) {
+      candidate.setDate(candidate.getDate() + 1)
+    }
+  }
+  return formatLocalIsoDate(candidate)
+}
+
+function getNextWorkingDayAfter(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const dt = new Date(y, m - 1, d, 12, 0, 0)
+  dt.setDate(dt.getDate() + 1)
+  while (dt.getDay() === 0) {
+    dt.setDate(dt.getDate() + 1)
+  }
+  return formatLocalIsoDate(dt)
+}
+
 function getClinicHoursForDate(dateStr: string): string[] {
   if (!dateStr) return []
   const [y, m, d] = dateStr.split('-').map(Number)
@@ -242,7 +276,8 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
   const [showBooking, setShowBooking] = useState(false)
   const [bookingDoctors, setBookingDoctors] = useState<DoctorDisponible[]>([])
   const [bookingDoctorId, setBookingDoctorId] = useState('')
-  const [bookingFecha, setBookingFecha] = useState(() => new Date().toISOString().slice(0, 10))
+  const [bookingFecha, setBookingFecha] = useState(() => getNextClinicOpenDate())
+  const [autoAdvancedInitialDate, setAutoAdvancedInitialDate] = useState(false)
   const [bookingHora, setBookingHora] = useState('')
   const [bookingMotivo, setBookingMotivo] = useState('Control general')
   const [bookingSlots, setBookingSlots] = useState<TurnoSlot[]>([])
@@ -254,7 +289,7 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
   const bookingClinicHours = useMemo(() => getClinicHoursForDate(bookingFecha), [bookingFecha])
 
   useEffect(() => {
-    if (token && perfil && bookingDoctors.length === 0) {
+    if (token && !loading && (perfil || showBooking) && bookingDoctors.length === 0) {
       void apiRequest<DoctorDisponible[]>('/chatbot/doctores', { token })
         .then(docs => {
           if (Array.isArray(docs)) {
@@ -266,7 +301,13 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
         })
         .catch(() => undefined)
     }
-  }, [bookingDoctors.length, bookingDoctorId, perfil, token])
+  }, [bookingDoctors.length, bookingDoctorId, loading, perfil, showBooking, token])
+
+  useEffect(() => {
+    if (bookingDoctors.length > 0 && !bookingDoctorId) {
+      setBookingDoctorId(String(bookingDoctors[0].id))
+    }
+  }, [bookingDoctors, bookingDoctorId])
 
   useEffect(() => {
     if (showBooking && bookingDoctorId && bookingFecha) {
@@ -275,6 +316,11 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
       void apiRequest<TurnoSlot[]>(`/chatbot/turnos/disponibles?fecha=${bookingFecha}&odontologoId=${bookingDoctorId}`, { token })
         .then(slots => {
           if (Array.isArray(slots)) {
+            if (slots.length === 0 && !autoAdvancedInitialDate) {
+              setAutoAdvancedInitialDate(true)
+              setBookingFecha(prev => getNextWorkingDayAfter(prev))
+              return
+            }
             setBookingSlots(slots)
             setBookingHora(prev =>
               slots.length > 0 && !slots.some(s => s.hora.startsWith(prev))
@@ -293,7 +339,7 @@ export function PortalPaciente({ token, onLogout }: { token: string; onLogout: (
         })
         .finally(() => setLoadingSlots(false))
     }
-  }, [showBooking, bookingDoctorId, bookingFecha, token])
+  }, [showBooking, bookingDoctorId, bookingFecha, autoAdvancedInitialDate, token])
 
   async function handleSolicitarTurno(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

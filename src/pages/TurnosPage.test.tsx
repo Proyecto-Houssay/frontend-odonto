@@ -48,6 +48,15 @@ describe('staff appointments', () => {
     expect(await screen.findByRole('status')).not.toBeNull()
   })
 
+  it('loads patients and allows assigning an appointment when clicking "+ Asignar turno" on a free slot', async () => {
+    render(<TurnosPage token="staff-token" />)
+    const assignButtons = await screen.findAllByRole('button', { name: '+ Asignar turno' })
+    fireEvent.click(assignButtons[0])
+    expect(await screen.findByRole('option', { name: 'Ana Nieto' })).not.toBeNull()
+    const saveButton = screen.getByRole('button', { name: 'Guardar turno' }) as HTMLButtonElement
+    expect(saveButton.disabled).toBe(false)
+  })
+
   it('advances from January 31 to February without overflowing into March', async () => {
     render(<TurnosPage token="staff-token" />)
     fireEvent.click(await screen.findByRole('button', { name: 'Mes' }))

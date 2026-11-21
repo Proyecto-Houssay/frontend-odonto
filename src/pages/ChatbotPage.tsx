@@ -119,6 +119,7 @@ export const SUGGESTIONS_BY_ROLE: Record<UserRole, readonly string[]> = {
     '¿Cómo agregar o actualizar documentos en la base de conocimiento?',
   ],
   RECEPCIONISTA: [
+    'Quiero asignar un turno',
     '¿Qué obras sociales y horarios están vigentes?',
     '¿Qué obras sociales y prepagas atienden?',
     '¿Cuáles son los medios de pago y financiación?',
@@ -550,8 +551,11 @@ export function ChatbotPage({ compact = false }: { compact?: boolean } = {}) {
       }
     }
 
-    // Consultas operativas directas sobre datos en vivo
-    if (/\b(turnos? hoy|agenda hoy|programados hoy|turnos de hoy|agenda de hoy)\b/.test(norm) || (/\b(turnos?|agenda|programados)\b/.test(norm) && !/\b(obra|horario|precio|cobertura|requisito|disponib|sacar|reservar)\b/.test(norm))) {
+    // Consultas operativas directas sobre datos en vivo (solo consultas de estado sobre los turnos programados hoy)
+    if (
+      /\b(turnos? hoy|agenda hoy|programados hoy|turnos de hoy|agenda de hoy|programados para hoy|cuantos turnos hay hoy)\b/.test(norm) &&
+      !/\b(obra|horario|precio|cobertura|requisito|disponib|sacar|reservar|asignar|agendar|dar|otorgar|nuevo|libre|manana|lunes|martes|miercoles|jueves|viernes|sabado|doctor|odontologo|con|para)\b/.test(norm.replace(/\bpara hoy\b/g, ''))
+    ) {
       try {
         const turnos = await apiRequest<TurnoClinica[]>('/turnos', { token })
         const activos = (Array.isArray(turnos) ? turnos : []).filter(t => t.estado !== 'CANCELADO')
@@ -572,7 +576,10 @@ export function ChatbotPage({ compact = false }: { compact?: boolean } = {}) {
       }
     }
 
-    if (/\b(odontologos?|profesionales|especialidad|activos|plantel|doctores)\b/.test(norm) && !/\b(obra|horario|prepaga|cobertura|precio|turno|sacar|reservar)\b/.test(norm)) {
+    if (
+      /\b(odontologos?|profesionales|especialidad|activos|plantel|doctores)\b/.test(norm) &&
+      !/\b(obra|horario|prepaga|cobertura|precio|disponib|agenda|turno|sacar|reservar|asignar|agendar)\b/.test(norm)
+    ) {
       try {
         const dentists = await apiRequest<OdontologoResumen[]>('/odontologos', { token })
         const activos = (Array.isArray(dentists) ? dentists : []).filter(d => d.activo !== false)
