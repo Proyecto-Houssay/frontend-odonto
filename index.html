@@ -5,6 +5,17 @@
     <link rel="icon" type="image/svg+xml" href="/novadent-favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>NovaDent · Consultorio odontológico</title>
+    <script>
+      (function() {
+        try {
+          const stored = localStorage.getItem('novadent-theme');
+          const theme = stored === 'dark' || stored === 'light' ? stored : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          document.documentElement.dataset.theme = theme;
+          if (theme === 'dark') document.documentElement.classList.add('dark');
+          else document.documentElement.classList.remove('dark');
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -17,7 +17,7 @@ La rama `Braian` contiene el esqueleto navegable del dashboard de Novadent: layo
 - Autenticación real, permisos y roles persistidos.
 - Integración con API o base de datos.
 - CRUDs, informes, caja, inventario y reglas clínicas.
-- Cambios en módulos asignados a Mateo, Kevin, Josue o Iris.
+- Cambios en módulos asignados al resto del equipo.
 
 ## Organización
 
